@@ -142,7 +142,7 @@ const RecruitmentResources = () => {
               </ul>
               <div className="text-center">
                 <a
-                  href="/src/assets/bell_n_harris.pdf"
+                  href="/assets/bell_n_harris.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 bg-accent/20 hover:bg-accent/30 text-accent px-4 py-2 rounded-lg transition-colors font-medium"
@@ -171,7 +171,7 @@ const RecruitmentResources = () => {
               </ul>
               <div className="text-center">
                 <a
-                  href="/src/assets/soloman_energy.pdf"
+                  href="/assets/soloman_energy.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 bg-accent/20 hover:bg-accent/30 text-accent px-4 py-2 rounded-lg transition-colors font-medium"
