@@ -220,7 +220,7 @@ const Join = () => {
               </h2>
               <div className="flex flex-col md:flex-row gap-6 justify-center">
                 <a href="#" className="bg-accent hover:bg-accent/90 text-white font-bold py-5 px-12 rounded-lg shadow text-lg transition-colors">Interest Form</a>
-                <a href="#" className="bg-white hover:bg-accent/10 text-accent font-bold py-5 px-12 rounded-lg shadow text-lg transition-colors border border-accent">Application</a>
+                <a href="/otcr-consulting/#/apply" className="bg-white hover:bg-accent/10 text-accent font-bold py-5 px-12 rounded-lg shadow text-lg transition-colors border border-accent">Application</a>
               </div>
             </div>
           </section>
