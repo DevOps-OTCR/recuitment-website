@@ -73,13 +73,6 @@ const partners = [
     linkedin: 'https://linkedin.com/in/drew-duckler-34176a250',
     mail: 'drewmd3@illinois.edu'
   },
-  {
-    name: 'Ava Shi',
-    role: 'New Hire Development Partner',
-    img: avaImg,
-    linkedin: 'https://linkedin.com/in/ava-shi-b45b1b277',
-    mail: 'avas5@illinois.edu'
-  },
 ];
 
 const Leadership = () => {
