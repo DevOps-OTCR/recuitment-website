@@ -164,7 +164,7 @@ const Leadership = () => {
               <FadeContent key={idx} delay={idx * 0.1}>
                 <div className="professional-card rounded-2xl overflow-hidden flex flex-col group ">
                   {partner.img ? (
-                    <img src={partner.img} alt={partner.name} className="w-full h-64 object-cover object-center group-hover:scale-110 transition-transform duration-300" />
+                    <img src={partner.img} alt={partner.name} className="w-full h-64 object-cover object-top group-hover:scale-110 transition-transform duration-300" />
                   ) : (
                     <div className="w-full h-64 bg-navy-light flex items-center justify-center text-4xl text-teal-primary group-hover:text-teal-light transition-colors duration-300">
                       <div className="w-16 h-16 rounded-full bg-teal-primary/20 flex items-center justify-center">
