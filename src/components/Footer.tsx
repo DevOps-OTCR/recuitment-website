@@ -4,13 +4,13 @@ import FadeContent from '@/reactbits/animations/FadeContent/FadeContent';
 const Footer = () => {
   const footerLinks = {
     about: [
-      { label: 'Our Story', href: '/about' },
-      { label: 'Our Team', href: '/about' },
-      { label: 'After OTCR', href: '/about' }
+      { label: 'Our Story', href: '/#/about' },
+      { label: 'Our Team', href: '/#/leadership' },
+      { label: 'After OTCR', href: '/#/leadership' }
     ],
     join: [
-      { label: 'Apply Now', href: '/join' },
-      { label: 'Application Process', href: '/join' }
+      { label: 'Apply Now', href: '/#/apply' },
+      { label: 'Application Process', href: '/#/join' }
     ]
   };
 
