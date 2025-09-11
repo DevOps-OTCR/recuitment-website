@@ -7,7 +7,7 @@ import ScrollReveal from '@/reactbits/textanimations/ScrollReveal/ScrollReveal';
 import FadeContent from '@/reactbits/animations/FadeContent/FadeContent';
 import AnimatedContent from '@/reactbits/animations/AnimatedContent/AnimatedContent';
 import SplitText from '@/reactbits/textanimations/SplitText/SplitText';
-import teamEventsImg from '/src/assets/team_events.JPG';
+import teamEventsImg from '/src/assets/team_events.png';
 import awardsImg from '/src/assets/awards.png';
 import chicagoSkyline from '/src/assets/chicago_skyline.png';
 import teamEvents from '/src/assets/team_events.png';
