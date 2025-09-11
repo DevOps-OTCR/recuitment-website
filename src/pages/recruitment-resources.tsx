@@ -49,11 +49,11 @@ const RecruitmentResources = () => {
             <div className="animate-fade-in-up">
               <h3 className="text-2xl font-bold mb-4 text-teal-primary">Round 1 Interview</h3>
               <p className="text-lg text-white/85 leading-relaxed">
-                <b>Consulting:</b> First round interviews will be split into two portions, a behavioral section and a case interview. The case interview will be interviewer led, and candidates will be evaluated on their problem solving and critical thinking skills. Candidates can expect a market sizing question, such as "How many t-shirts are sold in New York City?", within the business strategy problem they will be looking into.
+                <b>Consulting:</b><br></br>First round interviews will be split into two portions, a behavioral section and a case interview. The case interview will be interviewer led, and candidates will be evaluated on their problem solving and critical thinking skills. Candidates can expect a market sizing question, such as "How many t-shirts are sold in New York City?", within the business strategy problem they will be looking into.
               </p>
               <br />
               <p className="text-lg text-white/85 leading-relaxed">
-                <b>Dev Ops:</b> First round interviews will bea behavioral interview with a few technical questions. The technical interview will be based on basic tech stack and programming languages, and candidates will be evaluated on their knowledge and proficiency.
+                <b>Dev Ops:</b><br></br> First round interviews will bea behavioral interview with a few technical questions. The technical interview will be based on basic tech stack and programming languages, and candidates will be evaluated on their knowledge and proficiency.
               </p>
             </div>
           </div>
@@ -73,11 +73,11 @@ const RecruitmentResources = () => {
             <div className="animate-fade-in-up">
               <h3 className="text-2xl font-bold mb-4 text-cyan-accent">Round 2 Interview</h3>
               <p className="text-lg text-white/85 leading-relaxed">
-                <b>Consulting: </b>Second round interviews are more focused on the traditional case interview, which will be interviewee led. We look for the ability to break down a problem into manageable and understandable pieces, draw concise conclusions from available data, and engage in a focused conversation with the interviewer. Candidates will develop a strategy to solve a business question, such as determining the cause and proposing a recommendation for declining profits.
+                <b>Consulting: </b><br></br>Second round interviews are more focused on the traditional case interview, which will be interviewee led. We look for the ability to break down a problem into manageable and understandable pieces, draw concise conclusions from available data, and engage in a focused conversation with the interviewer. Candidates will develop a strategy to solve a business question, such as determining the cause and proposing a recommendation for declining profits.
               </p>
               <br />
               <p className="text-lg text-white/85 leading-relaxed">
-                <b>Dev Ops: </b>Second round interviews are more focused on the traditional coding interview, which will be interviewer led. We look for the ability to break down a tech problem into small easy to code pieces, program small mockups based on requiremtns, and work with LLM's to bring the idea to life. Candidates will develop a small part of a project to solve a real life problem, such as creating a internal dashboard of a company.
+                <b>Dev Ops: </b><br></br>Second round interviews are more focused on the traditional coding interview, which will be interviewer led. We look for the ability to break down a tech problem into small easy to code pieces, program small mockups based on requiremtns, and work with LLM's to bring the idea to life. Candidates will develop a small part of a project to solve a real life problem, such as creating a internal dashboard of a company.
               </p>
             </div>
           </div>
