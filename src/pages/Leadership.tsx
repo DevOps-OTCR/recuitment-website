@@ -26,7 +26,7 @@ const partners = [
   },
   {
     name: 'Sidhaartha Venkatesh',
-    role: 'Sourcing Partner',
+    role: 'Executive Partner',
     img: sidhaarthaImg,
     linkedin: 'https://linkedin.com/in/siddhaartav',
     mail: 'sv39@illinois.edu'
@@ -93,12 +93,6 @@ const Leadership = () => {
         </div>
 
         <div className="w-full flex flex-col items-center relative z-10 px-6">
-          <FadeContent delay={0.3}>
-            <div className="inline-flex items-center gap-2 bg-teal-primary/10 border border-teal-primary/20 rounded-full px-6 py-3 mb-8 backdrop-blur-sm">
-              <div className="w-2 h-2 bg-teal-primary rounded-full animate-pulse"></div>
-              <span className="text-sm font-medium text-teal-primary">Our Leadership Team</span>
-            </div>
-          </FadeContent>
 
           <SplitText
             text="Lead by Mission-Driven People"

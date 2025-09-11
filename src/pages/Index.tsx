@@ -14,6 +14,12 @@ const clients = [
   { name: "BP", logo: "https://logos-world.net/wp-content/uploads/2020/08/BP-Logo.png" },
   { name: "Chegg", logo: "https://logos-world.net/wp-content/uploads/2023/08/Chegg-Logo.png" },
   { name: "Salesforce", logo: "https://upload.wikimedia.org/wikipedia/commons/f/f9/Salesforce.com_logo.svg" },
+  {name: "Google", logo: "https://upload.wikimedia.org/wikipedia/commons/4/4a/Logo_2013_Google.png"},
+  { name: "Chegg", logo: "https://brandfetch.com/chegg.com?view=library&library=default&collection=logos&asset=idCW-o5U72&utm_source=https%253A%252F%252Fbrandfetch.com%252Fchegg.com&utm_medium=copyAction&utm_campaign=brandPageReferral"},
+  { name: "Reddit", logo: "https://brandfetch.com/reddit.com?view=library&library=default&collection=logos&asset=idK9aareEO&utm_source=https%253A%252F%252Fbrandfetch.com%252Freddit.com&utm_medium=copyAction&utm_campaign=brandPageReferral"},
+  { name: "Morningstar", logo: "https://brandfetch.com/morningstar.com?view=library&library=default&collection=logos&asset=id6nqMKYC-&utm_source=https%253A%252F%252Fbrandfetch.com%252Fmorningstar.com&utm_medium=copyAction&utm_campaign=brandPageReferral"},
+  { name: "Accenture", logo: "https://brandfetch.com/accenture.com?view=library&library=default&collection=logos&asset=id4vRrAYpl&utm_source=https%253A%252F%252Fbrandfetch.com%252Faccenture.com&utm_medium=copyAction&utm_campaign=brandPageReferral"},
+  { name: "Chicago Cubs", logo: "https://brandfetch.com/cubs.com?view=library&library=default&collection=logos&asset=idP8dT99kG&utm_source=https%253A%252F%252Fbrandfetch.com%252Fcubs.com&utm_medium=copyAction&utm_campaign=brandPageReferral"},
 ];
 
 const Index = () => {
