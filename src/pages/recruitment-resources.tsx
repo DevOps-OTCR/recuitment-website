@@ -212,7 +212,7 @@ const RecruitmentResources = () => {
                     <h3 className="text-lg font-bold text-white">Case Interview Fundamentals</h3>
                   </div>
                   <p className="text-white/80 text-sm mb-4">Learn the basics of structuring and solving case interviews with this comprehensive guide.</p>
-                  <a href="#" className="text-teal-primary hover:text-cyan-accent text-sm font-medium">Watch Video →</a>
+                  <a href="https://www.youtube.com/watch?v=FFQ_4FxXMm0&list=PLV4GapePqKHUfZXY6p804QJfo_ixPoEOt" className="text-teal-primary hover:text-cyan-accent text-sm font-medium">Watch Video →</a>
                 </div>
             </div>
         </div>

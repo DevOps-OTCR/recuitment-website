@@ -6,7 +6,6 @@ const Footer = () => {
     about: [
       { label: 'Our Story', href: '/#/about' },
       { label: 'Our Team', href: '/#/leadership' },
-      { label: 'After OTCR', href: '/#/leadership' }
     ],
     join: [
       { label: 'Apply Now', href: '/#/apply' },

@@ -73,7 +73,7 @@ const HeroSection = () => {
               <Button
                 size="lg"
                 className="relative bg-gradient-to-r from-teal-primary to-blue-accent hover:from-teal-light hover:to-blue-light text-white px-10 py-4 text-lg font-semibold transition-all duration-300 hover:scale-105 shadow-2xl hover:shadow-teal-primary/25 group overflow-hidden"
-                onClick={() => window.location.href = '/apply'}
+                onClick={() => window.location.href = '/#/apply'}
               >
                 <span className="relative z-10">Apply Now</span>
                 <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
@@ -82,7 +82,7 @@ const HeroSection = () => {
                 variant="outline"
                 size="lg"
                 className="relative border-2 border-white/50 text-white hover:bg-white/10 hover:border-white hover:text-white px-10 py-4 text-lg font-semibold transition-all duration-300 hover:scale-105 shadow-2xl backdrop-blur-sm group"
-                onClick={() => window.location.href = '/about'}
+                onClick={() => window.location.href = '/#/about'}
               >
                 <span className="relative z-10">About Us</span>
                 <div className="absolute inset-0 bg-gradient-to-r from-teal-primary/10 to-blue-accent/10 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
