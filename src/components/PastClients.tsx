@@ -41,9 +41,9 @@ const PastClients = () => {
     // Tech Giants - Using brand-official colors
     { name: 'Microsoft', logo: 'https://upload.wikimedia.org/wikipedia/commons/9/96/Microsoft_logo_%282012%29.svg' },
     { name: 'Google', logo: 'https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg' },
-    { name: 'Apple', logo: 'https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg' },
-    { name: 'Amazon', logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg' },
-    { name: 'Meta', logo: 'https://upload.wikimedia.org/wikipedia/commons/7/7b/Meta_Platforms_Inc._logo.svg' },
+    { name: 'Apple', logo: 'https://cdn.brandfetch.io/idnrCPuv87/theme/light/logo.svg?c=1bxid64Mup7aczewSAYMX&t=1729268375420' },
+    { name: 'Amazon', logo: 'https://cdn.brandfetch.io/idawOgYOsG/theme/light/logo.svg?c=1bxid64Mup7aczewSAYMX&t=1747149760643' },
+    { name: 'Meta', logo: 'https://cdn.brandfetch.io/idWvz5T3V7/theme/light/logo.svg?c=1bxid64Mup7aczewSAYMX&t=1677088245181' },
     { name: 'Netflix', logo: 'https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg' },
     { name: 'Tesla', logo: 'https://upload.wikimedia.org/wikipedia/commons/b/bb/Tesla_T_symbol.svg' },
     { name: 'Spotify', logo: 'https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg' },
@@ -61,7 +61,7 @@ const PastClients = () => {
     { name: 'KPMG', logo: 'https://logos-world.net/wp-content/uploads/2022/08/KPMG-Logo.png' },
     // Financial Services
     { name: 'Goldman Sachs', logo: 'https://logos-world.net/wp-content/uploads/2020/10/Goldman-Sachs-Logo.png' },
-    { name: 'JPMorgan Chase', logo: 'https://logos-world.net/wp-content/uploads/2021/04/JPMorgan-Chase-Logo.png' },
+    { name: 'JPMorgan Chase', logo: 'https://cdn.brandfetch.io/idB8rdGiLv/theme/light/logo.svg?c=1bxid64Mup7aczewSAYMX&t=1727703989354' },
     { name: 'Morgan Stanley', logo: 'https://cdn.brandfetch.io/idBGtJQnXa/theme/light/logo.svg?c=1bxid64Mup7aczewSAYMX&t=1681205442663' },
     // Additional Companies
     { name: 'Salesforce', logo: 'https://upload.wikimedia.org/wikipedia/commons/f/f9/Salesforce.com_logo.svg' },
