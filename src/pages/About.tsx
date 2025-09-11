@@ -10,7 +10,7 @@ import SplitText from '@/reactbits/textanimations/SplitText/SplitText';
 import teamEventsImg from '/src/assets/team_events.JPG';
 import awardsImg from '/src/assets/awards.png';
 import chicagoSkyline from '/src/assets/chicago_skyline.png';
-import teamEvents from '/src/assets/team_events.JPG';
+import teamEvents from '/src/assets/team_events.png';
 import awards from '/src/assets/awards.png';
 import team from '/src/assets/team.png';
 
