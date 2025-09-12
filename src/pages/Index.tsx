@@ -14,6 +14,11 @@ const clients = [
   { name: "BP", logo: "https://logos-world.net/wp-content/uploads/2020/08/BP-Logo.png" },
   { name: "Chegg", logo: "https://logos-world.net/wp-content/uploads/2023/08/Chegg-Logo.png" },
   { name: "Salesforce", logo: "https://upload.wikimedia.org/wikipedia/commons/f/f9/Salesforce.com_logo.svg" },
+  { name: "Google", logo: "https://upload.wikimedia.org/wikipedia/commons/4/4a/Logo_2013_Google.png"},
+  { name: "Reddit", logo: "https://cdn.brandfetch.io/idkKwm0IT0/theme/dark/logo.svg?c=1bxid64Mup7aczewSAYMX&t=1721371498085"},
+  { name: "Morningstar", logo: "https://cdn.brandfetch.io/idqGU16uAt/theme/dark/logo.svg?c=1bxid64Mup7aczewSAYMX&t=1667897315961"},
+  { name: "Accenture", logo: "https://cdn.brandfetch.io/id44tJQbVE/theme/dark/logo.svg?c=1bxid64Mup7aczewSAYMX&t=1667564496635"},
+  { name: "Chicago Cubs", logo: "https://cdn.brandfetch.io/idRRo1C-Pw/theme/dark/logo.svg?c=1bxid64Mup7aczewSAYMX&t=1756338618356"},
 ];
 
 const Index = () => {
@@ -158,7 +163,7 @@ const Index = () => {
             <FadeContent delay={0.1}>
               <div className="inline-flex items-center gap-2 bg-gradient-to-r from-teal-primary/10 to-blue-accent/10 border border-teal-primary/20 rounded-full px-6 py-3 mb-6 backdrop-blur-sm">
                 <div className="w-2 h-2 bg-gradient-to-r from-teal-primary to-blue-accent rounded-full animate-pulse" />
-                <span className="text-sm font-medium text-transparent bg-clip-text bg-gradient-to-r from-teal-primary to-blue-accent">
+                <span className="text-sm font-medium bg-clip-text bg-gradient-to-r from-teal-primary to-blue-accent">
                   Join Our Team
                 </span>
               </div>

@@ -50,9 +50,8 @@ const InfiniteScrollLogos: React.FC<InfiniteScrollLogosProps> = ({
   className = ""
 }) => {
   // Split into three rows for variety
-  const row1 = clients.slice(0, Math.ceil(clients.length / 3));
-  const row2 = clients.slice(Math.ceil(clients.length / 3), Math.ceil(clients.length * 2 / 3));
-  const row3 = clients.slice(Math.ceil(clients.length * 2 / 3));
+  const row1 = clients.slice(0, Math.ceil(clients.length / 2));
+  const row2 = clients.slice(Math.ceil(clients.length / 2), Math.ceil(clients.length));
 
   return (
     <>
