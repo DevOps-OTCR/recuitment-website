@@ -25,7 +25,7 @@ const partners = [
     mail: 'awasthi8@illinois.edu'
   },
   {
-    name: 'Sidhaartha Venkatesh',
+    name: 'Siddhaarta Venkatesh',
     role: 'Executive Partner',
     img: sidhaarthaImg,
     linkedin: 'https://linkedin.com/in/siddhaartav',
