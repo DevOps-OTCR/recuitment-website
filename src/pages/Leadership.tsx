@@ -46,13 +46,6 @@ const partners = [
     mail: 'stutib3@illinois.edu'
   },
   {
-    name: 'Adam El Bahey',
-    role: 'Social Partner',
-    img: adamImg,
-    linkedin: 'https://linkedin.com/in/adam-el-bahey-64a791209',
-    mail: 'elbahey2@illinois.edu'
-  },
-  {
     name: 'Laksh Sharma',
     role: 'Tech Partner',
     img: lakshImg,
