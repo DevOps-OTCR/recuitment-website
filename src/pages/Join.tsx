@@ -1,6 +1,6 @@
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
-import { ArrowRight, CheckCircle, FileText, Phone, Briefcase, PartyPopper, ArrowDown } from 'lucide-react';
+import { ArrowRight, FileText, Phone, Briefcase, PartyPopper, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import React from 'react';
@@ -8,13 +8,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import FadeContent from '@/reactbits/animations/FadeContent/FadeContent';
 import chicagoSkyline from '/src/assets/chicago_skyline.png';
 import SplitText from '@/reactbits/textanimations/SplitText/SplitText';
-
-const benefits = [
-  "Work directly with Fortune 500 companies and innovative startups",
-  "Develop critical business analysis and strategic thinking skills",
-  "Build your professional portfolio with meaningful accomplishments",
-  "Connect with industry professionals and like-minded peers"
-];
 
 const Join = () => {
   return (
@@ -53,25 +46,6 @@ const Join = () => {
 
       <section className="py-24 bg-background">
         <div className="section-container">
-          <div className="mb-24">
-            <div className="text-center mb-16">
-              <h3 className="text-4xl font-bold text-accent mb-6">Why Join OTCR?</h3>
-              <p className="text-xl text-muted-foreground max-w-3xl mx-auto">Discover the benefits of joining our elite consulting team</p>
-            </div>
-            <div className="max-w-4xl mx-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {benefits.map((benefit, index) => (
-                  <div key={index} className="professional-card p-6 text-center">
-                    <div className="w-12 h-12 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <CheckCircle className="w-6 h-6 text-accent" />
-                    </div>
-                    <span className="text-white text-lg block">{benefit}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
           <div className="text-center mb-16">
             <h3 className="text-4xl font-extrabold text-white mb-6">Application Process</h3>
             <p className="text-xl text-white/85 max-w-3xl mx-auto">Follow our structured recruitment timeline to join our team</p>
