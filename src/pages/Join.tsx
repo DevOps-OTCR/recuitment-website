@@ -166,16 +166,12 @@ const Join = () => {
           </section>
           */}
 
-          {/* --- INTEREST FORM & APPLICATION CTA --- */}
+          {/* --- APPLICATION CTA --- */}
           <section className="mt-32 mb-24">
             <div className="relative bg-card rounded-2xl flex flex-col items-center justify-center py-16 px-6 lg:px-8 text-center border border-border">
-              <h2 className="text-3xl md:text-4xl font-extrabold text-white mb-10 max-w-3xl">
-                Fill out our interest form to stay informed about upcoming events, or start working on your application!
+              <h2 className="text-3xl md:text-4xl font-extrabold text-white max-w-3xl">
+                Ready to <a href="/#/apply" className="text-accent hover:text-accent/80 underline underline-offset-4 transition-colors">apply</a>?
               </h2>
-              <div className="flex flex-col md:flex-row gap-6 justify-center">
-                <a href="https://docs.google.com/forms/d/e/1FAIpQLSci6UG2bIJP4G36TDTlZ1IWg2GkAF_WaUk1uzh_ibmnkDohiw/viewform" target="_blank" rel="noopener noreferrer" className="bg-accent hover:bg-accent/90 text-white font-bold py-5 px-12 rounded-lg shadow text-lg transition-colors">Interest Form</a>
-                <a href="/#/apply" className="bg-white hover:bg-accent/10 text-accent font-bold py-5 px-12 rounded-lg shadow text-lg transition-colors border border-accent">Application (Releases Jan 16th)</a>
-              </div>
             </div>
           </section>
 
