@@ -2,9 +2,10 @@ import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { ArrowDown } from 'lucide-react';
-import chicagoSkyline from '/src/assets/chicago_skyline.png';
 import FadeContent from '@/reactbits/animations/FadeContent/FadeContent';
 import SplitText from '@/reactbits/textanimations/SplitText/SplitText';
+
+const chicagoSkyline = new URL('../assets/chicago_skyline.png', import.meta.url).href;
 
 const Apply = () => {
   return (
@@ -51,7 +52,7 @@ const Apply = () => {
               Applications for the Spring 2026 cycle will open on <strong>Jan 16th</strong>.
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <a
                 href="https://docs.google.com/forms/d/e/1FAIpQLSci6UG2bIJP4G36TDTlZ1IWg2GkAF_WaUk1uzh_ibmnkDohiw/viewform"
                 target="_blank"
@@ -59,24 +60,19 @@ const Apply = () => {
               >
                 <Button
                   size="lg"
-                  className="bg-teal-primary hover:bg-teal-light text-white px-8 py-4 text-lg font-semibold hover-scale shadow-lg"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-4 text-base font-medium hover-scale"
                 >
                   Interest Form
                 </Button>
               </a>
+
               <Button
                 size="lg"
-                className="bg-teal-primary hover:bg-teal-light text-white px-8 py-4 text-lg font-semibold hover-scale shadow-lg"
+                variant="outline"
+                className="border-white/30 text-white/80 hover:bg-white/10 hover:text-white px-6 py-4 text-base font-medium hover-scale"
               >
                 Consultant Application
               </Button>
-              <Button
-                size="lg"
-                className="bg-teal-primary hover:bg-teal-light text-white px-8 py-4 text-lg font-semibold hover-scale shadow-lg"
-              >
-                Tech Application
-              </Button>
-
             </div>
           </div>
         </div>

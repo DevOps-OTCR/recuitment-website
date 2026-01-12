@@ -5,66 +5,72 @@ import ScrollReveal from '@/reactbits/textanimations/ScrollReveal/ScrollReveal';
 import FadeContent from '@/reactbits/animations/FadeContent/FadeContent';
 import SplitText from '@/reactbits/textanimations/SplitText/SplitText';
 
-import atharvaImg from '/src/assets/atharva.png';
-import sidhaarthaImg from '/src/assets/sidhaartha.png';
-import stutiImg from '/src/assets/stuti.png';
-import adamImg from '/src/assets/adam.png';
-import drewImg from '/src/assets/drew.png';
-import avaImg from '/src/assets/ava.png';
-import lakshImg from '/src/assets/laksh.png';
-import jonImg from '/src/assets/jon.png';
-import samImg from '/src/assets/sam.png';
+import atharvaImg from '/src/assets/atharva_sindwani.jpeg';
+import lakshImg from '/src/assets/laksh.jpeg';
+import isaiahImg from '/src/assets/Isaiah.jpeg';
+import aaronImg from '/src/assets/aaron.jpeg';
+import swarnikaImg from '/src/assets/swarnika.jpeg';
+import isabellaImg from '/src/assets/Isabella.jpeg';
+import adeetyaImg from '/src/assets/adeetya.jpeg';
+import mihikaImg from '/src/assets/mihika.jpeg';
 import chicagoSkyline from '/src/assets/chicago_skyline.png';
 
 const partners = [
   {
-    name: 'Atharva Awasthi',
+    name: 'Aaron Poetzel',
     role: 'Internal Operations Partner',
-    img: atharvaImg,
-    linkedin: 'https://linkedin.com/in/atharvaawasthi',
-    mail: 'awasthi8@illinois.edu'
-  },
-  {
-    name: 'Siddhaarta Venkatesh',
-    role: 'Executive Partner',
-    img: sidhaarthaImg,
-    linkedin: 'https://linkedin.com/in/siddhaartav',
-    mail: 'sv39@illinois.edu'
-  },
-  {
-    name: 'Sam Birdsley',
-    role: 'Project Excellence Partner',
-    img: samImg,
-    linkedin: 'https://linkedin.com/in/sam-birdsley-189655248',
-    mail: 'samuel36@illinois.edu'
-  },
-  {
-    name: 'Stuti Bhatia',
-    role: 'Alumni Relations Partner',
-    img: stutiImg,
-    linkedin: 'https://linkedin.com/in/stuti-bhatia',
-    mail: 'stutib3@illinois.edu'
+    img: aaronImg,
+    linkedin: 'https://www.linkedin.com/in/aaron-poetzel/',
+    mail: 'poetzel3@illinois.edu'
   },
   {
     name: 'Laksh Sharma',
-    role: 'Tech Partner',
+    role: 'Executive Partner',
     img: lakshImg,
     linkedin: 'https://linkedin.com/in/laksh-sharma-690b6a298',
     mail: 'lsharma2@illinois.edu'
   },
   {
-    name: 'Jon Han',
-    role: 'Professional Development Partner',
-    img: jonImg,
-    linkedin: 'https://linkedin.com/in/hanjon',
-    mail: 'jonhan2@illinois.edu'
+    name: 'Isaiah Ketedji',
+    role: 'Project Excellence Partner',
+    img: isaiahImg,
+    linkedin: 'https://www.linkedin.com/in/isaiah-ketedji-57247824a/',
+    mail: 'ketedji2@illinois.edu'
   },
   {
-    name: 'Drew Duckler',
-    role: 'Career Placement Partner',
-    img: drewImg,
-    linkedin: 'https://linkedin.com/in/drew-duckler-34176a250',
-    mail: 'drewmd3@illinois.edu'
+    name: 'Swarnika Bhardwaj',
+    role: 'Corporate Affairs Partner',
+    img: swarnikaImg,
+    linkedin: 'https://www.linkedin.com/in/swarnika-bhardwaj31/',
+    mail: 'sb113@illinois.edu'
+  },
+  {
+    name: 'Atharva Sindwani',
+    role: 'Professional Development Partner',
+    img: atharvaImg,
+    linkedin: 'https://www.linkedin.com/in/atharva-sindwani-686b292a7/',
+    mail: 'as203@illinois.edu'
+  },
+  {
+    name: 'Isabella Watson',
+    role: 'Alumni Relations Partner',
+    img: isabellaImg,
+    linkedin: 'https://www.linkedin.com/in/isabella-watson-353038270/',
+    mail: 'iwatson3@illinois.edu'
+  },
+  {
+    name: 'Adeetya Upadhyay',
+    role: 'Technology Partner',
+    img: adeetyaImg,
+    linkedin: 'https://www.linkedin.com/in/adeetya-upadhyay/',
+    mail: 'adeeu2@illinois.edu'
+  },
+  {
+    name: 'Mihika Hemrajani',
+    role: 'Social Partner',
+    img: mihikaImg,
+    linkedin: 'https://www.linkedin.com/in/mihika-hemrajani/',
+    mail: 'mihikah2@illinois.edu'
   },
 ];
 
@@ -151,7 +157,15 @@ const Leadership = () => {
               <FadeContent key={idx} delay={idx * 0.1}>
                 <div className="professional-card rounded-2xl overflow-hidden flex flex-col group ">
                   {partner.img ? (
-                    <img src={partner.img} alt={partner.name} className="w-full h-64 object-cover object-center group-hover:scale-110 transition-transform duration-300" />
+                    <img 
+                      src={partner.img} 
+                      alt={partner.name} 
+                      className={`w-full h-64 object-cover ${
+                        partner.name === 'Atharva Sindwani' ? 'object-bottom' : 
+                        partner.name === 'Isabella Watson' || partner.name === 'Adeetya Upadhyay' ? 'object-center' : 
+                        'object-top'
+                      } group-hover:scale-110 transition-transform duration-300`} 
+                    />
                   ) : (
                     <div className="w-full h-64 bg-navy-light flex items-center justify-center text-4xl text-teal-primary group-hover:text-teal-light transition-colors duration-300">
                       <div className="w-16 h-16 rounded-full bg-teal-primary/20 flex items-center justify-center">
