@@ -57,18 +57,8 @@ const Join = () => {
               {/* Timeline events */}
               {[
                 {
-                  title: 'Quad Day',
-                  date: 'Aug 24',
-                  description: (
-                    <>
-                      Meet us at Quad Day to learn about OTCR and our upcoming events.<br />
-                      Stop by our booth on the Main Quad!
-                    </>
-                  ),
-                },
-                {
-                  title: 'Info Night',
-                  date: 'Aug 28',
+                  title: 'Info Night 1',
+                  date: 'Jan 22',
                   description: (
                     <>
                       Learn more about us and our recruitment process.<br />
@@ -77,25 +67,15 @@ const Join = () => {
                   ),
                 },
                 {
-                  title: 'First Application Deadline',
-                  date: 'Aug 29',
+                  title: 'Cycle 1 Application Deadline',
+                  date: 'Jan 23',
                   description: (
                     <>Submit your application by this deadline. All applications will be evaluated equally regardless of cycle.</>
                   ),
                 },
                 {
-                  title: 'OTCR Q&A',
-                  date: 'Sept 2',
-                  description: (
-                    <>
-                      Ask questions about OTCR, our culture, and the application process.<br />
-                      Perfect opportunity to get all your questions answered!
-                    </>
-                  ),
-                },
-                {
                   title: 'Info Night 2',
-                  date: 'Sept 3',
+                  date: 'Jan 28',
                   description: (
                     <>
                       Second info night for those who missed the first one.<br />
@@ -104,18 +84,18 @@ const Join = () => {
                   ),
                 },
                 {
-                  title: 'Case Training + Meet and Greet / Dev ops Training',
-                  date: 'Sept 4',
+                  title: 'Case Training + Meet and Greet',
+                  date: 'Jan 29',
                   description: (
                     <>
-                      Learn about our case and coding interviews and get to know members of the firm afterwards.<br />
+                      Learn about our case interviews and get to know members of the firm afterwards.<br />
                       Dress Code: Business Casual
                     </>
                   ),
                 },
                 {
-                  title: 'Second Deadline',
-                  date: 'Sept 5',
+                  title: 'Cycle 2 Application Deadline',
+                  date: 'Jan 30',
                   description: (
                     <>Final deadline to submit your membership application. All applications will be evaluated equally regardless of cycle.</>
                   ),
@@ -193,8 +173,8 @@ const Join = () => {
                 Fill out our interest form to stay informed about upcoming events, or start working on your application!
               </h2>
               <div className="flex flex-col md:flex-row gap-6 justify-center">
-                <a href="#" className="bg-accent hover:bg-accent/90 text-white font-bold py-5 px-12 rounded-lg shadow text-lg transition-colors">Interest Form</a>
-                <a href="/#/apply" className="bg-white hover:bg-accent/10 text-accent font-bold py-5 px-12 rounded-lg shadow text-lg transition-colors border border-accent">Application</a>
+                <a href="https://docs.google.com/forms/d/e/1FAIpQLSci6UG2bIJP4G36TDTlZ1IWg2GkAF_WaUk1uzh_ibmnkDohiw/viewform" target="_blank" rel="noopener noreferrer" className="bg-accent hover:bg-accent/90 text-white font-bold py-5 px-12 rounded-lg shadow text-lg transition-colors">Interest Form</a>
+                <a href="/#/apply" className="bg-white hover:bg-accent/10 text-accent font-bold py-5 px-12 rounded-lg shadow text-lg transition-colors border border-accent">Application (Releases Jan 16th)</a>
               </div>
             </div>
           </section>
