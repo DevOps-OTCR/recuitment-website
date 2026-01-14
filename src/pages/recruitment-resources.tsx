@@ -150,20 +150,20 @@ const RecruitmentResources = () => {
               <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-accent" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/>
                   </svg>
                 </div>
-                <h3 className="text-xl font-bold text-accent mb-4">Soloman Energy Case</h3>
+                <h3 className="text-xl font-bold text-accent mb-4">May Pharmaceuticals Case</h3>
               </div>
-              <p className="text-muted-foreground mb-4 text-center">An energy sector case study focusing on market entry strategies and operational optimization challenges.</p>
+              <p className="text-muted-foreground mb-4 text-center">A biopharmaceuticals case study examining declining profits at a cardiovascular drug market leader.</p>
               <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1 mb-6">
-                <li>Assess market attractiveness</li>
+                <li>Analyze revenue and cost drivers</li>
                 <li>Evaluate competitive landscape</li>
-                <li>Develop entry strategy</li>
+                <li>Propose profit recovery strategy</li>
               </ul>
               <div className="text-center">
                 <a
-                  href="/assets/soloman_energy.pdf"
+                  href="/assets/may-pharmaceuticals-case1.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 bg-accent/20 hover:bg-accent/30 text-accent px-4 py-2 rounded-lg transition-colors font-medium"
