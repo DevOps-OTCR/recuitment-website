@@ -207,6 +207,10 @@ const Join = () => {
                   {
                     q: "How can I prepare more for interviews?",
                     a: "Please utilize our practice cases down below and visit our case training! We will have some excellent tips to get you started."
+                  },
+                  {
+                    q: "Is there a difference between Cycle 1 and Cycle 2?",
+                    a: "All applications are evaluated equally regardless of which cycle you apply in. The two cycles exist to give applicants more flexibility with their schedules."
                   }
                 ],
                 [
