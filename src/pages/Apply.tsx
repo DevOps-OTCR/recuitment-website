@@ -48,11 +48,20 @@ const Apply = () => {
             <h2 className="text-4xl lg:text-5xl font-extrabold text-white mb-8">
               Fill out our interest form to stay informed about upcoming events, or start working on your application!
             </h2>
-            <p className="text-xl text-white/90 mb-12 max-w-3xl mx-auto">
-              Applications for the Spring 2026 cycle will open on <strong>Jan 16th</strong>.
-            </p>
-            
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <a
+                href="https://docs.google.com/forms/d/e/1FAIpQLSd9imBmn6u_4MKFTn4ZD5lzQkMQQzDkCsdaKQTgS-nZFq4VnQ/viewform"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button
+                  size="lg"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-4 text-base font-medium hover-scale"
+                >
+                  Consultant Application
+                </Button>
+              </a>
+
               <a
                 href="https://docs.google.com/forms/d/e/1FAIpQLSci6UG2bIJP4G36TDTlZ1IWg2GkAF_WaUk1uzh_ibmnkDohiw/viewform"
                 target="_blank"
@@ -65,14 +74,6 @@ const Apply = () => {
                   Interest Form
                 </Button>
               </a>
-
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-white/30 text-white/80 hover:bg-white/10 hover:text-white px-6 py-4 text-base font-medium hover-scale"
-              >
-                Consultant Application
-              </Button>
             </div>
           </div>
         </div>
