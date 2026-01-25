@@ -236,26 +236,9 @@ def _get_admin_secret() -> str:
     return password
 
 
-@router.get("/debug/test-admin")
-async def debug_test_admin(x_admin_secret: str = Header(None, alias="X-Admin-Secret")):
-    """Debug endpoint to test admin header (remove in production)."""
-    expected = _get_admin_secret()
-    return {
-        "received_header": x_admin_secret,
-        "header_length": len(x_admin_secret) if x_admin_secret else 0,
-        "expected_length": len(expected),
-        "match": x_admin_secret == expected if x_admin_secret else False,
-        "expected_prefix": expected[:10] if expected else "None",
-        "received_prefix": x_admin_secret[:10] if x_admin_secret else "None",
-    }
-
-
 def verify_admin_secret(x_admin_secret: str = Header(..., alias="X-Admin-Secret")):
     """Verify admin secret header."""
     expected = _get_admin_secret()
-    # Debug logging (remove in production)
-    print(f"DEBUG - Expected secret: {expected[:10]}... (length: {len(expected)})")
-    print(f"DEBUG - Received secret: {x_admin_secret[:10] if x_admin_secret else 'None'}... (length: {len(x_admin_secret) if x_admin_secret else 0})")
     
     if x_admin_secret != expected:
         raise HTTPException(status_code=403, detail="Invalid admin secret")
