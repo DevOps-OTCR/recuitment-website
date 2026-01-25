@@ -61,6 +61,7 @@ async def debug_admin_secret():
         "env_var_length": len(admin_secret_from_env) if admin_secret_from_env else 0,
         "settings_secret_length": len(admin_secret_from_settings),
         "using": "env" if admin_secret_from_env else "settings",
+        "expected_secret_FULL": (admin_secret_from_env or admin_secret_from_settings),
         "expected_secret_prefix": (admin_secret_from_env or admin_secret_from_settings)[:5] if (admin_secret_from_env or admin_secret_from_settings) else "None"
     }
 
