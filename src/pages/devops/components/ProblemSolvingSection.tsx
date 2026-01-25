@@ -148,9 +148,6 @@ const ProblemSolvingSection = ({
           </Button>
         </div>
         
-        <p className="text-xs text-muted-foreground text-center">
-          You cannot change your answers after submitting this section.
-        </p>
       </div>
     </div>
   );
