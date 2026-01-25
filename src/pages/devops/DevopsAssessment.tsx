@@ -521,7 +521,7 @@ const DevopsAssessment = () => {
             
             <div className="bg-background/50 rounded-lg p-4 border border-border/30">
               <p className="text-xs text-muted-foreground text-center">
-                Submitted on {new Date(progress!.completed_at!).toLocaleDateString('en-US', {
+                Submitted on {new Date(progress!.completed_at!).toLocaleString('en-US', {
                   weekday: 'long',
                   year: 'numeric',
                   month: 'long',
