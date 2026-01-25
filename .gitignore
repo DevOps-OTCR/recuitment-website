@@ -22,3 +22,25 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Backend - sensitive files (NEVER commit these)
+devops-oa-backend/.env
+devops-oa-backend/uploads/
+devops-oa-backend/*.db
+devops-oa-backend/__pycache__/
+devops-oa-backend/venv/
+
+# Generic Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+.eggs/
+venv/
+.venv/
+ENV/
+
+# Generic secrets
+.env
+*.env.local
