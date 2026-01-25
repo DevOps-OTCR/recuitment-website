@@ -96,7 +96,24 @@ const CodingSection = ({
 
   const lineCount = code.split('\n').length;
 
-  return (
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const textarea = e.currentTarget;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const tabChar = '  '; // 2 spaces for tab
+      
+      const newCode = code.substring(0, start) + tabChar + code.substring(end);
+      setCode(newCode);
+      onCodeChange(newCode);
+      
+      // Move cursor after the inserted tab
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + tabChar.length;
+      }, 0);
+    }
+  };
     <div className="h-[calc(100vh-120px)] flex rounded-lg overflow-hidden border border-teal-500/30">
       {/* Left Panel - Problem Description (OTCR Style) */}
       <div className="w-[45%] flex flex-col bg-[#0a1628] border-r border-teal-500/30">
@@ -179,6 +196,7 @@ const CodingSection = ({
                   setCode(e.target.value);
                   onCodeChange(e.target.value);
                 }}
+                onKeyDown={handleKeyDown}
                 className="flex-1 bg-[#0a1628] text-zinc-200 font-mono text-[13px] py-3 px-4 resize-none outline-none leading-[21px] min-h-full"
                 spellCheck={false}
                 disabled={submitted}
