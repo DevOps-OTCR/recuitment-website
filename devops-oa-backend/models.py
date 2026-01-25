@@ -64,6 +64,11 @@ class Attempt(Base):
     # Track which sections are completed
     sections_completed = Column(JSON, default=list)  # ["problem_solving", "coding", "system_design"]
     
+    # Track integrity violations
+    focus_loss_events = Column(Integer, default=0)  # Count of times assessment window lost focus
+    is_flagged = Column(Boolean, default=False)  # Flag for admin review
+    integrity_notes = Column(String(500), nullable=True)  # Notes about integrity concerns
+    
     # Relationships
     link = relationship("AssessmentLink", back_populates="attempts")
     submissions = relationship("Submission", back_populates="attempt", cascade="all, delete-orphan")

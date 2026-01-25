@@ -594,6 +594,33 @@ async def submit_section(
     )
 
 
+@router.post("/assessment/{token}/focus-loss")
+async def log_focus_loss(token: str, db: Session = Depends(get_db)):
+    """Log when assessment window loses focus (integrity tracking)."""
+    link = get_link_or_404(token, db)
+    attempt = db.query(Attempt).filter(Attempt.link_id == link.id).first()
+    
+    if not attempt:
+        raise HTTPException(status_code=404, detail="No attempt found")
+    
+    # Increment focus loss counter
+    attempt.focus_loss_events = (attempt.focus_loss_events or 0) + 1
+    
+    # Flag if too many focus loss events (more than 2)
+    if attempt.focus_loss_events > 2:
+        attempt.is_flagged = True
+        attempt.integrity_notes = f"Multiple focus loss events detected ({attempt.focus_loss_events})"
+    
+    attempt.last_activity_at = datetime.utcnow()
+    db.commit()
+    
+    return {
+        "success": True,
+        "focus_loss_count": attempt.focus_loss_events,
+        "flagged": attempt.is_flagged
+    }
+
+
 @router.get("/assessment/{token}/result", response_model=ResultResponse)
 async def get_result(token: str, db: Session = Depends(get_db)):
     """Get minimal result view for the candidate."""

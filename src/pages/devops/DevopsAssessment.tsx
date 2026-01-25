@@ -26,6 +26,7 @@ const DevopsAssessment = () => {
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
   const [currentSection, setCurrentSection] = useState<Section>('problem_solving');
   const [submitting, setSubmitting] = useState(false);
+  const [aiDetectionFlag, setAiDetectionFlag] = useState<string | null>(null);
   
   // Email verification state
   const [requiresEmail, setRequiresEmail] = useState(false);
@@ -46,6 +47,13 @@ const DevopsAssessment = () => {
       try {
         // Fetch config
         const configData = await assessmentApi.getConfig(token);
+        
+        // Extract and store AI detection flag
+        const flag = (configData as any)._aiDetectionFlag;
+        if (flag) {
+          setAiDetectionFlag(flag);
+        }
+        
         setConfig(configData);
         setRequiresEmail(configData.requiresEmail || false);
         
@@ -61,6 +69,12 @@ const DevopsAssessment = () => {
           if (nextSection) {
             setCurrentSection(nextSection);
           }
+          
+          // Request fullscreen
+          requestFullscreen();
+          
+          // Track focus loss
+          setupFocusTracking(token);
         }
         
         setLoading(false);
@@ -80,6 +94,46 @@ const DevopsAssessment = () => {
     loadConfig();
   }, [token]);
 
+  // Request fullscreen
+  const requestFullscreen = () => {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) {
+      elem.requestFullscreen().catch(() => {
+        // Fullscreen request denied, continue anyway
+      });
+    }
+  };
+
+  // Setup focus loss tracking
+  const setupFocusTracking = (assessmentToken: string) => {
+    let focusLossReported = false;
+
+    const handleBlur = () => {
+      if (!focusLossReported) {
+        focusLossReported = true;
+        // Report focus loss to backend
+        fetch(`${import.meta.env.VITE_OA_API_URL || 'http://localhost:8000'}/api/assessment/${assessmentToken}/focus-loss`, {
+          method: 'POST',
+        }).catch(() => {
+          // Silent fail, continue assessment
+        });
+      }
+    };
+
+    const handleFocus = () => {
+      focusLossReported = false;
+    };
+
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
+
+    // Cleanup on unmount
+    return () => {
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
+    };
+  };
+
   // Handle email verification and start attempt
   const handleEmailVerify = async () => {
     if (!token || !email.trim()) return;
@@ -98,6 +152,13 @@ const DevopsAssessment = () => {
       if (nextSection) {
         setCurrentSection(nextSection);
       }
+      
+      // Request fullscreen
+      requestFullscreen();
+      
+      // Track focus loss
+      setupFocusTracking(token);
+
     } catch (err: any) {
       console.error('Failed to verify email:', err);
       if (err.message?.includes('403') || err.message?.includes('does not match')) {
@@ -115,9 +176,15 @@ const DevopsAssessment = () => {
   const handleSectionSubmit = async (section: Section, payload: any) => {
     if (!token) return;
     
+    // Include AI detection flag in payload
+    const payloadWithFlag = {
+      ...payload,
+      _aiDetectionFlag: aiDetectionFlag,
+    };
+    
     setSubmitting(true);
     try {
-      const result = await assessmentApi.submitSection(token, section, payload);
+      const result = await assessmentApi.submitSection(token, section, payloadWithFlag);
       
       // Update progress
       const newProgress = await assessmentApi.getProgress(token);
