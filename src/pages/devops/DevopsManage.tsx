@@ -298,8 +298,10 @@ const DevopsManage = () => {
                     <tr key={app.id} className="border-b border-border/50 bg-card/50 hover:bg-card/70 transition-colors">
                       <td className="px-4 py-3 text-white font-medium">{app.name}</td>
                       <td className="px-4 py-3 text-muted-foreground text-sm">{app.email}</td>
-                      <td className="px-4 py-3 text-muted-foreground text-sm max-w-xs truncate" title={app.interest ?? ''}>
-                        {app.interest ?? '—'}
+                      <td className="px-4 py-3 text-muted-foreground text-sm max-w-xs">
+                        <div className="overflow-x-auto whitespace-nowrap scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent max-w-[200px] pb-1" title={app.interest ?? ''}>
+                          {app.interest ?? '—'}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         {app.resume_filename ? (
