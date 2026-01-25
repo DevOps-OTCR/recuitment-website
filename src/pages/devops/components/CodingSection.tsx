@@ -4,7 +4,7 @@ import { Loader2, CheckCircle, XCircle, Play, Terminal, ChevronDown, ChevronUp, 
 import type { CodingConfig, SubmitResponse } from '@/lib/assessment-api';
 import { assessmentApi } from '@/lib/assessment-api';
 
-// Convert markdown-like text to HTML
+// Convert markdown-like text to HTML (tighter spacing, no big paragraph gaps)
 const formatDescription = (text: string): string => {
   return text
     .replace(/&/g, '&amp;')
@@ -15,22 +15,14 @@ const formatDescription = (text: string): string => {
     .replace(/\*([^*]+)\*/g, '<em>$1</em>')
     .replace(/_([^_]+)_/g, '<em>$1</em>')
     .replace(/`([^`]+)`/g, '<code class="bg-zinc-800 px-1.5 py-0.5 rounded text-teal-400 font-mono text-xs">$1</code>')
-    .replace(/^### (.+)$/gm, '<h3 class="text-white font-semibold mt-4 mb-2">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 class="text-white font-semibold text-lg mt-4 mb-2">$1</h2>')
+    .replace(/^### (.+)$/gm, '<h3 class="text-white font-semibold mt-3 mb-1">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 class="text-white font-semibold text-lg mt-3 mb-1">$1</h2>')
     .replace(/^(\d+)\. (.+)$/gm, '<li class="ml-4">$2</li>')
     .replace(/^[-•] (.+)$/gm, '<li class="ml-4">$1</li>')
-    .replace(/(<li[^>]*>.*<\/li>\n?)+/g, (match) => {
-      return `<ul class="list-disc pl-4 space-y-1 my-2">${match}</ul>`;
-    })
-    .replace(/\n\n/g, '</p><p class="my-3">')
-    .replace(/\n/g, '<br>')
-    .replace(/^/, '<p class="my-3">')
-    .replace(/$/, '</p>')
-    .replace(/<p class="my-3"><\/p>/g, '')
-    .replace(/<p class="my-3">(<h[23])/g, '$1')
-    .replace(/(<\/h[23]>)<\/p>/g, '$1')
-    .replace(/<p class="my-3">(<ul)/g, '$1')
-    .replace(/(<\/ul>)<\/p>/g, '$1');
+    .replace(/(<li[^>]*>.*<\/li>\n?)+/g, (match) => `<ul class="list-disc pl-4 space-y-1 my-2">${match}</ul>`)
+    // Keep single newlines tight, double newlines just add a small break
+    .replace(/\n\n+/g, '<br><br>')
+    .replace(/\n/g, '<br>');
 };
 
 interface CodingSectionProps {
@@ -169,19 +161,17 @@ const CodingSection = ({
         {/* Code Editor Area */}
         <div className="flex-1 flex flex-col min-h-0">
           <div className={`${consoleOpen ? 'h-[55%]' : 'flex-1'} flex flex-col min-h-0 transition-all`}>
-            {/* Line Numbers + Code */}
-            <div className="flex-1 flex overflow-hidden bg-[#0a1628]">
-              {/* Line Numbers */}
-              <div className="w-12 bg-[#0a1628] text-teal-600/50 text-[13px] font-mono py-3 text-right pr-4 select-none border-r border-teal-500/20">
+            {/* Line Numbers + Code (shared scroll) */}
+            <div className="flex-1 flex bg-[#0a1628] overflow-auto">
+              <div className="w-12 shrink-0 bg-[#0a1628] text-teal-600/50 text-[13px] font-mono py-3 text-right pr-4 select-none border-r border-teal-500/20">
                 {Array.from({ length: Math.max(lineCount, 20) }, (_, i) => (
                   <div key={i} className="h-[21px] leading-[21px]">{i + 1}</div>
                 ))}
               </div>
-              {/* Code Input */}
               <textarea
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="flex-1 bg-[#0a1628] text-zinc-200 font-mono text-[13px] py-3 px-4 resize-none outline-none leading-[21px] overflow-auto"
+                className="flex-1 bg-[#0a1628] text-zinc-200 font-mono text-[13px] py-3 px-4 resize-none outline-none leading-[21px] min-h-full"
                 spellCheck={false}
                 disabled={submitted}
               />
