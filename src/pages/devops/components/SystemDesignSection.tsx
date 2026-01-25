@@ -94,59 +94,72 @@ const SystemDesignSection = ({
   const wordCount = response.trim().split(/\s+/).filter(Boolean).length;
 
   return (
-    <div className="space-y-8">
+    <div className="h-[calc(100vh-120px)] flex flex-col">
       {/* Section Header */}
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold text-white">{config.title}</h1>
-        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+      <div className="text-center space-y-2 py-4 shrink-0">
+        <h1 className="text-2xl font-bold text-white">{config.title}</h1>
+        <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
           <Clock className="w-4 h-4" />
           <span>{config.timeEstimate}</span>
+          <span className="mx-2">•</span>
+          <span>{config.instructions}</span>
         </div>
-        <p className="text-muted-foreground max-w-xl mx-auto">
-          {config.instructions}
-        </p>
       </div>
 
-      {/* Prompt Card */}
-      <Card className="bg-card/60 backdrop-blur-sm border-border/50 max-w-3xl mx-auto">
-        <CardHeader>
-          <CardTitle className="text-lg text-white">Design Prompt</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div 
-            className="prose prose-invert prose-sm max-w-none text-muted-foreground leading-relaxed
-              [&_h1]:text-white [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-3 [&_h1]:mt-4
-              [&_h2]:text-white [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4
-              [&_h3]:text-white [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-3
-              [&_strong]:text-white [&_strong]:font-semibold
-              [&_p]:mb-2 [&_p]:leading-relaxed
-              [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-0.5 [&_ol]:mb-3
-              [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-0.5 [&_ul]:mb-3
-              [&_li]:mb-0 [&_li]:leading-snug"
-            dangerouslySetInnerHTML={{ __html: formatPrompt(config.prompt) }}
-          />
-        </CardContent>
-      </Card>
+      {/* Side-by-Side Layout */}
+      <div className="flex-1 flex gap-4 min-h-0 px-4">
+        {/* Left Panel - Prompt */}
+        <div className="w-1/2 flex flex-col min-h-0">
+          <Card className="bg-card/60 backdrop-blur-sm border-border/50 flex-1 flex flex-col min-h-0">
+            <CardHeader className="pb-2 shrink-0">
+              <CardTitle className="text-lg text-white">Design Prompt</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto">
+              <div 
+                className="prose prose-invert prose-sm max-w-none text-muted-foreground leading-relaxed
+                  [&_h1]:text-white [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-3 [&_h1]:mt-4
+                  [&_h2]:text-white [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4
+                  [&_h3]:text-white [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-3
+                  [&_strong]:text-white [&_strong]:font-semibold
+                  [&_p]:mb-2 [&_p]:leading-relaxed
+                  [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-0.5 [&_ol]:mb-3
+                  [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-0.5 [&_ul]:mb-3
+                  [&_li]:mb-0 [&_li]:leading-snug"
+                dangerouslySetInnerHTML={{ __html: formatPrompt(config.prompt) }}
+              />
+              
+              {/* Tips */}
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 mt-4">
+                <h4 className="text-sm font-medium text-white mb-2">Tips</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• Keep it concise — about half a page or a few bullets per part</li>
+                  <li>• Focus on clear thinking, not specific tool names</li>
+                  <li>• Address all 5 parts: Scope, Data flow, Execution, Storage, Trade-off</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Response Area */}
-      <div className="max-w-3xl mx-auto space-y-4">
-        <Card className="bg-card/60 backdrop-blur-sm border-border/50">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm text-white">Your Response</CardTitle>
-              <span className="text-xs text-muted-foreground">
-                {wordCount} words
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              value={response}
-              onChange={(e) => {
-                setResponse(e.target.value);
-                onResponseChange?.(e.target.value);
-              }}
-              placeholder="Write your system design response here...
+        {/* Right Panel - Response */}
+        <div className="w-1/2 flex flex-col min-h-0">
+          <Card className="bg-card/60 backdrop-blur-sm border-border/50 flex-1 flex flex-col min-h-0">
+            <CardHeader className="pb-2 shrink-0">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg text-white">Your Response</CardTitle>
+                <span className="text-xs text-muted-foreground">
+                  {wordCount} words
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col min-h-0">
+              <Textarea
+                value={response}
+                onChange={(e) => {
+                  setResponse(e.target.value);
+                  onResponseChange?.(e.target.value);
+                }}
+                placeholder="Write your system design response here...
 
 1. Scope – ...
 
@@ -157,27 +170,18 @@ const SystemDesignSection = ({
 4. Storage – ...
 
 5. One trade-off – ..."
-              className="min-h-[400px] bg-background/50 border-border text-white placeholder:text-muted-foreground/50 resize-none leading-relaxed"
-              disabled={submitted}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Tips */}
-        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-white mb-2">Tips</h4>
-          <ul className="text-sm text-muted-foreground space-y-1">
-            <li>• Keep it concise — about half a page or a few bullets per part</li>
-            <li>• Focus on clear thinking, not specific tool names</li>
-            <li>• Address all 5 parts: Scope, Data flow, Execution, Storage, Trade-off</li>
-          </ul>
+                className="flex-1 bg-background/50 border-border text-white placeholder:text-muted-foreground/50 resize-none leading-relaxed"
+                disabled={submitted}
+              />
+            </CardContent>
+          </Card>
         </div>
       </div>
 
       {/* Submit Section */}
-      <div className="max-w-3xl mx-auto space-y-4">
+      <div className="shrink-0 px-4 py-4">
         {error && (
-          <p className="text-sm text-destructive text-center">{error}</p>
+          <p className="text-sm text-destructive text-center mb-2">{error}</p>
         )}
         
         <div className="flex items-center justify-between bg-card/40 rounded-lg px-4 py-3">
@@ -218,7 +222,7 @@ const SystemDesignSection = ({
           </Button>
         </div>
         
-        <p className="text-xs text-muted-foreground text-center">
+        <p className="text-xs text-muted-foreground text-center mt-2">
           Once submitted, you cannot make changes to your assessment.
         </p>
       </div>

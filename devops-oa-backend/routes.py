@@ -650,14 +650,11 @@ async def submit_section(
     if request.section not in valid_sections:
         raise HTTPException(status_code=400, detail=f"Invalid section: {request.section}")
     
-    # Check if already submitted
+    # Check if already submitted (allow override)
     existing = db.query(Submission).filter(
         Submission.attempt_id == attempt.id,
         Submission.section == request.section,
     ).first()
-    
-    if existing:
-        raise HTTPException(status_code=400, detail=f"Section '{request.section}' already submitted")
     
     coding_result = None
     ai_flag_present = False
@@ -672,19 +669,22 @@ async def submit_section(
     if request.section == "coding":
         coding_result = await run_code_tests(request.payload)
     
-    # Create submission with AI detection flag
-    submission = Submission(
-        attempt_id=attempt.id,
-        section=request.section,
-        payload=request.payload,
-        coding_result=coding_result,
-    )
-    
-    # Store AI flag info in notes for admin review
+    # Create or update submission with AI detection flag
+    if existing:
+        submission = existing
+    else:
+        submission = Submission(
+            attempt_id=attempt.id,
+            section=request.section,
+        )
+        db.add(submission)
+
+    submission.payload = request.payload
+    submission.coding_result = coding_result
+    submission.submitted_at = datetime.utcnow()
+    submission.notes = None
     if not ai_flag_present:
         submission.notes = "[WARNING] AI detection flag missing - possible AI assistance detected"
-    
-    db.add(submission)
     
     # Update sections completed - create new list to trigger SQLAlchemy change detection
     sections_completed = list(attempt.sections_completed or [])

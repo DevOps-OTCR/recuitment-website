@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Editor from '@monaco-editor/react';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle, XCircle, Play, Terminal, ChevronDown, ChevronUp, Code2, FileText } from 'lucide-react';
 import type { CodingConfig, SubmitResponse } from '@/lib/assessment-api';
@@ -94,26 +95,13 @@ const CodingSection = ({
     }
   };
 
-  const lineCount = code.split('\n').length;
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const textarea = e.currentTarget;
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const tabChar = '  '; // 2 spaces for tab
-      
-      const newCode = code.substring(0, start) + tabChar + code.substring(end);
-      setCode(newCode);
-      onCodeChange(newCode);
-      
-      // Move cursor after the inserted tab
-      setTimeout(() => {
-        textarea.selectionStart = textarea.selectionEnd = start + tabChar.length;
-      }, 0);
-    }
+  const handleEditorChange = (value: string | undefined) => {
+    const newCode = value || '';
+    setCode(newCode);
+    onCodeChange(newCode);
   };
+
+  return (
     <div className="h-[calc(100vh-120px)] flex rounded-lg overflow-hidden border border-teal-500/30">
       {/* Left Panel - Problem Description (OTCR Style) */}
       <div className="w-[45%] flex flex-col bg-[#0a1628] border-r border-teal-500/30">
@@ -183,28 +171,95 @@ const CodingSection = ({
         {/* Code Editor Area */}
         <div className="flex-1 flex flex-col min-h-0">
           <div className={`${consoleOpen ? 'h-[55%]' : 'flex-1'} flex flex-col min-h-0 transition-all`}>
-            {/* Line Numbers + Code (shared scroll) */}
-            <div className="flex-1 flex bg-[#0a1628] overflow-auto relative">
-              <div className="w-12 shrink-0 bg-[#0a1628] text-teal-600/50 text-[13px] font-mono py-3 text-right pr-4 select-none border-r border-teal-500/20">
-                {Array.from({ length: 50 }, (_, i) => (
-                  <div key={i} className="h-[21px] leading-[21px]">{i + 1}</div>
-                ))}
-              </div>
-              <textarea
+            {/* Monaco Editor */}
+            <div className="flex-1 min-h-0">
+              <Editor
+                height="100%"
+                defaultLanguage="python"
                 value={code}
-                onChange={(e) => {
-                  setCode(e.target.value);
-                  onCodeChange(e.target.value);
+                onChange={handleEditorChange}
+                theme="vs-dark"
+                options={{
+                  fontSize: 13,
+                  fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
+                  lineHeight: 21,
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  renderLineHighlight: 'line',
+                  lineNumbers: 'on',
+                  glyphMargin: false,
+                  folding: true,
+                  lineDecorationsWidth: 8,
+                  lineNumbersMinChars: 3,
+                  renderIndentGuides: true,
+                  guides: {
+                    indentation: true,
+                    highlightActiveIndentation: true,
+                    bracketPairs: true,
+                  },
+                  tabSize: 4,
+                  insertSpaces: true,
+                  automaticLayout: true,
+                  wordWrap: 'off',
+                  padding: { top: 12, bottom: 12 },
+                  scrollbar: {
+                    vertical: 'auto',
+                    horizontal: 'auto',
+                    verticalScrollbarSize: 10,
+                    horizontalScrollbarSize: 10,
+                  },
+                  overviewRulerLanes: 0,
+                  hideCursorInOverviewRuler: true,
+                  overviewRulerBorder: false,
+                  readOnly: submitted,
+                  cursorBlinking: 'smooth',
+                  cursorSmoothCaretAnimation: 'on',
+                  smoothScrolling: true,
                 }}
-                onKeyDown={handleKeyDown}
-                className="flex-1 bg-[#0a1628] text-zinc-200 font-mono text-[13px] py-3 px-4 resize-none outline-none leading-[21px] min-h-full relative z-10"
-                style={{
-                  backgroundImage:
-                    'repeating-linear-gradient(90deg, transparent 0px, transparent 15px, rgba(94, 234, 212, 0.22) 15px, rgba(94, 234, 212, 0.22) 16px)',
-                  backgroundSize: '16px 16px',
+                beforeMount={(monaco) => {
+                  // Define custom theme matching OTCR colors
+                  monaco.editor.defineTheme('otcr-dark', {
+                    base: 'vs-dark',
+                    inherit: true,
+                    rules: [
+                      { token: 'comment', foreground: '6b7280', fontStyle: 'italic' },
+                      { token: 'keyword', foreground: '5eead4' },
+                      { token: 'string', foreground: 'fbbf24' },
+                      { token: 'number', foreground: 'f472b6' },
+                      { token: 'function', foreground: '60a5fa' },
+                      { token: 'variable', foreground: 'e4e4e7' },
+                      { token: 'type', foreground: '34d399' },
+                    ],
+                    colors: {
+                      'editor.background': '#0a1628',
+                      'editor.foreground': '#e4e4e7',
+                      'editor.lineHighlightBackground': '#0d1d33',
+                      'editor.selectionBackground': '#2dd4bf30',
+                      'editorLineNumber.foreground': '#2dd4bf50',
+                      'editorLineNumber.activeForeground': '#2dd4bf',
+                      'editorIndentGuide.background': '#2dd4bf25',
+                      'editorIndentGuide.activeBackground': '#2dd4bf50',
+                      'editor.selectionHighlightBackground': '#2dd4bf20',
+                      'editorCursor.foreground': '#5eead4',
+                      'editorWhitespace.foreground': '#2dd4bf20',
+                      'scrollbarSlider.background': '#2dd4bf20',
+                      'scrollbarSlider.hoverBackground': '#2dd4bf40',
+                      'scrollbarSlider.activeBackground': '#2dd4bf60',
+                    },
+                  });
                 }}
-                spellCheck={false}
-                disabled={submitted}
+                onMount={(editor, monaco) => {
+                  // Apply custom theme after mount
+                  monaco.editor.setTheme('otcr-dark');
+                  
+                  // Focus the editor
+                  editor.focus();
+                }}
+                loading={
+                  <div className="flex items-center justify-center h-full bg-[#0a1628]">
+                    <Loader2 className="w-6 h-6 text-teal-400 animate-spin" />
+                  </div>
+                }
               />
             </div>
           </div>
