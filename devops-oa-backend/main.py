@@ -52,15 +52,52 @@ async def root():
 @app.get("/debug/admin-secret-check")
 async def debug_admin_secret():
     """Debug endpoint to check admin password configuration (remove in production)."""
+    import os
     admin_password = settings.admin_password
+    
+    # Check if secret file exists
+    secret_file_exists = os.path.exists("/etc/secrets/.env")
     
     return {
         "password_set": admin_password != "change-me-in-production",
         "password_length": len(admin_password) if admin_password else 0,
         "expected_password_FULL": admin_password,
         "expected_password_prefix": admin_password[:5] if admin_password else "NOT_SET",
-        "source": "Render /etc/secrets/.env or local .env file"
+        "source": "Render /etc/secrets/.env or local .env file",
+        "secret_file_exists": secret_file_exists,
+        "secret_file_path": "/etc/secrets/.env"
     }
+
+
+@app.get("/debug/check-secret-file")
+async def check_secret_file():
+    """Debug endpoint to read secret file content (remove in production)."""
+    import os
+    
+    secret_file_path = "/etc/secrets/.env"
+    
+    if not os.path.exists(secret_file_path):
+        return {
+            "exists": False,
+            "path": secret_file_path,
+            "message": "Secret file not found at /etc/secrets/.env"
+        }
+    
+    try:
+        with open(secret_file_path, 'r') as f:
+            content = f.read()
+        return {
+            "exists": True,
+            "path": secret_file_path,
+            "content": content,
+            "lines": len(content.split('\n'))
+        }
+    except Exception as e:
+        return {
+            "exists": True,
+            "path": secret_file_path,
+            "error": str(e)
+        }
 
 
 if __name__ == "__main__":
