@@ -513,13 +513,30 @@ const DevopsManage = () => {
                   </div>
                   <div className="p-4">
                     {sub.section === 'problem_solving' && sub.payload && (
-                      <div className="space-y-3">
-                        {Object.entries(sub.payload).map(([qId, answer]) => (
-                          <div key={qId} className="text-sm">
-                            <p className="text-muted-foreground">Question {qId}:</p>
-                            <p className="text-white ml-2">Answer: {String(answer)}</p>
-                          </div>
-                        ))}
+                      <div className="space-y-4">
+                        {Object.entries(sub.payload).map(([qId, answer], idx) => {
+                          // MCQ questions are ps1-ps5 (or last index before short answer)
+                          // Short answer is the last question (has "_short" or is after all MCQs)
+                          const isShortAnswer = qId.includes('short') || idx === Object.entries(sub.payload).length - 1;
+                          
+                          return (
+                            <div key={qId} className="border border-border/50 rounded p-3 bg-[#0f0f1a]">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1">
+                                  <p className="text-muted-foreground text-sm">Question {qId}:</p>
+                                  <p className="text-white ml-2 text-sm mt-1">{String(answer)}</p>
+                                </div>
+                                {isShortAnswer && (
+                                  <div className="flex-shrink-0 text-right">
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-blue-500/10 border border-blue-500/30">
+                                      <span className="text-xs font-medium text-blue-400">Manual Review</span>
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                     
