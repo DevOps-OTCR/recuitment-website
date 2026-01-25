@@ -48,6 +48,8 @@ class ApplicationListItem(BaseModel):
     reviewed_at: Optional[datetime]
     notes: Optional[str]
     has_assessment_link: bool
+    assessment_completed: bool = False
+    assessment_token: Optional[str] = None
     focus_loss_events: int = 0
     is_flagged: bool = False
     integrity_notes: Optional[str] = None
@@ -265,8 +267,13 @@ async def list_applications(
     for app in applications:
         # Get attempt data if exists
         attempt = None
+        assessment_token = None
         if app.assessment_link_id:
             attempt = db.query(Attempt).filter(Attempt.link_id == app.assessment_link_id).first()
+            # Get the token from the assessment link
+            link = db.query(AssessmentLink).filter(AssessmentLink.id == app.assessment_link_id).first()
+            if link:
+                assessment_token = link.token
         
         result.append(ApplicationListItem(
             id=app.id,
@@ -279,6 +286,8 @@ async def list_applications(
             reviewed_at=app.reviewed_at,
             notes=app.notes,
             has_assessment_link=app.assessment_link_id is not None,
+            assessment_completed=attempt.completed_at is not None if attempt else False,
+            assessment_token=assessment_token,
             focus_loss_events=attempt.focus_loss_events if attempt else 0,
             is_flagged=attempt.is_flagged if attempt else False,
             integrity_notes=attempt.integrity_notes if attempt else None,
@@ -335,6 +344,52 @@ async def get_application_resume(
         media_type=media_type,
         headers={"Content-Disposition": f"inline; filename={filename!r}"},
     )
+
+
+@router.get("/admin/submissions/{token}")
+async def get_submission(
+    token: str,
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_admin_secret),
+):
+    """Get all submissions for an assessment token (admin only)."""
+    link = db.query(AssessmentLink).filter(AssessmentLink.token == token).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Assessment link not found")
+    
+    attempt = db.query(Attempt).filter(Attempt.link_id == link.id).first()
+    if not attempt:
+        raise HTTPException(status_code=404, detail="No attempt found for this assessment")
+    
+    submissions = db.query(Submission).filter(Submission.attempt_id == attempt.id).all()
+    
+    # Get the applicant name from Application if linked
+    applicant_name = None
+    application = db.query(Application).filter(Application.assessment_link_id == link.id).first()
+    if application:
+        applicant_name = application.name
+    
+    return {
+        "token": token,
+        "applicant_name": applicant_name,
+        "email": link.email,
+        "started_at": attempt.started_at,
+        "completed_at": attempt.completed_at,
+        "sections_completed": attempt.sections_completed or [],
+        "focus_loss_events": attempt.focus_loss_events,
+        "is_flagged": attempt.is_flagged,
+        "integrity_notes": attempt.integrity_notes,
+        "submissions": [
+            {
+                "section": sub.section,
+                "submitted_at": sub.submitted_at,
+                "payload": sub.payload,
+                "coding_result": sub.coding_result,
+                "notes": sub.notes,
+            }
+            for sub in submissions
+        ],
+    }
 
 
 @router.post("/admin/applications/{application_id}/approve")

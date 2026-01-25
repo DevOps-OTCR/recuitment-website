@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Lock, Loader2, CheckCircle, XCircle, Clock, Copy, FileText, LogOut, ExternalLink, AlertCircle } from 'lucide-react';
+import { Lock, Loader2, CheckCircle, XCircle, Clock, Copy, FileText, LogOut, ExternalLink, AlertCircle, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 
@@ -23,9 +23,30 @@ interface ApplicationItem {
   reviewed_at: string | null;
   notes: string | null;
   has_assessment_link: boolean;
+  assessment_completed: boolean;
+  assessment_token: string | null;
   focus_loss_events: number;
   is_flagged: boolean;
   integrity_notes: string | null;
+}
+
+interface SubmissionData {
+  token: string;
+  applicant_name: string | null;
+  email: string | null;
+  started_at: string;
+  completed_at: string | null;
+  sections_completed: string[];
+  focus_loss_events: number;
+  is_flagged: boolean;
+  integrity_notes: string | null;
+  submissions: {
+    section: string;
+    submitted_at: string;
+    payload: any;
+    coding_result: any | null;
+    notes: string | null;
+  }[];
 }
 
 const DevopsManage = () => {
@@ -37,6 +58,8 @@ const DevopsManage = () => {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [approvedLink, setApprovedLink] = useState<{ id: number; url: string } | null>(null);
+  const [viewingSubmission, setViewingSubmission] = useState<SubmissionData | null>(null);
+  const [loadingSubmission, setLoadingSubmission] = useState(false);
 
   useEffect(() => {
     const key = sessionStorage.getItem(ADMIN_KEY_STORAGE);
@@ -165,6 +188,26 @@ const DevopsManage = () => {
       window.open(u, '_blank', 'noopener,noreferrer');
     } catch {
       setError('Could not open resume');
+    }
+  };
+
+  const viewSubmission = async (token: string) => {
+    setLoadingSubmission(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/submissions/${token}`, { headers: headers() });
+      if (res.status === 403) {
+        handleLogout();
+        return;
+      }
+      if (!res.ok) {
+        throw new Error('Failed to load submission');
+      }
+      const data = await res.json();
+      setViewingSubmission(data);
+    } catch (e: any) {
+      setError(e.message || 'Could not load submission');
+    } finally {
+      setLoadingSubmission(false);
     }
   };
 
@@ -377,20 +420,34 @@ const DevopsManage = () => {
                           </div>
                         )}
                         {app.status === 'approved' && app.has_assessment_link && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              const base = `${window.location.origin}${window.location.pathname || '/'}`.replace(/\/?$/, '');
-                              const token = app.id.toString();
-                              const url = `${base}#/tech/assessment/${token}`;
-                              copyLink(url);
-                            }}
-                            className="text-teal-primary hover:text-teal-primary/90 hover:bg-teal-primary/10 border-teal-primary/30"
-                          >
-                            <Copy className="w-4 h-4 mr-1" />
-                            Copy Link
-                          </Button>
+                          app.assessment_completed ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => app.assessment_token && viewSubmission(app.assessment_token)}
+                              disabled={loadingSubmission}
+                              className="text-green-500 hover:text-green-400 hover:bg-green-500/10 border-green-500/30"
+                            >
+                              {loadingSubmission ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Eye className="w-4 h-4 mr-1" />}
+                              View Submission
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                if (app.assessment_token) {
+                                  const base = `${window.location.origin}${window.location.pathname || '/'}`.replace(/\/?$/, '');
+                                  const url = `${base}#/tech/assessment/${app.assessment_token}`;
+                                  copyLink(url);
+                                }
+                              }}
+                              className="text-teal-primary hover:text-teal-primary/90 hover:bg-teal-primary/10 border-teal-primary/30"
+                            >
+                              <Copy className="w-4 h-4 mr-1" />
+                              Copy Link
+                            </Button>
+                          )
                         )}
                       </td>
                     </tr>
@@ -401,6 +458,122 @@ const DevopsManage = () => {
           )}
         </div>
       </section>
+
+      {/* Submission Viewer Modal */}
+      {viewingSubmission && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overflow-auto">
+          <div className="bg-[#1a1a2e] rounded-lg max-w-4xl w-full max-h-[90vh] overflow-auto border border-border">
+            <div className="sticky top-0 bg-[#1a1a2e] border-b border-border p-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-white">Submission Review</h2>
+                <p className="text-sm text-muted-foreground">
+                  {viewingSubmission.applicant_name} ({viewingSubmission.email})
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewingSubmission(null)}
+                className="text-muted-foreground hover:text-white"
+              >
+                <XCircle className="w-5 h-5" />
+              </Button>
+            </div>
+            
+            <div className="p-4 space-y-6">
+              {/* Integrity Status */}
+              <div className={`p-4 rounded-lg ${viewingSubmission.is_flagged ? 'bg-destructive/10 border border-destructive/30' : 'bg-green-500/10 border border-green-500/30'}`}>
+                <div className="flex items-center gap-2">
+                  {viewingSubmission.is_flagged ? (
+                    <AlertCircle className="w-5 h-5 text-destructive" />
+                  ) : (
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                  )}
+                  <span className={`font-medium ${viewingSubmission.is_flagged ? 'text-destructive' : 'text-green-500'}`}>
+                    {viewingSubmission.is_flagged ? 'Flagged for Review' : 'No Integrity Issues'}
+                  </span>
+                </div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  <p>Focus loss events: {viewingSubmission.focus_loss_events}</p>
+                  <p>Sections completed: {viewingSubmission.sections_completed.join(', ')}</p>
+                  {viewingSubmission.integrity_notes && (
+                    <p className="mt-1 text-yellow-500">{viewingSubmission.integrity_notes}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Submissions by Section */}
+              {viewingSubmission.submissions.map((sub, idx) => (
+                <div key={idx} className="border border-border rounded-lg overflow-hidden">
+                  <div className="bg-[#0f0f1a] px-4 py-2 border-b border-border">
+                    <h3 className="font-medium text-white capitalize">{sub.section.replace('_', ' ')}</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Submitted: {new Date(sub.submitted_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-4">
+                    {sub.section === 'problem_solving' && sub.payload && (
+                      <div className="space-y-3">
+                        {Object.entries(sub.payload).map(([qId, answer]) => (
+                          <div key={qId} className="text-sm">
+                            <p className="text-muted-foreground">Question {qId}:</p>
+                            <p className="text-white ml-2">Answer: {String(answer)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {sub.section === 'coding' && (
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-2">Code:</p>
+                          <pre className="bg-[#0f0f1a] p-3 rounded text-sm text-white overflow-x-auto font-mono">
+                            {sub.payload?.code || 'No code submitted'}
+                          </pre>
+                        </div>
+                        {sub.coding_result && (
+                          <div className={`p-3 rounded text-sm ${sub.coding_result.passed ? 'bg-green-500/10 border border-green-500/30' : 'bg-destructive/10 border border-destructive/30'}`}>
+                            <p className={`font-medium ${sub.coding_result.passed ? 'text-green-500' : 'text-destructive'}`}>
+                              {sub.coding_result.passed ? '✓ All Test Cases Passed' : '✗ Test Cases Failed'}
+                            </p>
+                            {sub.coding_result.results && (
+                              <div className="mt-2 space-y-1">
+                                {sub.coding_result.results.map((r: any, i: number) => (
+                                  <div key={i} className="text-xs">
+                                    <span className={r.passed ? 'text-green-500' : 'text-destructive'}>
+                                      Test {i + 1}: {r.passed ? 'Passed' : 'Failed'}
+                                    </span>
+                                    {!r.passed && r.expected !== undefined && (
+                                      <span className="text-muted-foreground ml-2">
+                                        Expected: {JSON.stringify(r.expected)}, Got: {JSON.stringify(r.actual)}
+                                      </span>
+                                    )}
+                                    {r.error && <span className="text-destructive ml-2">{r.error}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {sub.section === 'system_design' && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-2">Response:</p>
+                        <div className="bg-[#0f0f1a] p-3 rounded text-sm text-white whitespace-pre-wrap">
+                          {sub.payload?.response || 'No response submitted'}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <Footer />
     </div>
   );
