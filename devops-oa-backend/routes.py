@@ -225,9 +225,14 @@ async def check_application_status(email: str, db: Session = Depends(get_db)):
 # Admin Endpoints
 # ============================================================================
 
+def _get_admin_secret() -> str:
+    """Admin secret: env var takes precedence (Render env groups)."""
+    return os.environ.get("ADMIN_SECRET") or settings.admin_secret
+
+
 def verify_admin_secret(x_admin_secret: str = Header(...)):
     """Verify admin secret header."""
-    if x_admin_secret != settings.admin_secret:
+    if x_admin_secret != _get_admin_secret():
         raise HTTPException(status_code=403, detail="Invalid admin secret")
     return True
 
