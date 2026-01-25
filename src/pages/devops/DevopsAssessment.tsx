@@ -15,6 +15,7 @@ import SystemDesignSection from './components/SystemDesignSection';
 type Section = 'problem_solving' | 'coding' | 'system_design';
 
 const SECTION_ORDER: Section[] = ['problem_solving', 'coding', 'system_design'];
+const getDraftStorageKey = (token: string) => `assessmentDrafts:${token}`;
 
 const DevopsAssessment = () => {
   const { token } = useParams<{ token: string }>();
@@ -97,6 +98,32 @@ const DevopsAssessment = () => {
     loadConfig();
   }, [token]);
 
+  // Restore drafts (and last section) from localStorage on load
+  useEffect(() => {
+    if (!token || typeof window === 'undefined') return;
+
+    try {
+      const stored = localStorage.getItem(getDraftStorageKey(token));
+      if (!stored) return;
+
+      const parsed = JSON.parse(stored) as {
+        problemSolving?: Record<string, string>;
+        coding?: string;
+        systemDesign?: string;
+        currentSection?: Section;
+      };
+
+      if (parsed.problemSolving) setProblemSolvingDraft(parsed.problemSolving);
+      if (typeof parsed.coding === 'string') setCodingDraft(parsed.coding);
+      if (typeof parsed.systemDesign === 'string') setSystemDesignDraft(parsed.systemDesign);
+      if (parsed.currentSection && SECTION_ORDER.includes(parsed.currentSection)) {
+        setCurrentSection(parsed.currentSection);
+      }
+    } catch (err) {
+      console.warn('Failed to restore drafts', err);
+    }
+  }, [token]);
+
   // Stopwatch timer effect
   useEffect(() => {
     if (!assessmentStartTime) return;
@@ -107,6 +134,24 @@ const DevopsAssessment = () => {
     
     return () => clearInterval(interval);
   }, [assessmentStartTime]);
+
+  // Persist drafts (and current section) to localStorage
+  useEffect(() => {
+    if (!token || typeof window === 'undefined') return;
+
+    const payload = {
+      problemSolving: problemSolvingDraft,
+      coding: codingDraft,
+      systemDesign: systemDesignDraft,
+      currentSection,
+    };
+
+    try {
+      localStorage.setItem(getDraftStorageKey(token), JSON.stringify(payload));
+    } catch (err) {
+      console.warn('Failed to save drafts', err);
+    }
+  }, [token, problemSolvingDraft, codingDraft, systemDesignDraft, currentSection]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -241,6 +286,14 @@ const DevopsAssessment = () => {
 
   const isCompleted = progress?.completed_at != null;
   const sectionsCompleted = progress?.sections_completed || [];
+
+  // Clear stored drafts after completion
+  useEffect(() => {
+    if (!token || typeof window === 'undefined') return;
+    if (isCompleted) {
+      localStorage.removeItem(getDraftStorageKey(token));
+    }
+  }, [isCompleted, token]);
 
   // Loading state
   if (loading) {
