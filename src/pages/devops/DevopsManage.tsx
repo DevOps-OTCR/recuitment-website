@@ -557,33 +557,102 @@ OTCR Technologies`;
                     <p className="text-xs text-muted-foreground">
                       Submitted: {new Date(sub.submitted_at).toLocaleString()}
                     </p>
+                    {/* MCQ Score Summary */}
+                    {sub.section === 'problem_solving' && sub.mcq_score && (
+                      <div className="mt-2">
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-sm font-medium ${
+                          sub.mcq_score.total === 0 
+                            ? 'bg-gray-500/10 border border-gray-500/30 text-gray-400'
+                            : sub.mcq_score.correct === sub.mcq_score.total 
+                              ? 'bg-green-500/10 border border-green-500/30 text-green-400'
+                              : sub.mcq_score.correct >= sub.mcq_score.total / 2
+                                ? 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-400'
+                                : 'bg-red-500/10 border border-red-500/30 text-red-400'
+                        }`}>
+                          MCQ Score: {sub.mcq_score.correct}/{sub.mcq_score.total}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="p-4">
-                    {sub.section === 'problem_solving' && sub.payload && (
+                    {sub.section === 'problem_solving' && (
                       <div className="space-y-4">
-                        {Object.entries(sub.payload).map(([qId, answer], idx) => {
-                          // MCQ questions are ps1-ps5 (or last index before short answer)
-                          // Short answer is the last question (has "_short" or is after all MCQs)
-                          const isShortAnswer = qId.includes('short') || idx === Object.entries(sub.payload).length - 1;
-                          
-                          return (
-                            <div key={qId} className="border border-border/50 rounded p-3 bg-[#0f0f1a]">
+                        {/* Use mcq_results if available (new format), otherwise fall back to payload */}
+                        {sub.mcq_results ? (
+                          sub.mcq_results.map((result: any, idx: number) => (
+                            <div key={result.questionId} className="border border-border/50 rounded p-3 bg-[#0f0f1a]">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1">
-                                  <p className="text-muted-foreground text-sm">Question {qId}:</p>
-                                  <p className="text-white ml-2 text-sm mt-1">{String(answer)}</p>
+                                  <p className="text-muted-foreground text-sm font-medium">
+                                    Q{idx + 1}: {result.questionText}
+                                  </p>
+                                  <div className="mt-2 ml-2">
+                                    <p className="text-white text-sm">
+                                      Answer: <span className={
+                                        result.isManualReview 
+                                          ? 'text-blue-400' 
+                                          : result.isCorrect 
+                                            ? 'text-green-400' 
+                                            : result.isCorrect === false 
+                                              ? 'text-red-400' 
+                                              : 'text-white'
+                                      }>
+                                        {result.userAnswer}
+                                      </span>
+                                    </p>
+                                    {!result.isManualReview && result.correctAnswer && !result.isCorrect && (
+                                      <p className="text-green-400 text-sm mt-1">
+                                        Correct: {result.correctAnswer}
+                                      </p>
+                                    )}
+                                  </div>
                                 </div>
-                                {isShortAnswer && (
-                                  <div className="flex-shrink-0 text-right">
+                                <div className="flex-shrink-0 text-right">
+                                  {result.isManualReview ? (
                                     <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-blue-500/10 border border-blue-500/30">
                                       <span className="text-xs font-medium text-blue-400">Manual Review</span>
                                     </span>
-                                  </div>
-                                )}
+                                  ) : result.isCorrect === true ? (
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-green-500/10 border border-green-500/30">
+                                      <span className="text-xs font-medium text-green-400">✓ Correct</span>
+                                    </span>
+                                  ) : result.isCorrect === false ? (
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-red-500/10 border border-red-500/30">
+                                      <span className="text-xs font-medium text-red-400">✗ Incorrect</span>
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-gray-500/10 border border-gray-500/30">
+                                      <span className="text-xs font-medium text-gray-400">Legacy</span>
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          );
-                        })}
+                          ))
+                        ) : sub.payload && (
+                          // Fallback for old format submissions
+                          Object.entries(sub.payload).map(([qId, answer], idx) => {
+                            const isShortAnswer = qId.includes('short') || idx === Object.entries(sub.payload).length - 1;
+                            
+                            return (
+                              <div key={qId} className="border border-border/50 rounded p-3 bg-[#0f0f1a]">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex-1">
+                                    <p className="text-muted-foreground text-sm">Question {qId}:</p>
+                                    <p className="text-white ml-2 text-sm mt-1">{String(answer)}</p>
+                                  </div>
+                                  {isShortAnswer && (
+                                    <div className="flex-shrink-0 text-right">
+                                      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-blue-500/10 border border-blue-500/30">
+                                        <span className="text-xs font-medium text-blue-400">Manual Review</span>
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
                       </div>
                     )}
                     

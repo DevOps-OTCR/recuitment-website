@@ -12,6 +12,7 @@ from pydantic import BaseModel, EmailStr
 from config import get_settings
 from database import get_db
 from models import AssessmentLink, Attempt, Submission, Application, ApplicationStatus
+from assessment_content import get_mcq_answer_key
 
 router = APIRouter()
 settings = get_settings()
@@ -369,6 +370,94 @@ async def get_submission(
     if application:
         applicant_name = application.name
     
+    # Get MCQ answer key for scoring (maps question text to correct answer)
+    mcq_answer_key = get_mcq_answer_key()
+    
+    # Build a lookup by question text for matching
+    answer_key_by_text = {}
+    for q_id, info in mcq_answer_key.items():
+        answer_key_by_text[info["questionText"]] = info["correctAnswer"]
+    
+    # Process submissions to add MCQ scoring
+    processed_submissions = []
+    for sub in submissions:
+        sub_data = {
+            "section": sub.section,
+            "submitted_at": sub.submitted_at,
+            "payload": sub.payload,
+            "coding_result": sub.coding_result,
+            "notes": sub.notes,
+        }
+        
+        # Add MCQ scoring for problem_solving section
+        if sub.section == "problem_solving" and sub.payload:
+            mcq_results = []
+            correct_count = 0
+            total_mcq = 0
+            
+            for q_id, q_data in sub.payload.items():
+                # Handle both old format (just answer string) and new format (dict with metadata)
+                if isinstance(q_data, dict):
+                    # New enhanced format with question metadata
+                    user_answer = q_data.get("answer", "")
+                    question_text = q_data.get("questionText", "")
+                    question_type = q_data.get("type", "mcq")
+                    options = q_data.get("options", [])
+                    
+                    # Check if it's a short answer (manual review)
+                    if question_type == "short_answer" or "short" in q_id.lower():
+                        mcq_results.append({
+                            "questionId": q_id,
+                            "questionText": question_text,
+                            "userAnswer": user_answer,
+                            "isManualReview": True,
+                        })
+                        continue
+                    
+                    # MCQ: look up correct answer by question text
+                    correct_answer = answer_key_by_text.get(question_text)
+                    is_correct = correct_answer is not None and user_answer == correct_answer
+                    
+                    if correct_answer:
+                        total_mcq += 1
+                        if is_correct:
+                            correct_count += 1
+                    
+                    mcq_results.append({
+                        "questionId": q_id,
+                        "questionText": question_text,
+                        "userAnswer": user_answer,
+                        "correctAnswer": correct_answer,
+                        "isCorrect": is_correct,
+                        "options": options,
+                        "isManualReview": False,
+                    })
+                else:
+                    # Old format: just the answer string (legacy submissions)
+                    user_answer = str(q_data)
+                    
+                    if "short" in q_id.lower():
+                        mcq_results.append({
+                            "questionId": q_id,
+                            "questionText": "Short Answer (legacy format)",
+                            "userAnswer": user_answer,
+                            "isManualReview": True,
+                        })
+                    else:
+                        mcq_results.append({
+                            "questionId": q_id,
+                            "questionText": f"Question {q_id} (legacy format - cannot match)",
+                            "userAnswer": user_answer,
+                            "correctAnswer": None,
+                            "isCorrect": None,
+                            "isManualReview": False,
+                        })
+            
+            sub_data["mcq_results"] = mcq_results
+            sub_data["mcq_score"] = {"correct": correct_count, "total": total_mcq}
+        
+        processed_submissions.append(sub_data)
+    
     return {
         "token": token,
         "applicant_name": applicant_name,
@@ -379,16 +468,7 @@ async def get_submission(
         "focus_loss_events": attempt.focus_loss_events,
         "is_flagged": attempt.is_flagged,
         "integrity_notes": attempt.integrity_notes,
-        "submissions": [
-            {
-                "section": sub.section,
-                "submitted_at": sub.submitted_at,
-                "payload": sub.payload,
-                "coding_result": sub.coding_result,
-                "notes": sub.notes,
-            }
-            for sub in submissions
-        ],
+        "submissions": processed_submissions,
     }
 
 

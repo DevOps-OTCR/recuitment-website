@@ -47,7 +47,17 @@ const ProblemSolvingSection = ({
 
     setError(null);
     try {
-      await onSubmit(answers);
+      // Build enhanced payload with question metadata for admin review
+      const enhancedPayload: Record<string, any> = {};
+      for (const question of config.questions) {
+        enhancedPayload[question.id] = {
+          answer: answers[question.id],
+          questionText: question.questionText,
+          type: question.type,
+          options: question.options || null,
+        };
+      }
+      await onSubmit(enhancedPayload);
     } catch (err: any) {
       setError(err.message || 'Failed to submit. Please try again.');
     }
