@@ -436,6 +436,55 @@ async def create_link(
     )
 
 
+@router.get("/admin/test-link")
+async def get_admin_test_link(
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_admin_secret),
+):
+    """Get or create a reusable admin test link (admin only).
+    
+    This link can be used for testing without creating applications.
+    It does not require email verification.
+    """
+    # Look for existing admin test link
+    existing = db.query(AssessmentLink).filter(
+        AssessmentLink.label == "_ADMIN_TEST_LINK_"
+    ).first()
+    
+    if existing:
+        # Delete any existing attempts so it can be reused
+        db.query(Attempt).filter(Attempt.link_id == existing.id).delete()
+        db.query(Submission).filter(
+            Submission.attempt_id.in_(
+                db.query(Attempt.id).filter(Attempt.link_id == existing.id)
+            )
+        ).delete(synchronize_session=False)
+        db.commit()
+        
+        return {
+            "token": existing.token,
+            "url": f"{settings.frontend_base_url}/{existing.token}",
+            "message": "Existing test link reset and ready to use",
+        }
+    
+    # Create new admin test link (no email required)
+    token = secrets.token_urlsafe(16)
+    link = AssessmentLink(
+        token=token,
+        email=None,  # No email verification required
+        label="_ADMIN_TEST_LINK_",
+    )
+    db.add(link)
+    db.commit()
+    db.refresh(link)
+    
+    return {
+        "token": token,
+        "url": f"{settings.frontend_base_url}/{token}",
+        "message": "New test link created",
+    }
+
+
 # ============================================================================
 # Assessment Endpoints
 # ============================================================================
@@ -604,6 +653,30 @@ async def submit_section(
         section=request.section,
         coding_result=coding_result,
     )
+
+
+class TestCodeRequest(BaseModel):
+    """Request to test code without submitting."""
+    code: str
+    language: str = "python3"
+
+
+@router.post("/assessment/{token}/test-code")
+async def test_code(
+    token: str,
+    request: TestCodeRequest,
+    db: Session = Depends(get_db),
+):
+    """Test code against test cases without submitting (no state change)."""
+    link = get_link_or_404(token, db)
+    
+    # Just run the tests and return results
+    result = await run_code_tests({
+        "code": request.code,
+        "language": request.language,
+    })
+    
+    return result
 
 
 @router.post("/assessment/{token}/focus-loss")

@@ -471,22 +471,54 @@ const DevopsAssessment = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border/50">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/tech')}
-              className="text-muted-foreground hover:text-white"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Exit
-            </Button>
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-6">
             <img 
               src={otcrTechLogo} 
               alt="OTCR Technologies" 
               className="h-6 w-auto"
             />
+            {/* Section Navigation Tabs */}
+            <nav className="flex items-center gap-1">
+              {SECTION_ORDER.map((section, index) => {
+                const isCompleted = sectionsCompleted.includes(section);
+                const isCurrent = section === currentSection;
+                const labels: Record<Section, string> = {
+                  problem_solving: 'Problem',
+                  coding: 'Coding',
+                  system_design: 'Design',
+                };
+                
+                return (
+                  <button
+                    key={section}
+                    onClick={() => setCurrentSection(section)}
+                    className={`
+                      px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2
+                      ${isCurrent 
+                        ? 'bg-primary/20 text-primary' 
+                        : isCompleted 
+                          ? 'text-green-500 hover:bg-green-500/10'
+                          : 'text-muted-foreground hover:text-white hover:bg-white/5'
+                      }
+                    `}
+                  >
+                    <span className={`
+                      w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold
+                      ${isCurrent 
+                        ? 'bg-primary text-primary-foreground' 
+                        : isCompleted 
+                          ? 'bg-green-500/20 text-green-500'
+                          : 'bg-muted text-muted-foreground'
+                      }
+                    `}>
+                      {isCompleted ? '✓' : index + 1}
+                    </span>
+                    {labels[section]}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             {assessmentStartTime && (
@@ -499,17 +531,8 @@ const DevopsAssessment = () => {
         </div>
       </header>
 
-      {/* Progress Indicator */}
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        <ProgressIndicator
-          sections={SECTION_ORDER}
-          currentSection={currentSection}
-          completedSections={sectionsCompleted}
-        />
-      </div>
-
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 pb-16">
+      <main className="max-w-6xl mx-auto px-4 py-6 pb-16">
         {currentSection === 'problem_solving' && config && (
           <ProblemSolvingSection
             config={config.problemSolving}
@@ -518,9 +541,10 @@ const DevopsAssessment = () => {
           />
         )}
         
-        {currentSection === 'coding' && config && (
+        {currentSection === 'coding' && config && token && (
           <CodingSection
             config={config.coding}
+            token={token}
             onSubmit={(payload) => handleSectionSubmit('coding', payload)}
             submitting={submitting}
           />

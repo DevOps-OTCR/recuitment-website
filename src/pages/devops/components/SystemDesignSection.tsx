@@ -5,6 +5,50 @@ import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle, Loader2, Clock, Send } from 'lucide-react';
 import type { SystemDesignConfig } from '@/lib/assessment-api';
 
+// Convert markdown-like text to HTML
+const formatPrompt = (text: string): string => {
+  return text
+    // Escape HTML first
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    // Bold: **text** or __text__
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/__(.+?)__/g, '<strong>$1</strong>')
+    // Italic: *text* or _text_
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/_([^_]+)_/g, '<em>$1</em>')
+    // Headings
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    // Numbered lists
+    .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
+    // Bullet lists
+    .replace(/^[-•] (.+)$/gm, '<li>$1</li>')
+    // Wrap consecutive <li> in <ol> or <ul>
+    .replace(/(<li>.*<\/li>\n?)+/g, (match) => {
+      // Check if it starts with a number pattern
+      if (/^<li>\d/.test(match)) {
+        return `<ol>${match}</ol>`;
+      }
+      return `<ul>${match}</ul>`;
+    })
+    // Paragraphs (double newlines)
+    .replace(/\n\n/g, '</p><p>')
+    // Single newlines to <br> within paragraphs
+    .replace(/\n/g, '<br>')
+    // Wrap in paragraph
+    .replace(/^/, '<p>')
+    .replace(/$/, '</p>')
+    // Clean up empty paragraphs
+    .replace(/<p><\/p>/g, '')
+    .replace(/<p>(<h[123]>)/g, '$1')
+    .replace(/(<\/h[123]>)<\/p>/g, '$1')
+    .replace(/<p>(<[ou]l>)/g, '$1')
+    .replace(/(<\/[ou]l>)<\/p>/g, '$1');
+};
+
 interface SystemDesignSectionProps {
   config: SystemDesignConfig;
   onSubmit: (payload: { response: string }) => Promise<any>;
@@ -62,11 +106,18 @@ const SystemDesignSection = ({
           <CardTitle className="text-lg text-white">Design Prompt</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="prose prose-invert prose-sm max-w-none">
-            <pre className="whitespace-pre-wrap text-sm text-muted-foreground font-sans bg-transparent p-0 overflow-visible leading-relaxed">
-              {config.prompt}
-            </pre>
-          </div>
+          <div 
+            className="prose prose-invert prose-sm max-w-none text-muted-foreground leading-relaxed
+              [&_h1]:text-white [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-4 [&_h1]:mt-6
+              [&_h2]:text-white [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mb-3 [&_h2]:mt-5
+              [&_h3]:text-white [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4
+              [&_strong]:text-white [&_strong]:font-semibold
+              [&_p]:mb-3 [&_p]:leading-relaxed
+              [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:space-y-2 [&_ol]:mb-4
+              [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-1 [&_ul]:mb-4
+              [&_li]:mb-1"
+            dangerouslySetInnerHTML={{ __html: formatPrompt(config.prompt) }}
+          />
         </CardContent>
       </Card>
 

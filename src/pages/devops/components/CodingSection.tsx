@@ -4,15 +4,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowRight, Loader2, CheckCircle, XCircle, Play } from 'lucide-react';
 import type { CodingConfig, SubmitResponse } from '@/lib/assessment-api';
+import { assessmentApi } from '@/lib/assessment-api';
 
 interface CodingSectionProps {
   config: CodingConfig;
+  token: string;
   onSubmit: (payload: { code: string; language: string }) => Promise<SubmitResponse>;
   submitting: boolean;
 }
 
 const CodingSection = ({
   config,
+  token,
   onSubmit,
   submitting,
 }: CodingSectionProps) => {
@@ -31,8 +34,9 @@ const CodingSection = ({
     setError(null);
     setTestingCode(true);
     try {
-      const response = await onSubmit({ code, language: 'python3' });
-      setResult(response.coding_result || null);
+      // Use the test-code endpoint instead of submit
+      const testResult = await assessmentApi.testCode(token, code, 'python3');
+      setResult(testResult || null);
     } catch (err: any) {
       setError(err.message || 'Failed to run tests. Please try again.');
     } finally {

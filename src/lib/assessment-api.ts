@@ -149,6 +149,20 @@ class AssessmentApiClient {
   }
 
   /**
+   * Test code without submitting (coding section only)
+   */
+  async testCode(
+    token: string,
+    code: string,
+    language: string = 'python3'
+  ): Promise<SubmitResponse['coding_result']> {
+    return this.fetch<SubmitResponse['coding_result']>(`/api/assessment/${token}/test-code`, {
+      method: 'POST',
+      body: JSON.stringify({ code, language }),
+    });
+  }
+
+  /**
    * Get result summary (after completion)
    */
   async getResult(token: string): Promise<{
