@@ -184,11 +184,15 @@ const CodingSection = ({
         <div className="flex-1 flex flex-col min-h-0">
           <div className={`${consoleOpen ? 'h-[55%]' : 'flex-1'} flex flex-col min-h-0 transition-all`}>
             {/* Line Numbers + Code (shared scroll) */}
-            <div className="flex-1 flex bg-[#0a1628] overflow-auto">
+            <div className="flex-1 flex bg-[#0a1628] overflow-auto relative">
               <div className="w-12 shrink-0 bg-[#0a1628] text-teal-600/50 text-[13px] font-mono py-3 text-right pr-4 select-none border-r border-teal-500/20">
                 {Array.from({ length: 50 }, (_, i) => (
                   <div key={i} className="h-[21px] leading-[21px]">{i + 1}</div>
                 ))}
+              </div>
+              {/* Indentation guide background */}
+              <div className="absolute top-0 left-12 bottom-0 pointer-events-none overflow-hidden w-full">
+                <svg className="w-full h-full" style={{ backgroundImage: 'repeating-linear-gradient(90deg, transparent, transparent 15px, rgba(94, 234, 212, 0.1) 15px, rgba(94, 234, 212, 0.1) 16px)' }} />
               </div>
               <textarea
                 value={code}
@@ -197,7 +201,7 @@ const CodingSection = ({
                   onCodeChange(e.target.value);
                 }}
                 onKeyDown={handleKeyDown}
-                className="flex-1 bg-[#0a1628] text-zinc-200 font-mono text-[13px] py-3 px-4 resize-none outline-none leading-[21px] min-h-full"
+                className="flex-1 bg-transparent text-zinc-200 font-mono text-[13px] py-3 px-4 resize-none outline-none leading-[21px] min-h-full relative z-10"
                 spellCheck={false}
                 disabled={submitted}
               />
