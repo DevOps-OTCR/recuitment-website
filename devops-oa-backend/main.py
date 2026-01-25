@@ -28,6 +28,9 @@ app = FastAPI(
 
 # Configure CORS
 origins = [origin.strip() for origin in settings.allowed_origins.split(",")]
+# Always include production origin
+if "https://recruit.otcr-consulting.com" not in origins:
+    origins.append("https://recruit.otcr-consulting.com")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
