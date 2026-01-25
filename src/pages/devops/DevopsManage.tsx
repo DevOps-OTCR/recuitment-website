@@ -185,6 +185,22 @@ const DevopsManage = () => {
     });
   };
 
+  const copyEmailTemplate = (name: string, url: string) => {
+    const template = `Hi ${name},
+
+Thank you for your interest in OTCR Technologies. Please complete the technical assessment at your earliest convenience:
+
+${url}
+
+Best regards,
+OTCR Technologies`;
+    navigator.clipboard.writeText(template);
+    toast({
+      title: 'Email template copied!',
+      description: 'Email body with assessment link copied to clipboard.',
+    });
+  };
+
   const openResume = async (id: number) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/applications/${id}/resume`, { headers: headers() });
@@ -442,21 +458,39 @@ const DevopsManage = () => {
                               View Submission
                             </Button>
                           ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                if (app.assessment_token) {
-                                  const base = `${window.location.origin}${window.location.pathname || '/'}`.replace(/\/?$/, '');
-                                  const url = `${base}#/tech/assessment/${app.assessment_token}`;
-                                  copyLink(url);
-                                }
-                              }}
-                              className="text-teal-primary hover:text-teal-primary/90 hover:bg-teal-primary/10 border-teal-primary/30"
-                            >
-                              <Copy className="w-4 h-4 mr-1" />
-                              Copy Link
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  if (app.assessment_token) {
+                                    const base = `${window.location.origin}${window.location.pathname || '/'}`.replace(/\/?$/, '');
+                                    const url = `${base}#/tech/assessment/${app.assessment_token}`;
+                                    copyLink(url);
+                                  }
+                                }}
+                                className="text-teal-primary hover:text-teal-primary/90 hover:bg-teal-primary/10 border-teal-primary/30"
+                              >
+                                <Copy className="w-4 h-4 mr-1" />
+                                Copy Link
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  if (app.assessment_token) {
+                                    const base = `${window.location.origin}${window.location.pathname || '/'}`.replace(/\/?$/, '');
+                                    const url = `${base}#/tech/assessment/${app.assessment_token}`;
+                                    copyEmailTemplate(app.name, url);
+                                  }
+                                }}
+                                className="text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 border-blue-400/30"
+                                title="Copy email template"
+                              >
+                                <FileText className="w-4 h-4 mr-1" />
+                                Email
+                              </Button>
+                            </div>
                           )
                         )}
                       </td>

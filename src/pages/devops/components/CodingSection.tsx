@@ -190,10 +190,6 @@ const CodingSection = ({
                   <div key={i} className="h-[21px] leading-[21px]">{i + 1}</div>
                 ))}
               </div>
-              {/* Indentation guide background */}
-              <div className="absolute top-0 left-12 bottom-0 pointer-events-none overflow-hidden w-full">
-                <svg className="w-full h-full" style={{ backgroundImage: 'repeating-linear-gradient(90deg, transparent, transparent 15px, rgba(94, 234, 212, 0.1) 15px, rgba(94, 234, 212, 0.1) 16px)' }} />
-              </div>
               <textarea
                 value={code}
                 onChange={(e) => {
@@ -201,7 +197,12 @@ const CodingSection = ({
                   onCodeChange(e.target.value);
                 }}
                 onKeyDown={handleKeyDown}
-                className="flex-1 bg-transparent text-zinc-200 font-mono text-[13px] py-3 px-4 resize-none outline-none leading-[21px] min-h-full relative z-10"
+                className="flex-1 bg-[#0a1628] text-zinc-200 font-mono text-[13px] py-3 px-4 resize-none outline-none leading-[21px] min-h-full relative z-10"
+                style={{
+                  backgroundImage:
+                    'repeating-linear-gradient(90deg, transparent 0px, transparent 15px, rgba(94, 234, 212, 0.22) 15px, rgba(94, 234, 212, 0.22) 16px)',
+                  backgroundSize: '16px 16px',
+                }}
                 spellCheck={false}
                 disabled={submitted}
               />
