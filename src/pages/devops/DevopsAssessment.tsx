@@ -426,8 +426,20 @@ const DevopsAssessment = () => {
     );
   }
 
+  // Exit fullscreen helper
+  const exitFullscreen = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {
+        // Ignore errors
+      });
+    }
+  };
+
   // Completed state
   if (isCompleted) {
+    // Exit fullscreen when assessment is complete
+    exitFullscreen();
+    
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="max-w-md w-full bg-card/80 border-border/50">
@@ -435,15 +447,23 @@ const DevopsAssessment = () => {
             <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-green-500" />
             </div>
-            <CardTitle className="text-2xl text-white">Assessment Complete!</CardTitle>
-            <CardDescription>
-              Thank you for completing the Technical Assessment.
-              We'll review your submission and get back to you soon.
+            <CardTitle className="text-2xl text-white">Thank You!</CardTitle>
+            <CardDescription className="text-base">
+              Your assessment has been submitted successfully.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-background/50 rounded-lg p-4">
-              <p className="text-sm text-muted-foreground text-center">
+          <CardContent className="space-y-6">
+            <div className="text-center space-y-2">
+              <p className="text-muted-foreground">
+                We appreciate you taking the time to complete the OTCR Technologies technical assessment.
+              </p>
+              <p className="text-muted-foreground">
+                Our team will review your submission and <strong className="text-white">reach out soon with results</strong>.
+              </p>
+            </div>
+            
+            <div className="bg-background/50 rounded-lg p-4 border border-border/30">
+              <p className="text-xs text-muted-foreground text-center">
                 Submitted on {new Date(progress!.completed_at!).toLocaleDateString('en-US', {
                   weekday: 'long',
                   year: 'numeric',
@@ -454,13 +474,10 @@ const DevopsAssessment = () => {
                 })}
               </p>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => navigate('/tech')}
-              className="w-full"
-            >
-              Back to Tech
-            </Button>
+            
+            <p className="text-xs text-muted-foreground text-center">
+              You may now close this window.
+            </p>
           </CardContent>
         </Card>
       </div>

@@ -2,9 +2,50 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowRight, Loader2, CheckCircle, XCircle, Play } from 'lucide-react';
+import { ArrowRight, Loader2, CheckCircle, XCircle, Play, ChevronRight } from 'lucide-react';
 import type { CodingConfig, SubmitResponse } from '@/lib/assessment-api';
 import { assessmentApi } from '@/lib/assessment-api';
+
+// Convert markdown-like text to HTML
+const formatDescription = (text: string): string => {
+  return text
+    // Escape HTML first
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    // Bold: **text** or __text__
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white">$1</strong>')
+    .replace(/__(.+?)__/g, '<strong class="text-white">$1</strong>')
+    // Italic: *text* or _text_
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/_([^_]+)_/g, '<em>$1</em>')
+    // Code blocks: `code`
+    .replace(/`([^`]+)`/g, '<code class="bg-background/50 px-1.5 py-0.5 rounded text-primary font-mono text-xs">$1</code>')
+    // Headings
+    .replace(/^### (.+)$/gm, '<h3 class="text-white font-semibold mt-4 mb-2">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 class="text-white font-semibold text-lg mt-4 mb-2">$1</h2>')
+    // Numbered lists
+    .replace(/^(\d+)\. (.+)$/gm, '<li class="ml-4">$2</li>')
+    // Bullet lists
+    .replace(/^[-•] (.+)$/gm, '<li class="ml-4">$1</li>')
+    // Wrap consecutive <li> in <ol> or <ul>
+    .replace(/(<li[^>]*>.*<\/li>\n?)+/g, (match) => {
+      return `<ul class="list-disc pl-4 space-y-1 my-2">${match}</ul>`;
+    })
+    // Paragraphs (double newlines)
+    .replace(/\n\n/g, '</p><p class="my-3">')
+    // Single newlines to <br>
+    .replace(/\n/g, '<br>')
+    // Wrap in paragraph
+    .replace(/^/, '<p class="my-3">')
+    .replace(/$/, '</p>')
+    // Clean up empty paragraphs
+    .replace(/<p class="my-3"><\/p>/g, '')
+    .replace(/<p class="my-3">(<h[23])/g, '$1')
+    .replace(/(<\/h[23]>)<\/p>/g, '$1')
+    .replace(/<p class="my-3">(<ul)/g, '$1')
+    .replace(/(<\/ul>)<\/p>/g, '$1');
+};
 
 interface CodingSectionProps {
   config: CodingConfig;
@@ -119,37 +160,36 @@ const CodingSection = ({
           <div className="p-6 space-y-6">
             {/* Problem Description */}
             <div>
-              <h3 className="text-sm font-semibold text-white mb-3">Description</h3>
-              <pre className="whitespace-pre-wrap text-sm text-muted-foreground font-sans bg-background/30 p-4 rounded-lg border border-border/30">
-                {config.problem.description}
-              </pre>
+              <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                <span className="w-1 h-4 bg-primary rounded-full"></span>
+                Description
+              </h3>
+              <div 
+                className="text-sm text-muted-foreground leading-relaxed [&_strong]:font-semibold [&_code]:text-xs"
+                dangerouslySetInnerHTML={{ __html: formatDescription(config.problem.description) }}
+              />
             </div>
 
-            {/* Test Cases */}
+            {/* Test Cases - LeetCode Style */}
             <div>
-              <h3 className="text-sm font-semibold text-white mb-3">Sample Test Cases</h3>
-              <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                <span className="w-1 h-4 bg-primary rounded-full"></span>
+                Examples
+              </h3>
+              <div className="space-y-4">
                 {config.testCases.map((tc, i) => (
-                  <div key={i} className="bg-background/30 border border-border/30 rounded-lg p-4 space-y-2">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium mb-1">Test Case {i + 1}</p>
-                      <div className="space-y-1">
-                        <p className="text-xs">
-                          <span className="text-white font-medium">Input:</span>
-                        </p>
-                        <pre className="text-xs bg-background/50 p-2 rounded border border-border/30 overflow-x-auto">
-                          {tc.input}
-                        </pre>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="space-y-1">
-                        <p className="text-xs">
-                          <span className="text-white font-medium">Expected Output:</span>
-                        </p>
-                        <pre className="text-xs bg-background/50 p-2 rounded border border-border/30 overflow-x-auto">
-                          {tc.expectedOutput}
-                        </pre>
+                  <div key={i} className="space-y-2">
+                    <p className="text-sm font-medium text-white">Example {i + 1}:</p>
+                    <div className="bg-background/40 rounded-lg border border-border/30 overflow-hidden">
+                      <div className="px-4 py-3 space-y-2">
+                        <div className="flex items-start gap-2">
+                          <span className="text-xs font-medium text-muted-foreground min-w-[50px]">Input:</span>
+                          <pre className="text-xs font-mono text-white flex-1 whitespace-pre-wrap">{tc.input}</pre>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="text-xs font-medium text-muted-foreground min-w-[50px]">Output:</span>
+                          <pre className="text-xs font-mono text-white flex-1 whitespace-pre-wrap">{tc.expectedOutput}</pre>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -196,29 +236,51 @@ const CodingSection = ({
                 )}
               </div>
 
-              <div className="p-4 space-y-2 overflow-y-auto flex-1">
+              <div className="p-4 space-y-3 overflow-y-auto flex-1">
                 {result.details?.map((detail, i) => (
                   <div
                     key={i}
-                    className={`text-sm p-3 rounded border ${
+                    className={`rounded-lg border overflow-hidden ${
                       detail.passed
-                        ? 'bg-green-500/5 border-green-500/30 text-green-400'
-                        : 'bg-red-500/5 border-red-500/30 text-red-400'
+                        ? 'bg-green-500/5 border-green-500/30'
+                        : 'bg-red-500/5 border-red-500/30'
                     }`}
                   >
-                    <div className="flex items-center gap-2 font-medium mb-1">
+                    {/* Test Header */}
+                    <div className={`px-4 py-2 flex items-center gap-2 border-b ${
+                      detail.passed ? 'border-green-500/20 bg-green-500/10' : 'border-red-500/20 bg-red-500/10'
+                    }`}>
                       {detail.passed ? (
-                        <CheckCircle className="w-4 h-4" />
+                        <CheckCircle className="w-4 h-4 text-green-500" />
                       ) : (
-                        <XCircle className="w-4 h-4" />
+                        <XCircle className="w-4 h-4 text-red-500" />
                       )}
-                      <span>Test {detail.test}</span>
+                      <span className={`text-sm font-medium ${detail.passed ? 'text-green-400' : 'text-red-400'}`}>
+                        Case {detail.test} {detail.passed ? 'Passed' : 'Failed'}
+                      </span>
                     </div>
-                    {!detail.passed && detail.error && (
-                      <p className="text-xs text-muted-foreground ml-6">
-                        {detail.error}
-                      </p>
-                    )}
+                    
+                    {/* Test Details */}
+                    <div className="px-4 py-3 space-y-2 text-xs font-mono">
+                      {detail.expected && detail.expected !== '[hidden]' && (
+                        <div className="flex items-start gap-3">
+                          <span className="text-muted-foreground min-w-[70px]">Expected:</span>
+                          <span className="text-white">{detail.expected}</span>
+                        </div>
+                      )}
+                      {detail.actual && detail.actual !== '[hidden]' && (
+                        <div className="flex items-start gap-3">
+                          <span className="text-muted-foreground min-w-[70px]">Output:</span>
+                          <span className={detail.passed ? 'text-green-400' : 'text-red-400'}>{detail.actual}</span>
+                        </div>
+                      )}
+                      {detail.error && (
+                        <div className="flex items-start gap-3">
+                          <span className="text-red-400 min-w-[70px]">Error:</span>
+                          <span className="text-red-400 whitespace-pre-wrap">{detail.error}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -226,8 +288,9 @@ const CodingSection = ({
           )}
 
           {!result && (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-              Run tests to see results here
+            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
+              <Play className="w-8 h-8 text-muted-foreground/50" />
+              <span>Click "Test" to run your code</span>
             </div>
           )}
         </div>

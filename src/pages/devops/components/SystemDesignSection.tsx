@@ -108,14 +108,14 @@ const SystemDesignSection = ({
         <CardContent>
           <div 
             className="prose prose-invert prose-sm max-w-none text-muted-foreground leading-relaxed
-              [&_h1]:text-white [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-4 [&_h1]:mt-6
-              [&_h2]:text-white [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mb-3 [&_h2]:mt-5
-              [&_h3]:text-white [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4
+              [&_h1]:text-white [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-3 [&_h1]:mt-4
+              [&_h2]:text-white [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4
+              [&_h3]:text-white [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-3
               [&_strong]:text-white [&_strong]:font-semibold
-              [&_p]:mb-3 [&_p]:leading-relaxed
-              [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:space-y-2 [&_ol]:mb-4
-              [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-1 [&_ul]:mb-4
-              [&_li]:mb-1"
+              [&_p]:mb-2 [&_p]:leading-relaxed
+              [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-0.5 [&_ol]:mb-3
+              [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-0.5 [&_ul]:mb-3
+              [&_li]:mb-0 [&_li]:leading-snug"
             dangerouslySetInnerHTML={{ __html: formatPrompt(config.prompt) }}
           />
         </CardContent>
