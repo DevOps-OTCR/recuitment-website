@@ -186,7 +186,7 @@ const CodingSection = ({
             {/* Line Numbers + Code (shared scroll) */}
             <div className="flex-1 flex bg-[#0a1628] overflow-auto">
               <div className="w-12 shrink-0 bg-[#0a1628] text-teal-600/50 text-[13px] font-mono py-3 text-right pr-4 select-none border-r border-teal-500/20">
-                {Array.from({ length: Math.max(lineCount, 20) }, (_, i) => (
+                {Array.from({ length: 50 }, (_, i) => (
                   <div key={i} className="h-[21px] leading-[21px]">{i + 1}</div>
                 ))}
               </div>
