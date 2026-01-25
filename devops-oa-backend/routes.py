@@ -751,7 +751,37 @@ async def execute_code_judge0(code: str, stdin: str, language: str) -> dict:
 # Assessment Content (Questions, Problems, Prompts)
 # ============================================================================
 # Assessment content is loaded from a separate file that is GITIGNORED
-# to keep questions private. On Render, create assessment_content.py with
-# the actual questions. For local dev, copy assessment_content.example.py.
+# to keep questions private. On Render, use Secret Files to upload
+# assessment_content.py. For local dev, copy assessment_content.example.py.
 
-from assessment_content import get_assessment_content
+import sys
+import importlib.util
+
+# Try to load from Render secret files first, then local file
+def _load_assessment_content():
+    paths_to_try = [
+        "/etc/secrets/assessment_content.py",  # Render secret files
+        "assessment_content.py",  # Local development
+    ]
+    for path in paths_to_try:
+        try:
+            spec = importlib.util.spec_from_file_location("assessment_content", path)
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                return module.get_assessment_content
+        except (FileNotFoundError, ImportError):
+            continue
+    # Fallback: return a placeholder if no file found
+    def placeholder():
+        return {
+            "estimatedMinutes": 0,
+            "timeLimitMinutes": 0,
+            "sections": [],
+            "problemSolving": {"title": "Not configured", "questions": []},
+            "coding": {"title": "Not configured", "problem": {}, "testCases": []},
+            "systemDesign": {"title": "Not configured", "prompt": ""},
+        }
+    return placeholder
+
+get_assessment_content = _load_assessment_content()
