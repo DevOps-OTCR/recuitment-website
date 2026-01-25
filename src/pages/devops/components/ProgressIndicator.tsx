@@ -22,12 +22,11 @@ const ProgressIndicator = ({
   return (
     <div className="w-full">
       {/* Mobile: Simple step indicator */}
-      <div className="flex items-center justify-center gap-2 md:hidden">
+      <div className="flex flex-col items-center justify-center gap-2 md:hidden">
         <span className="text-sm font-medium text-white">
           {currentIndex + 1} / {sections.length}
         </span>
-        <span className="text-muted-foreground">–</span>
-        <span className="text-sm text-muted-foreground">
+        <span className="text-sm text-white font-semibold">
           {SECTION_LABELS[currentSection]}
         </span>
       </div>

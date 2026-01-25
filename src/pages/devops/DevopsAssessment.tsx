@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, CheckCircle, Loader2, Mail, AlertCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Loader2, Mail, AlertCircle, Clock } from 'lucide-react';
 import { assessmentApi, AssessmentConfig, ProgressResponse } from '@/lib/assessment-api';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 import ProgressIndicator from './components/ProgressIndicator';
@@ -27,6 +27,8 @@ const DevopsAssessment = () => {
   const [currentSection, setCurrentSection] = useState<Section>('problem_solving');
   const [submitting, setSubmitting] = useState(false);
   const [aiDetectionFlag, setAiDetectionFlag] = useState<string | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [assessmentStartTime, setAssessmentStartTime] = useState<number | null>(null);
   
   // Email verification state
   const [requiresEmail, setRequiresEmail] = useState(false);
@@ -62,6 +64,7 @@ const DevopsAssessment = () => {
           const progressData = await assessmentApi.startAttempt(token);
           setProgress(progressData);
           setEmailVerified(true);
+          setAssessmentStartTime(Date.now());
           
           // Determine current section based on completed sections
           const completed = progressData.sections_completed || [];
@@ -93,6 +96,28 @@ const DevopsAssessment = () => {
 
     loadConfig();
   }, [token]);
+
+  // Stopwatch timer effect
+  useEffect(() => {
+    if (!assessmentStartTime) return;
+    
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - assessmentStartTime) / 1000));
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [assessmentStartTime]);
+
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Request fullscreen
   const requestFullscreen = () => {
@@ -152,6 +177,9 @@ const DevopsAssessment = () => {
       if (nextSection) {
         setCurrentSection(nextSection);
       }
+      
+      // Set assessment start time for stopwatch
+      setAssessmentStartTime(Date.now());
       
       // Request fullscreen
       requestFullscreen();
@@ -371,11 +399,17 @@ const DevopsAssessment = () => {
               className="h-6 w-auto"
             />
           </div>
-          {config && (
-            <span className="text-sm text-muted-foreground">
-              ~{config.estimatedMinutes} min
-            </span>
-          )}
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            {assessmentStartTime && (
+              <div className="flex items-center gap-1">
+                <Clock className="w-4 h-4" />
+                <span className="font-mono font-medium text-white">{formatTime(elapsedSeconds)}</span>
+              </div>
+            )}
+            {config && (
+              <span>~{config.estimatedMinutes} min</span>
+            )}
+          </div>
         </div>
       </header>
 
