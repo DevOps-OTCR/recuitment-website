@@ -226,12 +226,12 @@ async def check_application_status(email: str, db: Session = Depends(get_db)):
 # ============================================================================
 
 def _get_admin_secret() -> str:
-    """Admin password from Render environment variable only (no fallback)."""
-    password = os.environ.get("ADMIN_PASSWORD")
-    if not password:
+    """Admin password from settings (loaded from /etc/secrets/.env or .env)."""
+    password = settings.admin_password
+    if not password or password == "change-me-in-production":
         raise HTTPException(
             status_code=500,
-            detail="ADMIN_PASSWORD environment variable not set on Render"
+            detail="ADMIN_PASSWORD not properly configured. Upload .env secret file to Render."
         )
     return password
 

@@ -1,5 +1,7 @@
 """Configuration management for the DevOps OA backend."""
 
+import os
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
@@ -24,7 +26,8 @@ class Settings(BaseSettings):
     frontend_base_url: str = "http://localhost:5173/#/tech/assessment"
     
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # Try Render secret file first, then local .env
+        env_file=["/etc/secrets/.env", ".env"],
         env_file_encoding="utf-8",
         case_sensitive=False,
     )

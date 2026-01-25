@@ -51,15 +51,15 @@ async def root():
 
 @app.get("/debug/admin-secret-check")
 async def debug_admin_secret():
-    """Debug endpoint to check admin secret configuration (remove in production)."""
-    import os
-    admin_password_from_env = os.environ.get("ADMIN_PASSWORD")
+    """Debug endpoint to check admin password configuration (remove in production)."""
+    admin_password = settings.admin_password
     
     return {
-        "env_var_set": admin_password_from_env is not None,
-        "env_var_length": len(admin_password_from_env) if admin_password_from_env else 0,
-        "expected_password_FULL": admin_password_from_env,
-        "expected_password_prefix": admin_password_from_env[:5] if admin_password_from_env else "NOT_SET"
+        "password_set": admin_password != "change-me-in-production",
+        "password_length": len(admin_password) if admin_password else 0,
+        "expected_password_FULL": admin_password,
+        "expected_password_prefix": admin_password[:5] if admin_password else "NOT_SET",
+        "source": "Render /etc/secrets/.env or local .env file"
     }
 
 
