@@ -31,7 +31,7 @@ const Apply = () => {
           />
           <FadeContent delay={1}>
             <p className="text-xl text-white/90 text-center max-w-3xl mx-auto">
-              Take the first step towards joining our elite consulting team. Fill out our interest form to stay informed about upcoming events and opportunities.
+              Take the first step towards joining our consulting team. Fill out our interest form to stay informed about upcoming events and opportunities.
             </p>
           </FadeContent>
         </div>
