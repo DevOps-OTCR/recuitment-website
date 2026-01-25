@@ -29,6 +29,10 @@ const DevopsAssessment = () => {
   const [aiDetectionFlag, setAiDetectionFlag] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [assessmentStartTime, setAssessmentStartTime] = useState<number | null>(null);
+  // Draft responses to persist when navigating back/forward
+  const [problemSolvingDraft, setProblemSolvingDraft] = useState<Record<string, string>>({});
+  const [codingDraft, setCodingDraft] = useState<string>('');
+  const [systemDesignDraft, setSystemDesignDraft] = useState<string>('');
   
   // Email verification state
   const [requiresEmail, setRequiresEmail] = useState(false);
@@ -554,6 +558,8 @@ const DevopsAssessment = () => {
           <ProblemSolvingSection
             config={config.problemSolving}
             onSubmit={(payload) => handleSectionSubmit('problem_solving', payload)}
+            initialAnswers={problemSolvingDraft}
+            onAnswersChange={setProblemSolvingDraft}
             submitting={submitting}
           />
         )}
@@ -564,6 +570,8 @@ const DevopsAssessment = () => {
             token={token}
             onSubmit={(payload) => handleSectionSubmit('coding', payload)}
             onBack={() => setCurrentSection('problem_solving')}
+            codeDraft={codingDraft || config.coding.problem.starterCode}
+            onCodeChange={setCodingDraft}
             submitting={submitting}
           />
         )}
@@ -573,6 +581,8 @@ const DevopsAssessment = () => {
             config={config.systemDesign}
             onSubmit={(payload) => handleSectionSubmit('system_design', payload)}
             onBack={() => setCurrentSection('coding')}
+            responseDraft={systemDesignDraft}
+            onResponseChange={setSystemDesignDraft}
             submitting={submitting}
           />
         )}

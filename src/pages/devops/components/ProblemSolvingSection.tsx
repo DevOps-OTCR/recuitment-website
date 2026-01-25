@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,22 +10,31 @@ import type { ProblemSolvingConfig } from '@/lib/assessment-api';
 interface ProblemSolvingSectionProps {
   config: ProblemSolvingConfig;
   onSubmit: (payload: Record<string, string>) => Promise<any>;
+  initialAnswers?: Record<string, string>;
+  onAnswersChange?: (answers: Record<string, string>) => void;
   submitting: boolean;
 }
 
 const ProblemSolvingSection = ({
   config,
   onSubmit,
+  initialAnswers = {},
+  onAnswersChange,
   submitting,
 }: ProblemSolvingSectionProps) => {
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, string>>(initialAnswers);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setAnswers(initialAnswers);
+  }, [initialAnswers]);
+
   const handleAnswerChange = (questionId: string, value: string) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: value,
-    }));
+    setAnswers((prev) => {
+      const next = { ...prev, [questionId]: value };
+      onAnswersChange?.(next);
+      return next;
+    });
   };
 
   const handleSubmit = async () => {

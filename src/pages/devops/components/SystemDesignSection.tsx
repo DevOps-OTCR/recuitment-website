@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -50,6 +50,8 @@ interface SystemDesignSectionProps {
   config: SystemDesignConfig;
   onSubmit: (payload: { response: string }) => Promise<any>;
   onBack: () => void;
+  responseDraft?: string;
+  onResponseChange?: (response: string) => void;
   submitting: boolean;
 }
 
@@ -57,11 +59,17 @@ const SystemDesignSection = ({
   config,
   onSubmit,
   onBack,
+  responseDraft = '',
+  onResponseChange,
   submitting,
 }: SystemDesignSectionProps) => {
-  const [response, setResponse] = useState('');
+  const [response, setResponse] = useState(responseDraft);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    setResponse(responseDraft);
+  }, [responseDraft]);
 
   const handleSubmit = async () => {
     if (!response.trim()) {
@@ -134,7 +142,10 @@ const SystemDesignSection = ({
           <CardContent>
             <Textarea
               value={response}
-              onChange={(e) => setResponse(e.target.value)}
+              onChange={(e) => {
+                setResponse(e.target.value);
+                onResponseChange?.(e.target.value);
+              }}
               placeholder="Write your system design response here...
 
 1. Scope – ...

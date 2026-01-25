@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle, XCircle, Play, Terminal, ChevronDown, ChevronUp, Code2, FileText } from 'lucide-react';
 import type { CodingConfig, SubmitResponse } from '@/lib/assessment-api';
@@ -32,6 +32,8 @@ interface CodingSectionProps {
   token: string;
   onSubmit: (payload: { code: string; language: string }) => Promise<SubmitResponse>;
   onBack: () => void;
+  codeDraft: string;
+  onCodeChange: (code: string) => void;
   submitting: boolean;
 }
 
@@ -40,15 +42,21 @@ const CodingSection = ({
   token,
   onSubmit,
   onBack,
+  codeDraft,
+  onCodeChange,
   submitting,
 }: CodingSectionProps) => {
-  const [code, setCode] = useState(config.problem.starterCode);
+  const [code, setCode] = useState(codeDraft || config.problem.starterCode);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SubmitResponse['coding_result'] | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [testingCode, setTestingCode] = useState(false);
   const [activeTestCase, setActiveTestCase] = useState(0);
   const [consoleOpen, setConsoleOpen] = useState(true);
+
+  useEffect(() => {
+    setCode(codeDraft || config.problem.starterCode);
+  }, [codeDraft, config.problem.starterCode]);
 
   const handleTest = async () => {
     if (!code.trim()) {
@@ -167,7 +175,10 @@ const CodingSection = ({
               </div>
               <textarea
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => {
+                  setCode(e.target.value);
+                  onCodeChange(e.target.value);
+                }}
                 className="flex-1 bg-[#0a1628] text-zinc-200 font-mono text-[13px] py-3 px-4 resize-none outline-none leading-[21px] min-h-full"
                 spellCheck={false}
                 disabled={submitted}
