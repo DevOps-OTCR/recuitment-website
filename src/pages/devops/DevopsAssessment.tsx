@@ -36,6 +36,9 @@ const DevopsAssessment = () => {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [verifyingEmail, setVerifyingEmail] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
+  
+  // Pledge agreement state
+  const [pledgeAccepted, setPledgeAccepted] = useState(false);
 
   // Load assessment config
   useEffect(() => {
@@ -59,12 +62,11 @@ const DevopsAssessment = () => {
         setConfig(configData);
         setRequiresEmail(configData.requiresEmail || false);
         
-        // If email not required, start attempt immediately
+        // If email not required, show pledge screen
         if (!configData.requiresEmail) {
           const progressData = await assessmentApi.startAttempt(token);
           setProgress(progressData);
           setEmailVerified(true);
-          setAssessmentStartTime(Date.now());
           
           // Determine current section based on completed sections
           const completed = progressData.sections_completed || [];
@@ -72,12 +74,6 @@ const DevopsAssessment = () => {
           if (nextSection) {
             setCurrentSection(nextSection);
           }
-          
-          // Request fullscreen
-          requestFullscreen();
-          
-          // Track focus loss
-          setupFocusTracking(token);
         }
         
         setLoading(false);
@@ -159,6 +155,20 @@ const DevopsAssessment = () => {
     };
   };
 
+  // Handle pledge acceptance
+  const handlePledgeAccept = () => {
+    setPledgeAccepted(true);
+    setAssessmentStartTime(Date.now());
+    
+    // Request fullscreen
+    requestFullscreen();
+    
+    // Track focus loss
+    if (token) {
+      setupFocusTracking(token);
+    }
+  };
+
   // Handle email verification and start attempt
   const handleEmailVerify = async () => {
     if (!token || !email.trim()) return;
@@ -169,7 +179,6 @@ const DevopsAssessment = () => {
     try {
       const progressData = await assessmentApi.startAttempt(token, email.trim());
       setProgress(progressData);
-      setEmailVerified(true);
       
       // Determine current section based on completed sections
       const completed = progressData.sections_completed || [];
@@ -178,14 +187,7 @@ const DevopsAssessment = () => {
         setCurrentSection(nextSection);
       }
       
-      // Set assessment start time for stopwatch
-      setAssessmentStartTime(Date.now());
-      
-      // Request fullscreen
-      requestFullscreen();
-      
-      // Track focus loss
-      setupFocusTracking(token);
+      setEmailVerified(true);
 
     } catch (err: any) {
       console.error('Failed to verify email:', err);
@@ -337,6 +339,93 @@ const DevopsAssessment = () => {
     );
   }
 
+  // Pledge screen (after email verification, before assessment)
+  if (emailVerified && !pledgeAccepted) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-2xl w-full bg-card/80 border-border/50">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl text-white">Academic Integrity Pledge</CardTitle>
+            <CardDescription>
+              Please review and accept the following terms before starting the assessment
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="bg-background/50 rounded-lg p-6 space-y-4 max-h-96 overflow-y-auto">
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                By starting this assessment, I agree to the following:
+              </p>
+              
+              <ul className="space-y-3 text-sm text-muted-foreground">
+                <li className="flex gap-3">
+                  <span className="text-primary font-bold flex-shrink-0">•</span>
+                  <span>
+                    <strong className="text-white">No Cheating:</strong> I will not cheat or attempt to gain an unfair advantage. I understand that dishonesty will result in immediate disqualification.
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="text-primary font-bold flex-shrink-0">•</span>
+                  <span>
+                    <strong className="text-white">No Outside Resources:</strong> I will not use any external resources including the internet, ChatGPT, AI tools, Stack Overflow, documentation, or any other reference materials except what is provided in this assessment.
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="text-primary font-bold flex-shrink-0">•</span>
+                  <span>
+                    <strong className="text-white">No Copy/Paste:</strong> I will not copy and paste code or solutions from any external source.
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="text-primary font-bold flex-shrink-0">•</span>
+                  <span>
+                    <strong className="text-white">No Spell Check / Grammar Tools:</strong> I will not use spell checkers, grammar tools, or any automated writing assistance.
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="text-primary font-bold flex-shrink-0">•</span>
+                  <span>
+                    <strong className="text-white">Integrity Monitoring:</strong> This assessment monitors for suspicious activity including window focus loss and AI-generated content detection. Any flagged behavior may result in disqualification.
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="text-primary font-bold flex-shrink-0">•</span>
+                  <span>
+                    <strong className="text-white">Own Work:</strong> All work submitted must be my own. I understand that submitting work that is not entirely my own is academic dishonesty.
+                  </span>
+                </li>
+              </ul>
+
+              <div className="border-t border-border/30 pt-4 mt-4">
+                <p className="text-xs text-muted-foreground">
+                  <strong className="text-white block mb-2">Timing Information:</strong>
+                  This assessment is <strong>untimed</strong>, but we recommend completing it within <strong>30-45 minutes</strong>. There is no time limit, and you can take as long as needed to complete all sections. A timer will track your elapsed time for reference.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Button
+                onClick={handlePledgeAccept}
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                I Agree and Accept
+              </Button>
+              
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/tech')}
+                className="w-full text-muted-foreground hover:text-white"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // Completed state
   if (isCompleted) {
     return (
@@ -405,9 +494,6 @@ const DevopsAssessment = () => {
                 <Clock className="w-4 h-4" />
                 <span className="font-mono font-medium text-white">{formatTime(elapsedSeconds)}</span>
               </div>
-            )}
-            {config && (
-              <span>~{config.estimatedMinutes} min</span>
             )}
           </div>
         </div>
