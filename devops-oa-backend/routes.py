@@ -461,6 +461,10 @@ async def get_assessment_config(token: str, db: Session = Depends(get_db)):
     config = get_assessment_content()
     config["requiresEmail"] = link.email is not None
     
+    # Add secret AI detection flag (hidden watermark)
+    # This flag should be returned in submissions to verify authenticity
+    config["_aiDetectionFlag"] = secrets.token_hex(16)
+    
     return config
 
 
@@ -540,18 +544,30 @@ async def submit_section(
         raise HTTPException(status_code=400, detail=f"Section '{request.section}' already submitted")
     
     coding_result = None
+    ai_flag_present = False
+    
+    # Check for AI detection flag in payload
+    if "_aiDetectionFlag" in request.payload:
+        ai_flag_present = True
+        # Remove it before storing (don't store the flag in the submission)
+        request.payload.pop("_aiDetectionFlag", None)
     
     # For coding section, run against test cases
     if request.section == "coding":
         coding_result = await run_code_tests(request.payload)
     
-    # Create submission
+    # Create submission with AI detection flag
     submission = Submission(
         attempt_id=attempt.id,
         section=request.section,
         payload=request.payload,
         coding_result=coding_result,
     )
+    
+    # Store AI flag info in notes for admin review
+    if not ai_flag_present:
+        submission.notes = "[WARNING] AI detection flag missing - possible AI assistance detected"
+    
     db.add(submission)
     
     # Update sections completed - create new list to trigger SQLAlchemy change detection

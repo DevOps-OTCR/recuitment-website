@@ -78,6 +78,7 @@ class Submission(Base):
     section = Column(String(50), nullable=False)  # problem_solving, coding, system_design
     payload = Column(JSON, nullable=False)  # The actual submission content
     coding_result = Column(JSON, nullable=True)  # Only for coding section: { passed, total, details }
+    notes = Column(String(500), nullable=True)  # Admin notes (e.g., AI detection warnings)
     submitted_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relationship
