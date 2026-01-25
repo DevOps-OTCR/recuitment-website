@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Secret Debug</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 8px;
+        }
+        input {
+            padding: 10px;
+            width: 100%;
+            margin: 10px 0;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #1a1a1a;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Admin Secret Debug Tool</h1>
+        <p>This tool helps debug the admin authentication issue.</p>
+        
+        <div>
+            <label>Backend URL:</label>
+            <input type="text" id="apiUrl" value="https://recuitment-website.onrender.com" placeholder="https://recuitment-website.onrender.com">
+        </div>
+        
+        <div>
+            <label>Admin Secret:</label>
+            <input type="password" id="adminSecret" placeholder="Enter admin secret">
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <button onclick="checkServerSecret()">1. Check Server Config</button>
+            <button onclick="testAdminHeader()">2. Test Admin Header</button>
+            <button onclick="testApplicationsEndpoint()">3. Test Applications Endpoint</button>
+        </div>
+        
+        <div id="result" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        function showResult(data, isError = false) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result ' + (isError ? 'error' : 'success');
+            resultDiv.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        }
+
+        async function checkServerSecret() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            try {
+                const response = await fetch(`${apiUrl}/debug/admin-secret-check`);
+                const data = await response.json();
+                showResult(data);
+            } catch (error) {
+                showResult(`Error: ${error.message}`, true);
+            }
+        }
+
+        async function testAdminHeader() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const secret = document.getElementById('adminSecret').value;
+            
+            if (!secret) {
+                showResult('Please enter an admin secret', true);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${apiUrl}/api/debug/test-admin`, {
+                    headers: {
+                        'X-Admin-Secret': secret
+                    }
+                });
+                const data = await response.json();
+                showResult(data);
+            } catch (error) {
+                showResult(`Error: ${error.message}`, true);
+            }
+        }
+
+        async function testApplicationsEndpoint() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const secret = document.getElementById('adminSecret').value;
+            
+            if (!secret) {
+                showResult('Please enter an admin secret', true);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${apiUrl}/api/admin/applications`, {
+                    headers: {
+                        'X-Admin-Secret': secret
+                    }
+                });
+                
+                if (response.status === 403) {
+                    showResult(`403 Forbidden - Invalid admin secret\n\nThe secret you entered does not match the server's ADMIN_SECRET environment variable.`, true);
+                } else if (response.ok) {
+                    const data = await response.json();
+                    showResult(`✅ Success! Found ${data.length} applications\n\n${JSON.stringify(data, null, 2)}`);
+                } else {
+                    showResult(`HTTP ${response.status}: ${response.statusText}`, true);
+                }
+            } catch (error) {
+                showResult(`Error: ${error.message}`, true);
+            }
+        }
+    </script>
+</body>
+</html>

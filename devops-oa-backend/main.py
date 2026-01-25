@@ -49,6 +49,22 @@ async def root():
     return {"status": "ok", "service": "devops-oa-backend"}
 
 
+@app.get("/debug/admin-secret-check")
+async def debug_admin_secret():
+    """Debug endpoint to check admin secret configuration (remove in production)."""
+    import os
+    admin_secret_from_env = os.environ.get("ADMIN_SECRET")
+    admin_secret_from_settings = settings.admin_secret
+    
+    return {
+        "env_var_set": admin_secret_from_env is not None,
+        "env_var_length": len(admin_secret_from_env) if admin_secret_from_env else 0,
+        "settings_secret_length": len(admin_secret_from_settings),
+        "using": "env" if admin_secret_from_env else "settings",
+        "expected_secret_prefix": (admin_secret_from_env or admin_secret_from_settings)[:5] if (admin_secret_from_env or admin_secret_from_settings) else "None"
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
