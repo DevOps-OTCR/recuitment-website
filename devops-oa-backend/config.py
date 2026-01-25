@@ -6,6 +6,33 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
 
+def _load_secret_file():
+    """Load secret file from Render /etc/secrets/.env into environment variables."""
+    secret_file_path = "/etc/secrets/.env"
+    
+    if os.path.exists(secret_file_path):
+        try:
+            with open(secret_file_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    # Skip empty lines and comments
+                    if not line or line.startswith('#'):
+                        continue
+                    # Parse KEY=VALUE
+                    if '=' in line:
+                        key, value = line.split('=', 1)
+                        key = key.strip()
+                        value = value.strip().strip('"').strip("'")
+                        # Set in environment
+                        os.environ[key] = value
+        except Exception as e:
+            print(f"Warning: Could not load secret file {secret_file_path}: {e}")
+
+
+# Load secret file on startup
+_load_secret_file()
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
@@ -26,8 +53,8 @@ class Settings(BaseSettings):
     frontend_base_url: str = "http://localhost:5173/#/tech/assessment"
     
     model_config = SettingsConfigDict(
-        # Try Render secret file first, then local .env
-        env_file=["/etc/secrets/.env", ".env"],
+        # Fall back to local .env if secret file not found
+        env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
     )
