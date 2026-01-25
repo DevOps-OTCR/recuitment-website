@@ -7,8 +7,8 @@ from functools import lru_cache
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
-    # Admin secret for link generation
-    admin_secret: str = "change-me-in-production"
+    # Admin password for link generation
+    admin_password: str = "change-me-in-production"
     
     # Code execution API (Judge0 or Piston)
     code_exec_api_url: str = "https://judge0-ce.p.rapidapi.com"

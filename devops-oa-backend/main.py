@@ -53,8 +53,8 @@ async def root():
 async def debug_admin_secret():
     """Debug endpoint to check admin secret configuration (remove in production)."""
     import os
-    admin_secret_from_env = os.environ.get("ADMIN_SECRET")
-    admin_secret_from_settings = settings.admin_secret
+    admin_secret_from_env = os.environ.get("ADMIN_PASSWORD")
+    admin_secret_from_settings = settings.admin_password
     
     return {
         "env_var_set": admin_secret_from_env is not None,

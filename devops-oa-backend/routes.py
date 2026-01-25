@@ -227,7 +227,7 @@ async def check_application_status(email: str, db: Session = Depends(get_db)):
 
 def _get_admin_secret() -> str:
     """Admin secret: env var takes precedence (Render env groups)."""
-    return os.environ.get("ADMIN_SECRET") or settings.admin_secret
+    return os.environ.get("ADMIN_PASSWORD") or settings.admin_password
 
 
 @router.get("/debug/test-admin")
