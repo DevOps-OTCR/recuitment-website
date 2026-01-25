@@ -226,8 +226,14 @@ async def check_application_status(email: str, db: Session = Depends(get_db)):
 # ============================================================================
 
 def _get_admin_secret() -> str:
-    """Admin secret: env var takes precedence (Render env groups)."""
-    return os.environ.get("ADMIN_PASSWORD") or settings.admin_password
+    """Admin password from Render environment variable only (no fallback)."""
+    password = os.environ.get("ADMIN_PASSWORD")
+    if not password:
+        raise HTTPException(
+            status_code=500,
+            detail="ADMIN_PASSWORD environment variable not set on Render"
+        )
+    return password
 
 
 @router.get("/debug/test-admin")
