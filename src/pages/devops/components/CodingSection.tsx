@@ -93,12 +93,12 @@ const CodingSection = ({
   const lineCount = code.split('\n').length;
 
   return (
-    <div className="h-[calc(100vh-120px)] flex rounded-lg overflow-hidden border border-zinc-800">
-      {/* Left Panel - Problem Description (LeetCode Style) */}
-      <div className="w-[45%] flex flex-col bg-[#1e1e1e] border-r border-zinc-800">
+    <div className="h-[calc(100vh-120px)] flex rounded-lg overflow-hidden border border-teal-500/30">
+      {/* Left Panel - Problem Description (OTCR Style) */}
+      <div className="w-[45%] flex flex-col bg-[#0a1628] border-r border-teal-500/30">
         {/* Tabs */}
-        <div className="flex items-center gap-1 px-3 py-2 bg-[#2d2d2d] border-b border-zinc-700">
-          <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#1e1e1e] rounded-t border-t border-l border-r border-zinc-700 -mb-[1px]">
+        <div className="flex items-center gap-1 px-3 py-2 bg-[#0d1d33] border-b border-teal-500/30">
+          <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#0a1628] rounded-t border-t border-l border-r border-teal-500/30 -mb-[1px]">
             <FileText className="w-3.5 h-3.5 text-teal-400" />
             Description
           </button>
@@ -132,7 +132,7 @@ const CodingSection = ({
                   <h3 className="text-sm font-semibold text-white mb-2">
                     Example {i + 1}:
                   </h3>
-                  <div className="bg-[#262626] rounded-lg border border-zinc-700/50 overflow-hidden">
+                  <div className="bg-[#0d1d33] rounded-lg border border-teal-500/20 overflow-hidden">
                     <pre className="p-3 text-[13px] font-mono text-zinc-300 whitespace-pre-wrap leading-relaxed">
                       <span className="text-zinc-500">Input:</span>
                       {'\n'}{tc.input}
@@ -148,17 +148,17 @@ const CodingSection = ({
       </div>
 
       {/* Right Panel - Code Editor */}
-      <div className="flex-1 flex flex-col bg-[#1e1e1e]">
+      <div className="flex-1 flex flex-col bg-[#0a1628]">
         {/* Editor Header */}
-        <div className="flex items-center justify-between px-3 py-2 bg-[#2d2d2d] border-b border-zinc-700">
+        <div className="flex items-center justify-between px-3 py-2 bg-[#0d1d33] border-b border-teal-500/30">
           <div className="flex items-center gap-2">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#1e1e1e] rounded-t border-t border-l border-r border-zinc-700 -mb-[1px]">
+            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#0a1628] rounded-t border-t border-l border-r border-teal-500/30 -mb-[1px]">
               <Code2 className="w-3.5 h-3.5 text-teal-400" />
               Code
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-300 bg-[#1e1e1e] rounded border border-zinc-700">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-300 bg-[#0a1628] rounded border border-teal-500/30">
               <span className="text-teal-400">●</span>
               Python 3
               <ChevronDown className="w-3 h-3 text-zinc-500" />
@@ -170,9 +170,9 @@ const CodingSection = ({
         <div className="flex-1 flex flex-col min-h-0">
           <div className={`${consoleOpen ? 'h-[55%]' : 'flex-1'} flex flex-col min-h-0 transition-all`}>
             {/* Line Numbers + Code */}
-            <div className="flex-1 flex overflow-hidden bg-[#1e1e1e]">
+            <div className="flex-1 flex overflow-hidden bg-[#0a1628]">
               {/* Line Numbers */}
-              <div className="w-12 bg-[#1e1e1e] text-zinc-600 text-[13px] font-mono py-3 text-right pr-4 select-none border-r border-zinc-800/50">
+              <div className="w-12 bg-[#0a1628] text-teal-600/50 text-[13px] font-mono py-3 text-right pr-4 select-none border-r border-teal-500/20">
                 {Array.from({ length: Math.max(lineCount, 20) }, (_, i) => (
                   <div key={i} className="h-[21px] leading-[21px]">{i + 1}</div>
                 ))}
@@ -181,18 +181,18 @@ const CodingSection = ({
               <textarea
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="flex-1 bg-[#1e1e1e] text-zinc-200 font-mono text-[13px] py-3 px-4 resize-none outline-none leading-[21px] overflow-auto"
+                className="flex-1 bg-[#0a1628] text-zinc-200 font-mono text-[13px] py-3 px-4 resize-none outline-none leading-[21px] overflow-auto"
                 spellCheck={false}
                 disabled={submitted}
               />
             </div>
           </div>
 
-          {/* Console Panel (LeetCode Style) */}
+          {/* Console Panel (OTCR Style) */}
           {consoleOpen && (
-            <div className="h-[45%] flex flex-col border-t border-zinc-700 bg-[#1e1e1e]">
+            <div className="h-[45%] flex flex-col border-t border-teal-500/30 bg-[#0a1628]">
               {/* Console Header */}
-              <div className="flex items-center justify-between px-4 py-2 bg-[#2d2d2d] border-b border-zinc-700">
+              <div className="flex items-center justify-between px-4 py-2 bg-[#0d1d33] border-b border-teal-500/30">
                 <div className="flex items-center gap-4">
                   <button 
                     className={`text-xs font-medium px-1 pb-1 ${
@@ -212,7 +212,7 @@ const CodingSection = ({
                 </div>
                 <button 
                   onClick={() => setConsoleOpen(false)}
-                  className="text-zinc-400 hover:text-white p-1 rounded hover:bg-zinc-700"
+                  className="text-zinc-400 hover:text-white p-1 rounded hover:bg-teal-500/20"
                 >
                   <ChevronDown className="w-4 h-4" />
                 </button>
@@ -241,15 +241,15 @@ const CodingSection = ({
                     </div>
 
                     {/* Test Case Tabs */}
-                    <div className="flex items-center gap-2 border-b border-zinc-800 pb-2">
+                    <div className="flex items-center gap-2 border-b border-teal-500/20 pb-2">
                       {result.details?.map((detail, i) => (
                         <button
                           key={i}
                           onClick={() => setActiveTestCase(i)}
                           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                             activeTestCase === i 
-                              ? 'bg-zinc-700 text-white' 
-                              : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                              ? 'bg-teal-500/20 text-white' 
+                              : 'text-zinc-400 hover:text-white hover:bg-teal-500/10'
                           }`}
                         >
                           {detail.passed ? (
@@ -266,15 +266,15 @@ const CodingSection = ({
                     {result.details && result.details[activeTestCase] && (
                       <div className="space-y-4">
                         <div>
-                          <p className="text-xs text-zinc-500 mb-2 font-medium">Input =</p>
-                          <div className="bg-[#262626] rounded-lg p-3 border border-zinc-700/50">
+                          <p className="text-xs text-teal-400/70 mb-2 font-medium">Input =</p>
+                          <div className="bg-[#0d1d33] rounded-lg p-3 border border-teal-500/20">
                             <pre className="text-[13px] font-mono text-white whitespace-pre-wrap">
                               {config.testCases[activeTestCase]?.input || 'N/A'}
                             </pre>
                           </div>
                         </div>
                         <div>
-                          <p className="text-xs text-zinc-500 mb-2 font-medium">Output =</p>
+                          <p className="text-xs text-teal-400/70 mb-2 font-medium">Output =</p>
                           <div className={`rounded-lg p-3 border ${
                             result.details[activeTestCase].passed 
                               ? 'bg-green-500/5 border-green-500/30' 
@@ -288,8 +288,8 @@ const CodingSection = ({
                           </div>
                         </div>
                         <div>
-                          <p className="text-xs text-zinc-500 mb-2 font-medium">Expected =</p>
-                          <div className="bg-[#262626] rounded-lg p-3 border border-zinc-700/50">
+                          <p className="text-xs text-teal-400/70 mb-2 font-medium">Expected =</p>
+                          <div className="bg-[#0d1d33] rounded-lg p-3 border border-teal-500/20">
                             <pre className="text-[13px] font-mono text-white whitespace-pre-wrap">
                               {result.details[activeTestCase].expected || 'N/A'}
                             </pre>
@@ -312,15 +312,15 @@ const CodingSection = ({
                   /* Test Case Input (before running) */
                   <div className="space-y-4">
                     {/* Test Case Tabs */}
-                    <div className="flex items-center gap-2 border-b border-zinc-800 pb-2">
+                    <div className="flex items-center gap-2 border-b border-teal-500/20 pb-2">
                       {config.testCases.map((_, i) => (
                         <button
                           key={i}
                           onClick={() => setActiveTestCase(i)}
                           className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                             activeTestCase === i 
-                              ? 'bg-zinc-700 text-white' 
-                              : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                              ? 'bg-teal-500/20 text-white' 
+                              : 'text-zinc-400 hover:text-white hover:bg-teal-500/10'
                           }`}
                         >
                           Case {i + 1}
@@ -331,16 +331,16 @@ const CodingSection = ({
                     {/* Selected Test Case */}
                     <div className="space-y-4">
                       <div>
-                        <p className="text-xs text-zinc-500 mb-2 font-medium">Input =</p>
-                        <div className="bg-[#262626] rounded-lg p-3 border border-zinc-700/50">
+                        <p className="text-xs text-teal-400/70 mb-2 font-medium">Input =</p>
+                        <div className="bg-[#0d1d33] rounded-lg p-3 border border-teal-500/20">
                           <pre className="text-[13px] font-mono text-white whitespace-pre-wrap">
                             {config.testCases[activeTestCase]?.input}
                           </pre>
                         </div>
                       </div>
                       <div>
-                        <p className="text-xs text-zinc-500 mb-2 font-medium">Expected Output =</p>
-                        <div className="bg-[#262626] rounded-lg p-3 border border-zinc-700/50">
+                        <p className="text-xs text-teal-400/70 mb-2 font-medium">Expected Output =</p>
+                        <div className="bg-[#0d1d33] rounded-lg p-3 border border-teal-500/20">
                           <pre className="text-[13px] font-mono text-white whitespace-pre-wrap">
                             {config.testCases[activeTestCase]?.expectedOutput}
                           </pre>
@@ -357,7 +357,7 @@ const CodingSection = ({
           {!consoleOpen && (
             <button 
               onClick={() => setConsoleOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 border-t border-zinc-700 bg-[#2d2d2d] text-zinc-400 hover:text-white text-xs transition-colors"
+              className="flex items-center gap-2 px-4 py-2 border-t border-teal-500/30 bg-[#0d1d33] text-zinc-400 hover:text-white text-xs transition-colors"
             >
               <Terminal className="w-4 h-4" />
               Console
@@ -366,12 +366,12 @@ const CodingSection = ({
           )}
         </div>
 
-        {/* Bottom Action Bar (LeetCode Style) */}
-        <div className="flex items-center justify-between px-4 py-3 bg-[#2d2d2d] border-t border-zinc-700">
+        {/* Bottom Action Bar (OTCR Style) */}
+        <div className="flex items-center justify-between px-4 py-3 bg-[#0d1d33] border-t border-teal-500/30">
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setConsoleOpen(!consoleOpen)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 hover:text-white rounded hover:bg-zinc-700 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 hover:text-white rounded hover:bg-teal-500/20 transition-colors"
             >
               <Terminal className="w-4 h-4" />
               Console
@@ -387,7 +387,7 @@ const CodingSection = ({
               onClick={handleTest}
               disabled={testingCode || submitted}
               variant="outline"
-              className="h-8 px-5 text-xs font-medium bg-transparent border-zinc-600 text-white hover:bg-zinc-700 hover:text-white rounded-md"
+              className="h-8 px-5 text-xs font-medium bg-transparent border-teal-500/50 text-white hover:bg-teal-500/20 hover:text-white hover:border-teal-400 rounded-md"
             >
               {testingCode ? (
                 <>
