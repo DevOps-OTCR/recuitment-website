@@ -48,6 +48,9 @@ class ApplicationListItem(BaseModel):
     reviewed_at: Optional[datetime]
     notes: Optional[str]
     has_assessment_link: bool
+    focus_loss_events: int = 0
+    is_flagged: bool = False
+    integrity_notes: Optional[str] = None
 
 
 class ApproveApplicationRequest(BaseModel):
@@ -258,8 +261,14 @@ async def list_applications(
     
     applications = query.order_by(Application.created_at.desc()).all()
     
-    return [
-        ApplicationListItem(
+    result = []
+    for app in applications:
+        # Get attempt data if exists
+        attempt = None
+        if app.assessment_link_id:
+            attempt = db.query(Attempt).filter(Attempt.link_id == app.assessment_link_id).first()
+        
+        result.append(ApplicationListItem(
             id=app.id,
             name=app.name,
             email=app.email,
@@ -270,9 +279,12 @@ async def list_applications(
             reviewed_at=app.reviewed_at,
             notes=app.notes,
             has_assessment_link=app.assessment_link_id is not None,
-        )
-        for app in applications
-    ]
+            focus_loss_events=attempt.focus_loss_events if attempt else 0,
+            is_flagged=attempt.is_flagged if attempt else False,
+            integrity_notes=attempt.integrity_notes if attempt else None,
+        ))
+    
+    return result
 
 
 @router.get("/admin/applications/{application_id}")

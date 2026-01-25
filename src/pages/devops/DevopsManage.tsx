@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Lock, Loader2, CheckCircle, XCircle, Clock, Copy, FileText, LogOut, ExternalLink } from 'lucide-react';
+import { Lock, Loader2, CheckCircle, XCircle, Clock, Copy, FileText, LogOut, ExternalLink, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 
@@ -23,6 +23,9 @@ interface ApplicationItem {
   reviewed_at: string | null;
   notes: string | null;
   has_assessment_link: boolean;
+  focus_loss_events: number;
+  is_flagged: boolean;
+  integrity_notes: string | null;
 }
 
 const DevopsManage = () => {
@@ -278,7 +281,7 @@ const DevopsManage = () => {
             </Card>
           ) : (
             <div className="rounded-lg border border-border overflow-x-auto overflow-y-visible">
-              <table className="w-full text-left min-w-[700px]">
+              <table className="w-full text-left min-w-[900px]">
                 <thead>
                   <tr className="border-b border-border bg-card/80">
                     <th className="px-4 py-3 text-sm font-semibold text-white">Name</th>
@@ -286,6 +289,7 @@ const DevopsManage = () => {
                     <th className="px-4 py-3 text-sm font-semibold text-white">Why OTCR Tech</th>
                     <th className="px-4 py-3 text-sm font-semibold text-white">Resume</th>
                     <th className="px-4 py-3 text-sm font-semibold text-white">Status</th>
+                    <th className="px-4 py-3 text-sm font-semibold text-white">Integrity</th>
                     <th className="px-4 py-3 text-sm font-semibold text-white">Actions</th>
                   </tr>
                 </thead>
@@ -327,6 +331,24 @@ const DevopsManage = () => {
                           <span className="inline-flex items-center gap-1 text-sm text-amber-500">
                             <Clock className="w-4 h-4" /> Pending
                           </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {app.is_flagged ? (
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-destructive" />
+                            <div className="text-xs">
+                              <p className="text-destructive font-medium">Flagged</p>
+                              <p className="text-muted-foreground">Focus loss: {app.focus_loss_events}</p>
+                              {app.integrity_notes && (
+                                <p className="text-muted-foreground">{app.integrity_notes}</p>
+                              )}
+                            </div>
+                          </div>
+                        ) : app.focus_loss_events > 0 ? (
+                          <p className="text-xs text-muted-foreground">Focus loss: {app.focus_loss_events}</p>
+                        ) : (
+                          <p className="text-xs text-green-500">✓ Clean</p>
                         )}
                       </td>
                       <td className="px-4 py-3">
