@@ -61,6 +61,16 @@ const DevopsManage = () => {
   const [viewingSubmission, setViewingSubmission] = useState<SubmissionData | null>(null);
   const [loadingSubmission, setLoadingSubmission] = useState(false);
 
+  const formatDuration = (start?: string | null, end?: string | null) => {
+    if (!start || !end) return '—';
+    const ms = new Date(end).getTime() - new Date(start).getTime();
+    if (ms <= 0) return '—';
+    const totalMinutes = Math.floor(ms / 60000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  };
+
   useEffect(() => {
     const key = sessionStorage.getItem(ADMIN_KEY_STORAGE);
     if (key) setStoredSecret(key);
@@ -468,6 +478,9 @@ const DevopsManage = () => {
                 <h2 className="text-xl font-bold text-white">Submission Review</h2>
                 <p className="text-sm text-muted-foreground">
                   {viewingSubmission.applicant_name} ({viewingSubmission.email})
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Started: {new Date(viewingSubmission.started_at).toLocaleString()} · Finished: {viewingSubmission.completed_at ? new Date(viewingSubmission.completed_at).toLocaleString() : '—'} · Duration: {formatDuration(viewingSubmission.started_at, viewingSubmission.completed_at)}
                 </p>
               </div>
               <Button
