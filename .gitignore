@@ -29,6 +29,7 @@ devops-oa-backend/uploads/
 devops-oa-backend/*.db
 devops-oa-backend/__pycache__/
 devops-oa-backend/venv/
+devops-oa-backend/assessment_content.py
 
 # Generic Python
 __pycache__/
