@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Lock, Loader2, CheckCircle, XCircle, Clock, Copy, FileText, LogOut, ExternalLink } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 
 const API_BASE_URL = import.meta.env.VITE_OA_API_URL || 'http://localhost:8000';
@@ -25,6 +26,7 @@ interface ApplicationItem {
 }
 
 const DevopsManage = () => {
+  const { toast } = useToast();
   const [adminSecret, setAdminSecret] = useState('');
   const [storedSecret, setStoredSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -141,6 +143,10 @@ const DevopsManage = () => {
 
   const copyLink = (url: string) => {
     navigator.clipboard.writeText(url);
+    toast({
+      title: 'Link copied!',
+      description: 'Assessment link copied to clipboard.',
+    });
   };
 
   const openResume = async (id: number) => {
@@ -345,6 +351,22 @@ const DevopsManage = () => {
                               Reject
                             </Button>
                           </div>
+                        )}
+                        {app.status === 'approved' && app.has_assessment_link && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const base = `${window.location.origin}${window.location.pathname || '/'}`.replace(/\/?$/, '');
+                              const token = app.id.toString();
+                              const url = `${base}#/tech/assessment/${token}`;
+                              copyLink(url);
+                            }}
+                            className="text-teal-primary hover:text-teal-primary/90 hover:bg-teal-primary/10 border-teal-primary/30"
+                          >
+                            <Copy className="w-4 h-4 mr-1" />
+                            Copy Link
+                          </Button>
                         )}
                       </td>
                     </tr>
