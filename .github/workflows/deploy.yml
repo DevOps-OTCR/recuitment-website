@@ -29,7 +29,10 @@ jobs:
       - run: npm ci
 
       # build (Vite will pick base from vite.config.ts)
+      # Production frontend calls Render backend for tech applications / admin
       - run: npm run build
+        env:
+          VITE_OA_API_URL: https://recuitment-website.onrender.com
 
       # REQUIRED: configure Pages
       - uses: actions/configure-pages@v5
