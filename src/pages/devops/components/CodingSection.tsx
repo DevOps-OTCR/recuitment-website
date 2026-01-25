@@ -22,13 +22,16 @@ const formatDescription = (text: string): string => {
     .replace(/(<li[^>]*>.*<\/li>\n?)+/g, (match) => `<ul class="list-disc pl-4 space-y-1 my-2">${match}</ul>`)
     // Keep single newlines tight, double newlines just add a small break
     .replace(/\n\n+/g, '<br><br>')
-    .replace(/\n/g, '<br>');
+    .replace(/\n/g, '<br>')
+    // Collapse runs of <br> to avoid large gaps
+    .replace(/(<br>\s*){3,}/g, '<br><br>');
 };
 
 interface CodingSectionProps {
   config: CodingConfig;
   token: string;
   onSubmit: (payload: { code: string; language: string }) => Promise<SubmitResponse>;
+  onBack: () => void;
   submitting: boolean;
 }
 
@@ -36,6 +39,7 @@ const CodingSection = ({
   config,
   token,
   onSubmit,
+  onBack,
   submitting,
 }: CodingSectionProps) => {
   const [code, setCode] = useState(config.problem.starterCode);
@@ -103,13 +107,6 @@ const CodingSection = ({
             <h1 className="text-xl font-semibold text-white mb-3">
               {config.problem.title}
             </h1>
-
-            {/* Difficulty Badge */}
-            <div className="flex items-center gap-3 mb-5">
-              <span className="px-2.5 py-0.5 text-xs font-medium bg-amber-500/15 text-amber-400 rounded-full">
-                Medium
-              </span>
-            </div>
 
             {/* Description */}
             <div 
@@ -359,6 +356,14 @@ const CodingSection = ({
         {/* Bottom Action Bar (OTCR Style) */}
         <div className="flex items-center justify-between px-4 py-3 bg-[#0d1d33] border-t border-teal-500/30">
           <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              onClick={onBack}
+              disabled={submitting || submitted}
+              className="h-8 px-3 text-xs font-medium border-teal-500/50 text-white hover:bg-teal-500/20 hover:border-teal-400"
+            >
+              ← Back to Problem Solving
+            </Button>
             <button 
               onClick={() => setConsoleOpen(!consoleOpen)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 hover:text-white rounded hover:bg-teal-500/20 transition-colors"

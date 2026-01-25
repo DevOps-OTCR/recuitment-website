@@ -5,13 +5,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle, Loader2, Clock, Send } from 'lucide-react';
 import type { SystemDesignConfig } from '@/lib/assessment-api';
 
-// Convert markdown-like text to HTML
+// Convert markdown-like text to HTML (allow trusted inline HTML like <b>)
 const formatPrompt = (text: string): string => {
   return text
-    // Escape HTML first
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
     // Bold: **text** or __text__
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/__(.+?)__/g, '<strong>$1</strong>')
@@ -28,12 +24,13 @@ const formatPrompt = (text: string): string => {
     .replace(/^[-•] (.+)$/gm, '<li>$1</li>')
     // Wrap consecutive <li> in <ol> or <ul>
     .replace(/(<li>.*<\/li>\n?)+/g, (match) => {
-      // Check if it starts with a number pattern
       if (/^<li>\d/.test(match)) {
         return `<ol>${match}</ol>`;
       }
       return `<ul>${match}</ul>`;
     })
+    // Collapse excessive blank lines
+    .replace(/\n\n+/g, '\n\n')
     // Paragraphs (double newlines)
     .replace(/\n\n/g, '</p><p>')
     // Single newlines to <br> within paragraphs
@@ -52,12 +49,14 @@ const formatPrompt = (text: string): string => {
 interface SystemDesignSectionProps {
   config: SystemDesignConfig;
   onSubmit: (payload: { response: string }) => Promise<any>;
+  onBack: () => void;
   submitting: boolean;
 }
 
 const SystemDesignSection = ({
   config,
   onSubmit,
+  onBack,
   submitting,
 }: SystemDesignSectionProps) => {
   const [response, setResponse] = useState('');
@@ -171,9 +170,19 @@ const SystemDesignSection = ({
         )}
         
         <div className="flex items-center justify-between bg-card/40 rounded-lg px-4 py-3">
-          <span className="text-sm text-muted-foreground">
-            This is the final section.
-          </span>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              onClick={onBack}
+              disabled={submitting || submitted}
+              className="h-9 px-3 text-sm font-medium border-teal-500/50 text-white hover:bg-teal-500/20 hover:border-teal-400"
+            >
+              ← Back to Coding
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              This is the final section.
+            </span>
+          </div>
           <Button
             onClick={handleSubmit}
             disabled={submitting || submitted || !response.trim()}

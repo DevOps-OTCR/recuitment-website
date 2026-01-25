@@ -563,6 +563,7 @@ const DevopsAssessment = () => {
             config={config.coding}
             token={token}
             onSubmit={(payload) => handleSectionSubmit('coding', payload)}
+            onBack={() => setCurrentSection('problem_solving')}
             submitting={submitting}
           />
         )}
@@ -571,6 +572,7 @@ const DevopsAssessment = () => {
           <SystemDesignSection
             config={config.systemDesign}
             onSubmit={(payload) => handleSectionSubmit('system_design', payload)}
+            onBack={() => setCurrentSection('coding')}
             submitting={submitting}
           />
         )}
