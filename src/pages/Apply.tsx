@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -48,7 +49,15 @@ const Apply = () => {
             <h2 className="text-4xl lg:text-5xl font-extrabold text-white mb-8">
               Fill out our interest form to stay informed about upcoming events, or start working on your application!
             </h2>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-4 justify-center items-center">
+              <Link to="/tech/apply">
+                <Button
+                  size="lg"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-4 text-base font-medium hover-scale"
+                >
+                  Technologies Applications
+                </Button>
+              </Link>
               <a
                 href="https://docs.google.com/forms/d/e/1FAIpQLSd9imBmn6u_4MKFTn4ZD5lzQkMQQzDkCsdaKQTgS-nZFq4VnQ/viewform"
                 target="_blank"
@@ -61,7 +70,6 @@ const Apply = () => {
                   Consultant Application
                 </Button>
               </a>
-
               <a
                 href="https://docs.google.com/forms/d/e/1FAIpQLSci6UG2bIJP4G36TDTlZ1IWg2GkAF_WaUk1uzh_ibmnkDohiw/viewform"
                 target="_blank"

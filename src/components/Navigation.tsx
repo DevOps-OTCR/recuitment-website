@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { NavLink, Link } from 'react-router-dom';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import { Menu, X, Linkedin, Instagram } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 
 type Item = {
   label: string;
@@ -14,8 +15,9 @@ const navItems: Item[] = [
   { label: 'Home', to: '/' },
   { label: 'About OTCR', to: '/about' },
   { label: 'Leadership', to: '/leadership' },
-  { label: 'Recruitment Process', to: '/join' },
+  { label: 'Timeline', to: '/join' },
   { label: 'Resources', to: '/recruitment-resources' },
+  { label: 'Tech', to: '/tech' },
   { label: 'Apply Now', to: '/apply', cta: true },
   {
     label: 'Clients',
@@ -31,8 +33,12 @@ const linkInactive =
 const linkActive =
   'text-white bg-white/10'; // tweak to your theme
 
+const OTCR_LOGO_URL = 'https://cdn.builder.io/api/v1/image/assets%2F98c6b4d260e54d44896320277f23f7f2%2Fa46e089f3caf43dab4a95e9cb35165cb?format=webp&width=800';
+
 export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const location = useLocation();
+  const isTechPage = location.pathname.startsWith('/tech');
 
   const renderDesktopItem = (item: Item, idx: number) => {
     if (item.external) {
@@ -114,14 +120,24 @@ export default function Navigation() {
       <div className="flex items-center justify-between max-w-7xl mx-auto">
         {/* Logo */}
         <div className="flex items-center">
-          <Link to="/" className="flex items-center group transition-all duration-300">
+          <Link to={isTechPage ? '/tech' : '/'} className="flex items-center group transition-all duration-300">
             <div className="relative">
-              <img
-                src="https://cdn.builder.io/api/v1/image/assets%2F98c6b4d260e54d44896320277f23f7f2%2Fa46e089f3caf43dab4a95e9cb35165cb?format=webp&width=800"
-                alt="OTCR Consulting Logo"
-                className="h-10 w-auto transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-lg"
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-teal-primary/20 to-blue-accent/20 rounded-lg scale-0 group-hover:scale-110 transition-transform duration-300 blur-md"></div>
+              {isTechPage ? (
+                <img
+                  src={otcrTechLogo}
+                  alt="OTCR Technologies"
+                  className="h-10 w-auto transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-lg"
+                />
+              ) : (
+                <>
+                  <img
+                    src={OTCR_LOGO_URL}
+                    alt="OTCR Consulting Logo"
+                    className="h-10 w-auto transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-lg"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-teal-primary/20 to-blue-accent/20 rounded-lg scale-0 group-hover:scale-110 transition-transform duration-300 blur-md"></div>
+                </>
+              )}
             </div>
           </Link>
         </div>

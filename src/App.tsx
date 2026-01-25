@@ -2,16 +2,25 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import Index from "./pages/Index";
 import About from "./pages/About";
 import Leadership from "./pages/Leadership";
 import Join from "./pages/Join";
 import Apply from "./pages/Apply";
 import RecruitmentResources from "./pages/recruitment-resources";
+import DevopsLanding from "./pages/devops/DevopsLanding";
+import DevopsApply from "./pages/devops/DevopsApply";
+import DevopsAssessment from "./pages/devops/DevopsAssessment";
+import DevopsManage from "./pages/devops/DevopsManage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+function RedirectDevopsAssessment() {
+  const { token } = useParams<{ token: string }>();
+  return <Navigate to={token ? `/tech/assessment/${token}` : "/tech"} replace />;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -25,6 +34,15 @@ const App = () => (
         <Route path="/join" element={<Join />} />
         <Route path="/apply" element={<Apply />} />
         <Route path="/recruitment-resources" element={<RecruitmentResources />} />
+        <Route path="/tech" element={<DevopsLanding />} />
+        <Route path="/tech/apply" element={<DevopsApply />} />
+        <Route path="/tech/assessment/:token" element={<DevopsAssessment />} />
+        <Route path="/tech/manage" element={<DevopsManage />} />
+        {/* Redirect old /devops paths to /tech */}
+        <Route path="/devops" element={<Navigate to="/tech" replace />} />
+        <Route path="/devops/apply" element={<Navigate to="/tech/apply" replace />} />
+        <Route path="/devops/assessment/:token" element={<RedirectDevopsAssessment />} />
+        <Route path="/devops/manage" element={<Navigate to="/tech/manage" replace />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </TooltipProvider>
