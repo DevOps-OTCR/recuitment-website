@@ -1,6 +1,6 @@
 """Configuration management for the DevOps OA backend."""
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
 
@@ -23,9 +23,11 @@ class Settings(BaseSettings):
     # Frontend URL for assessment links
     frontend_base_url: str = "http://localhost:5173/#/tech/assessment"
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+    )
 
 
 @lru_cache()
