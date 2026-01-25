@@ -436,7 +436,7 @@ async def create_link(
     )
 
 
-@router.get("/admin/test-link")
+@router.post("/admin/test-link")
 async def get_admin_test_link(
     db: Session = Depends(get_db),
     _: bool = Depends(verify_admin_secret),
