@@ -23,6 +23,20 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 # ============================================================================
+# Health Check
+# ============================================================================
+
+@router.get("/health")
+async def health_check():
+    """Health check endpoint to verify API is running."""
+    return {
+        "status": "OK",
+        "message": "Your API is running",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+# ============================================================================
 # Pydantic Schemas
 # ============================================================================
 
