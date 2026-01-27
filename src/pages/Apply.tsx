@@ -62,14 +62,14 @@ const Apply = () => {
                   Consultant Application
                 </Button>
               </a>
-              <Link to="/tech/apply">
+              {/* <Link to="/tech/apply">
                 <Button
                   size="lg"
                   className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-4 text-base font-medium hover-scale"
                 >
                   Technologies Application
                 </Button>
-              </Link>
+              </Link> */}
               <a
                 href="https://docs.google.com/forms/d/e/1FAIpQLSci6UG2bIJP4G36TDTlZ1IWg2GkAF_WaUk1uzh_ibmnkDohiw/viewform"
                 target="_blank"

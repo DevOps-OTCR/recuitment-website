@@ -17,7 +17,7 @@ const navItems: Item[] = [
   { label: 'Leadership', to: '/leadership' },
   { label: 'Timeline', to: '/join' },
   { label: 'Resources', to: '/recruitment-resources' },
-  { label: 'Tech', to: '/tech' },
+  // { label: 'Tech', to: '/tech' },
   { label: 'Apply Now', to: '/apply', cta: true },
   {
     label: 'Clients',
