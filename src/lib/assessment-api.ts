@@ -151,10 +151,20 @@ class AssessmentApiClient {
 
   /**
    * Record a progress snapshot (e.g. every 5 min) for submission review timeline.
+   * progress_detail: MCQ answered count, coding/system_design character lengths at snapshot time.
    */
   async recordProgressSnapshot(
     token: string,
-    data: { sections_completed: string[]; current_section: string | null; elapsed_seconds: number }
+    data: {
+      sections_completed: string[];
+      current_section: string | null;
+      elapsed_seconds: number;
+      progress_detail?: {
+        problem_solving?: { answered_count: number; total: number };
+        coding?: { length: number };
+        system_design?: { length: number };
+      };
+    }
   ): Promise<void> {
     await this.fetch<{ ok: boolean }>(`/api/assessment/${token}/progress-snapshot`, {
       method: 'POST',

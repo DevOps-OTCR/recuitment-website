@@ -32,11 +32,18 @@ interface ApplicationItem {
   archived_at: string | null;
 }
 
+interface ProgressDetail {
+  problem_solving?: { answered_count: number; total: number };
+  coding?: { length: number };
+  system_design?: { length: number };
+}
+
 interface ProgressSnapshotItem {
   snapshot_at: string;
   sections_completed: string[];
   current_section: string | null;
   elapsed_seconds: number;
+  progress_detail?: ProgressDetail | null;
 }
 
 interface SubmissionData {
@@ -735,7 +742,7 @@ OTCR Technologies`;
                 <div className="border border-border rounded-lg overflow-hidden">
                   <div className="bg-[#0f0f1a] px-4 py-2 border-b border-border">
                     <h3 className="font-medium text-white">Progress through assessment</h3>
-                    <p className="text-xs text-muted-foreground">Snapshots taken every 5 minutes</p>
+                    <p className="text-xs text-muted-foreground">Snapshots taken every 5 minutes — MCQ/code/system design state at each time</p>
                   </div>
                   <div className="p-4">
                     <ul className="space-y-3">
@@ -745,18 +752,35 @@ OTCR Technologies`;
                           : '—';
                         const completedCount = (snap.sections_completed || []).length;
                         const min = Math.floor(snap.elapsed_seconds / 60);
+                        const d = snap.progress_detail;
+                        const parts: string[] = [];
+                        if (d?.problem_solving && d.problem_solving.total > 0) {
+                          parts.push(`MCQ ${d.problem_solving.answered_count}/${d.problem_solving.total} answered`);
+                        }
+                        if (d?.coding !== undefined) {
+                          parts.push(d.coding.length === 0 ? 'Coding: not started' : `Coding: ${d.coding.length >= 1000 ? `${(d.coding.length / 1000).toFixed(1)}k` : d.coding.length} chars`);
+                        }
+                        if (d?.system_design !== undefined) {
+                          parts.push(d.system_design.length === 0 ? 'System design: not started' : `System design: ${d.system_design.length >= 1000 ? `${(d.system_design.length / 1000).toFixed(1)}k` : d.system_design.length} chars`);
+                        }
+                        const detailText = parts.length > 0 ? parts.join(' · ') : null;
                         return (
-                          <li key={idx} className="flex items-center gap-3 text-sm border-l-2 border-border pl-3 py-1">
-                            <span className="text-muted-foreground shrink-0 w-16">{min} min</span>
-                            <span className="text-white">
-                              {completedCount} section{completedCount !== 1 ? 's' : ''} done
-                              {snap.current_section && (
-                                <> · on <span className="capitalize">{sectionLabel}</span></>
-                              )}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(snap.snapshot_at).toLocaleTimeString()}
-                            </span>
+                          <li key={idx} className="border-l-2 border-border pl-3 py-2">
+                            <div className="flex items-center gap-3 text-sm flex-wrap">
+                              <span className="text-muted-foreground shrink-0 w-16">{min} min</span>
+                              <span className="text-white">
+                                {completedCount} section{completedCount !== 1 ? 's' : ''} done
+                                {snap.current_section && (
+                                  <> · on <span className="capitalize">{sectionLabel}</span></>
+                                )}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(snap.snapshot_at).toLocaleTimeString()}
+                              </span>
+                            </div>
+                            {detailText && (
+                              <p className="text-xs text-muted-foreground mt-1 ml-16">{detailText}</p>
+                            )}
                           </li>
                         );
                       })}

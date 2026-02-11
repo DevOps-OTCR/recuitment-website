@@ -543,6 +543,7 @@ async def get_submission(
             "sections_completed": s.sections_completed or [],
             "current_section": s.current_section,
             "elapsed_seconds": s.elapsed_seconds,
+            "progress_detail": s.progress_detail,
         }
         for s in snapshots
     ]
@@ -962,6 +963,7 @@ class ProgressSnapshotRequest(BaseModel):
     sections_completed: List[str] = []
     current_section: Optional[str] = None
     elapsed_seconds: int = 0
+    progress_detail: Optional[dict] = None  # MCQ answered count, coding/system_design lengths at snapshot time
 
 
 @router.post("/assessment/{token}/progress-snapshot")
@@ -988,6 +990,7 @@ async def record_progress_snapshot(
         sections_completed=request.sections_completed,
         current_section=request.current_section,
         elapsed_seconds=request.elapsed_seconds,
+        progress_detail=request.progress_detail,
     )
     db.add(snapshot)
     db.commit()

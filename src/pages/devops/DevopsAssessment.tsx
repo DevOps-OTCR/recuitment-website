@@ -143,12 +143,24 @@ const DevopsAssessment = () => {
     const minutes = Math.floor(elapsedSeconds / 300) * 5; // 0, 5, 10, 15...
     if (minutes <= lastSnapshotMinutesRef.current) return;
     lastSnapshotMinutesRef.current = minutes;
+
+    const psTotal = config?.problemSolving?.questions?.length ?? 0;
+    const psAnswered = psTotal
+      ? Object.keys(problemSolvingDraft).filter((qId) => (problemSolvingDraft[qId] ?? '').trim().length > 0).length
+      : 0;
+    const progress_detail = {
+      problem_solving: psTotal > 0 ? { answered_count: psAnswered, total: psTotal } : undefined,
+      coding: { length: (codingDraft || '').length },
+      system_design: { length: (systemDesignDraft || '').length },
+    };
+
     assessmentApi.recordProgressSnapshot(token, {
       sections_completed: progress?.sections_completed ?? [],
       current_section: currentSection,
       elapsed_seconds: elapsedSeconds,
+      progress_detail,
     }).catch(() => { /* non-blocking */ });
-  }, [token, assessmentStartTime, elapsedSeconds, progress?.sections_completed, progress?.completed_at, currentSection]);
+  }, [token, assessmentStartTime, elapsedSeconds, progress?.sections_completed, progress?.completed_at, currentSection, config?.problemSolving?.questions?.length, problemSolvingDraft, codingDraft, systemDesignDraft]);
 
   // Persist drafts (and current section) to localStorage
   useEffect(() => {

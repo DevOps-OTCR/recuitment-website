@@ -86,6 +86,8 @@ class ProgressSnapshot(Base):
     sections_completed = Column(JSON, default=list)  # ["problem_solving", ...]
     current_section = Column(String(50), nullable=True)  # section they were on at snapshot time
     elapsed_seconds = Column(Integer, nullable=False)  # time since attempt started
+    # Actual progress at snapshot time: MCQ answered count, coding/system_design lengths
+    progress_detail = Column(JSON, nullable=True)  # { problem_solving: {answered_count, total}, coding: {length}, system_design: {length} }
 
     attempt = relationship("Attempt", back_populates="progress_snapshots")
 

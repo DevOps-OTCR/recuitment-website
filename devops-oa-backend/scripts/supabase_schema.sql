@@ -64,6 +64,17 @@ CREATE TABLE IF NOT EXISTS assessment_progress_snapshots (
     snapshot_at TIMESTAMP DEFAULT NOW() NOT NULL,
     sections_completed JSONB DEFAULT '[]',
     current_section VARCHAR(50),
-    elapsed_seconds INTEGER NOT NULL
+    elapsed_seconds INTEGER NOT NULL,
+    progress_detail JSONB
 );
 CREATE INDEX IF NOT EXISTS ix_assessment_progress_snapshots_attempt_id ON assessment_progress_snapshots (attempt_id);
+-- Add progress_detail if table already existed without it
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'assessment_progress_snapshots' AND column_name = 'progress_detail'
+    ) THEN
+        ALTER TABLE assessment_progress_snapshots ADD COLUMN progress_detail JSONB;
+    END IF;
+END $$;
