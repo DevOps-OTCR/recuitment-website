@@ -1,0 +1,8 @@
+#!/bin/sh
+# Remove "Co-authored-by: Cursor" trailer from commit messages.
+# Cursor IDE may add this automatically; this hook strips it so commits stay clean.
+MSG_FILE="$1"
+[ -f "$MSG_FILE" ] || exit 0
+# Strip lines that are Co-authored-by and mention Cursor (case-insensitive); write to temp then replace
+grep -v -i '^Co-authored-by:.*cursor' "$MSG_FILE" > "${MSG_FILE}.tmp" 2>/dev/null && mv "${MSG_FILE}.tmp" "$MSG_FILE"
+exit 0
