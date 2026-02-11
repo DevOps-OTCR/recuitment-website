@@ -46,8 +46,12 @@ class Settings(BaseSettings):
     # CORS
     allowed_origins: str = "http://localhost:5173,http://localhost:8080"
     
-    # Database
+    # Database (use Supabase Postgres in production)
     database_url: str = "sqlite:///./devops_oa.db"
+    
+    # Supabase (for resume storage; optional – if set, resumes go to Storage instead of local disk)
+    supabase_url: str = ""
+    supabase_key: str = ""  # Use Service Role key for private bucket access
     
     # Frontend URL for assessment links
     frontend_base_url: str = "http://localhost:5173/#/tech/assessment"

@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 
@@ -13,11 +13,12 @@ from config import get_settings
 from database import get_db
 from models import AssessmentLink, Attempt, Submission, Application, ApplicationStatus
 from assessment_content import get_mcq_answer_key
+from storage import upload_resume, download_resume, is_supabase_path, get_supabase_storage
 
 router = APIRouter()
 settings = get_settings()
 
-# Ensure uploads directory exists
+# Local uploads fallback when Supabase is not configured
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads", "resumes")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -181,25 +182,32 @@ async def submit_application(
             detail="An application with this email already exists. Please contact us if you need to update your application."
         )
     
-    # Save resume file
+    # Save resume file (Supabase Storage or local disk)
     file_ext = os.path.splitext(resume.filename)[1] if resume.filename else ".pdf"
     safe_filename = f"{secrets.token_urlsafe(16)}{file_ext}"
-    file_path = os.path.join(UPLOAD_DIR, safe_filename)
-    
-    try:
-        contents = await resume.read()
-        with open(file_path, "wb") as f:
-            f.write(contents)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save resume: {str(e)}")
-    
+    contents = await resume.read()
+    content_type = "application/pdf" if file_ext.lower() == ".pdf" else "application/octet-stream"
+
+    if get_supabase_storage():
+        if not upload_resume(safe_filename, contents, content_type):
+            raise HTTPException(status_code=500, detail="Failed to save resume to storage.")
+        resume_path = safe_filename  # storage object key
+    else:
+        file_path = os.path.join(UPLOAD_DIR, safe_filename)
+        try:
+            with open(file_path, "wb") as f:
+                f.write(contents)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to save resume: {str(e)}")
+        resume_path = file_path
+
     # Create application
     application = Application(
         name=name.strip(),
         email=email.lower().strip(),
         interest=interest.strip() if interest else None,
         resume_filename=resume.filename,
-        resume_path=file_path,
+        resume_path=resume_path,
         status=ApplicationStatus.PENDING.value,
     )
     db.add(application)
@@ -345,19 +353,30 @@ async def get_application_resume(
     db: Session = Depends(get_db),
     _: bool = Depends(verify_admin_secret),
 ):
-    """Stream resume file for admin (opens in new tab)."""
+    """Stream resume file for admin (opens in new tab). From Supabase Storage or local disk."""
     application = db.query(Application).filter(Application.id == application_id).first()
     if not application or not application.resume_path:
         raise HTTPException(status_code=404, detail="Resume not found")
-    if not os.path.isfile(application.resume_path):
-        raise HTTPException(status_code=404, detail="Resume file missing")
     filename = application.resume_filename or "resume.pdf"
     media_type = "application/pdf" if filename.lower().endswith(".pdf") else "application/octet-stream"
+    disposition = f"inline; filename={filename!r}"
+
+    if is_supabase_path(application.resume_path):
+        data = download_resume(application.resume_path)
+        if data is None:
+            raise HTTPException(status_code=404, detail="Resume file missing")
+        return Response(
+            content=data,
+            media_type=media_type,
+            headers={"Content-Disposition": disposition},
+        )
+    if not os.path.isfile(application.resume_path):
+        raise HTTPException(status_code=404, detail="Resume file missing")
     return FileResponse(
         application.resume_path,
         filename=filename,
         media_type=media_type,
-        headers={"Content-Disposition": f"inline; filename={filename!r}"},
+        headers={"Content-Disposition": disposition},
     )
 
 

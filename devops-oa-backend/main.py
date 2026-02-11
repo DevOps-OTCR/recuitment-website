@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from config import get_settings
 from database import init_db
 from routes import router
+from storage import ensure_resumes_bucket
 
 settings = get_settings()
 
@@ -14,8 +15,8 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown."""
-    # Initialize database on startup
     init_db()
+    ensure_resumes_bucket()
     yield
 
 

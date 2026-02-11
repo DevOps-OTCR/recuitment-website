@@ -2,13 +2,29 @@
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 from config import get_settings
 
 settings = get_settings()
 
+
+def _database_url() -> str:
+    """Use configured DATABASE_URL; ensure Supabase Postgres has SSL."""
+    url = settings.database_url
+    if "supabase" in url:
+        parsed = urlparse(url)
+        qs = parse_qs(parsed.query)
+        if "sslmode" not in qs:
+            qs["sslmode"] = ["require"]
+            new_query = urlencode(qs, doseq=True)
+            url = urlunparse(parsed._replace(query=new_query))
+    return url
+
+
 # Create engine with SQLite-specific settings
-connect_args = {"check_same_thread": False} if "sqlite" in settings.database_url else {}
-engine = create_engine(settings.database_url, connect_args=connect_args)
+_db_url = _database_url()
+connect_args = {"check_same_thread": False} if "sqlite" in _db_url else {}
+engine = create_engine(_db_url, connect_args=connect_args)
 
 # Session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
