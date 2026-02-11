@@ -10,7 +10,7 @@ from functools import lru_cache
 
 
 def _load_secret_file():
-    """Load secret file from Render /etc/secrets/.env into environment variables."""
+    """Load secret file from Render (or any host) /etc/secrets/.env into environment variables."""
     secret_file_path = "/etc/secrets/.env"
     
     if os.path.exists(secret_file_path):
@@ -49,12 +49,12 @@ class Settings(BaseSettings):
     # CORS
     allowed_origins: str = "http://localhost:5173,http://localhost:8080"
     
-    # Database (use Supabase Postgres in production)
+    # Database: Supabase Postgres in production (use pooler URL on Render)
     database_url: str = "sqlite:///./devops_oa.db"
     
-    # Supabase (for resume storage; optional – if set, resumes go to Storage instead of local disk)
+    # Supabase: required in production when using Supabase Postgres (resume storage)
     supabase_url: str = ""
-    supabase_key: str = ""  # Use Service Role key for private bucket access
+    supabase_key: str = ""  # Service Role key for private bucket access
     
     # Frontend URL for assessment links
     frontend_base_url: str = "http://localhost:5173/#/tech/assessment"

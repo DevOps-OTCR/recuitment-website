@@ -15,9 +15,23 @@ from storage import ensure_resumes_bucket
 settings = get_settings()
 
 
+def _require_supabase_storage_in_production():
+    """When using Supabase Postgres (production), Supabase Storage is required."""
+    url = (settings.database_url or "").lower()
+    if "postgres" not in url or "supabase" not in url:
+        return  # SQLite or non-Supabase Postgres: local storage allowed
+    if settings.supabase_url and settings.supabase_key:
+        return  # Supabase Storage configured
+    raise RuntimeError(
+        "Production uses Supabase Postgres; Supabase Storage is required. "
+        "Set SUPABASE_URL and SUPABASE_KEY (Service Role) in your environment (e.g. Render env vars or /etc/secrets/.env)."
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown."""
+    _require_supabase_storage_in_production()
     init_db()
     ensure_resumes_bucket()
     yield
