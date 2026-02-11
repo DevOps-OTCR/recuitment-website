@@ -28,6 +28,7 @@ class Application(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     reviewed_at = Column(DateTime, nullable=True)
     notes = Column(Text, nullable=True)  # Admin notes
+    archived_at = Column(DateTime, nullable=True)  # When set, hidden from default list
     
     # Relationship to assessment link (created when approved)
     assessment_link_id = Column(Integer, ForeignKey("assessment_links.id"), nullable=True)

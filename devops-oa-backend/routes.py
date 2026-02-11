@@ -27,14 +27,47 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 # Health Check
 # ============================================================================
 
+def _persistence_info():
+    """Return database and storage backend types (no secrets)."""
+    db_url = (settings.database_url or "").lower()
+    database = "postgres" if "postgres" in db_url else "sqlite"
+    storage = "supabase" if (settings.supabase_url and settings.supabase_key) else "local"
+    return {"database": database, "storage": storage}
+
+
 @router.get("/health")
 async def health_check():
-    """Health check endpoint to verify API is running."""
+    """Health check endpoint to verify API is running and report persistence backends."""
     return {
         "status": "OK",
         "message": "Your API is running",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
+        "persistence": _persistence_info(),
     }
+
+
+@router.get("/health/persistence")
+async def health_persistence(db: Session = Depends(get_db)):
+    """
+    Verify persistent storage is reachable.
+    Returns 200 if DB and (when configured) Supabase storage are working.
+    """
+    from sqlalchemy import text
+    from storage import get_supabase_storage
+    out = {"database": "ok", "storage": None}
+    # 1. Database: run a trivial read
+    db.execute(text("SELECT 1"))
+    # 2. Storage: if Supabase configured, verify connection
+    client = get_supabase_storage()
+    if client:
+        try:
+            client.storage.list_buckets()
+            out["storage"] = "ok"
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"Storage unreachable: {e}")
+    else:
+        out["storage"] = "local"
+    return {"status": "OK", "checks": out, "persistence": _persistence_info()}
 
 
 # ============================================================================
@@ -69,6 +102,7 @@ class ApplicationListItem(BaseModel):
     focus_loss_events: int = 0
     is_flagged: bool = False
     integrity_notes: Optional[str] = None
+    archived_at: Optional[datetime] = None
 
 
 class ApproveApplicationRequest(BaseModel):
@@ -276,24 +310,28 @@ def verify_admin_secret(x_admin_secret: str = Header(..., alias="X-Admin-Secret"
 @router.get("/admin/applications", response_model=List[ApplicationListItem])
 async def list_applications(
     status: Optional[str] = None,
+    archived: Optional[str] = None,
     db: Session = Depends(get_db),
     _: bool = Depends(verify_admin_secret),
 ):
-    """List all applications (admin only)."""
+    """List applications (admin only). archived=0 or omit = exclude archived; archived=1 = include; archived=only = only archived."""
     query = db.query(Application)
     if status:
         query = query.filter(Application.status == status)
+    if archived is None or archived == "0" or archived == "false":
+        query = query.filter(Application.archived_at.is_(None))
+    elif archived == "only":
+        query = query.filter(Application.archived_at.isnot(None))
+    # archived=1 or "true" = include all (no filter)
     
     applications = query.order_by(Application.created_at.desc()).all()
     
     result = []
     for app in applications:
-        # Get attempt data if exists
         attempt = None
         assessment_token = None
         if app.assessment_link_id:
             attempt = db.query(Attempt).filter(Attempt.link_id == app.assessment_link_id).first()
-            # Get the token from the assessment link
             link = db.query(AssessmentLink).filter(AssessmentLink.id == app.assessment_link_id).first()
             if link:
                 assessment_token = link.token
@@ -314,6 +352,7 @@ async def list_applications(
             focus_loss_events=attempt.focus_loss_events if attempt else 0,
             is_flagged=attempt.is_flagged if attempt else False,
             integrity_notes=attempt.integrity_notes if attempt else None,
+            archived_at=app.archived_at,
         ))
     
     return result
@@ -572,6 +611,59 @@ async def reject_application(
         "application_id": application.id,
         "status": application.status,
     }
+
+
+@router.post("/admin/applications/{application_id}/archive")
+async def archive_application(
+    application_id: int,
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_admin_secret),
+):
+    """Archive an application (hide from default list). Admin only."""
+    application = db.query(Application).filter(Application.id == application_id).first()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    application.archived_at = datetime.utcnow()
+    db.commit()
+    return {"success": True, "application_id": application.id, "archived": True}
+
+
+@router.post("/admin/applications/{application_id}/unarchive")
+async def unarchive_application(
+    application_id: int,
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_admin_secret),
+):
+    """Restore an archived application. Admin only."""
+    application = db.query(Application).filter(Application.id == application_id).first()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    application.archived_at = None
+    db.commit()
+    return {"success": True, "application_id": application.id, "archived": False}
+
+
+@router.delete("/admin/applications/{application_id}")
+async def delete_application(
+    application_id: int,
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_admin_secret),
+):
+    """Permanently delete an application and its assessment link/attempts. Admin only."""
+    application = db.query(Application).filter(Application.id == application_id).first()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    link_id = application.assessment_link_id
+    application.assessment_link_id = None
+    db.flush()
+    if link_id:
+        for attempt in db.query(Attempt).filter(Attempt.link_id == link_id).all():
+            db.query(Submission).filter(Submission.attempt_id == attempt.id).delete()
+        db.query(Attempt).filter(Attempt.link_id == link_id).delete()
+        db.query(AssessmentLink).filter(AssessmentLink.id == link_id).delete()
+    db.delete(application)
+    db.commit()
+    return {"success": True, "application_id": application_id}
 
 
 @router.post("/links", response_model=CreateLinkResponse)

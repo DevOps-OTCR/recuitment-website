@@ -5,6 +5,8 @@ Copy this file to assessment_content.py and fill in your actual questions.
 The real assessment_content.py is gitignored to keep questions private.
 
 For production (Render), create assessment_content.py on the server with actual content.
+
+Author: Adeetya Upadhyay <adeeu2@illinois.edu>
 """
 
 

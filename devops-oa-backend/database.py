@@ -23,7 +23,12 @@ def _database_url() -> str:
 
 # Create engine with SQLite-specific settings
 _db_url = _database_url()
-connect_args = {"check_same_thread": False} if "sqlite" in _db_url else {}
+connect_args = {}
+if "sqlite" in _db_url:
+    connect_args["check_same_thread"] = False
+elif "pooler.supabase.com" in _db_url:
+    # Transaction pooler does not support PREPARE statements; disable server-side prepared statements
+    connect_args["prepare_threshold"] = 0
 engine = create_engine(_db_url, connect_args=connect_args)
 
 # Session factory

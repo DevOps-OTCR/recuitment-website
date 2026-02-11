@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "author": "Adeetya Upadhyay <adeeu2@illinois.edu>",
   "homepage": "https://recruit.otcr-consulting.com",
   "scripts": {
     "dev": "vite",

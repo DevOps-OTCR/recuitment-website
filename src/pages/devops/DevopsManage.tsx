@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Lock, Loader2, CheckCircle, XCircle, Clock, Copy, FileText, LogOut, ExternalLink, AlertCircle, Eye } from 'lucide-react';
+import { Lock, Loader2, CheckCircle, XCircle, Clock, Copy, FileText, LogOut, ExternalLink, AlertCircle, Eye, Archive, ArchiveRestore, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 
@@ -28,6 +28,7 @@ interface ApplicationItem {
   focus_loss_events: number;
   is_flagged: boolean;
   integrity_notes: string | null;
+  archived_at: string | null;
 }
 
 interface SubmissionData {
@@ -60,6 +61,8 @@ const DevopsManage = () => {
   const [approvedLink, setApprovedLink] = useState<{ id: number; url: string } | null>(null);
   const [viewingSubmission, setViewingSubmission] = useState<SubmissionData | null>(null);
   const [loadingSubmission, setLoadingSubmission] = useState(false);
+  const [archivedFilter, setArchivedFilter] = useState<'active' | 'archived' | 'all'>('active');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
   const formatDuration = (start?: string | null, end?: string | null) => {
     if (!start || !end) return '—';
@@ -85,7 +88,10 @@ const DevopsManage = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/applications`, { headers: headers() });
+      const params = new URLSearchParams();
+      if (archivedFilter === 'archived') params.set('archived', 'only');
+      else if (archivedFilter === 'all') params.set('archived', '1');
+      const res = await fetch(`${API_BASE_URL}/api/admin/applications?${params}`, { headers: headers() });
       if (res.status === 403) {
         sessionStorage.removeItem(ADMIN_KEY_STORAGE);
         setStoredSecret(null);
@@ -105,7 +111,7 @@ const DevopsManage = () => {
 
   useEffect(() => {
     if (storedSecret) fetchApplications();
-  }, [storedSecret]);
+  }, [storedSecret, archivedFilter]);
 
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,6 +183,80 @@ const DevopsManage = () => {
     }
   };
 
+  const archiveApp = async (id: number) => {
+    setActionLoading(id);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/applications/${id}/archive`, {
+        method: 'POST',
+        headers: headers(),
+      });
+      if (res.status === 403) {
+        handleLogout();
+        return;
+      }
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || 'Archive failed');
+      }
+      await fetchApplications();
+      toast({ title: 'Archived', description: 'Application archived.' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message || 'Archive failed', variant: 'destructive' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const unarchiveApp = async (id: number) => {
+    setActionLoading(id);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/applications/${id}/unarchive`, {
+        method: 'POST',
+        headers: headers(),
+      });
+      if (res.status === 403) {
+        handleLogout();
+        return;
+      }
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || 'Restore failed');
+      }
+      await fetchApplications();
+      toast({ title: 'Restored', description: 'Application restored from archive.' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message || 'Restore failed', variant: 'destructive' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const deleteApp = async (id: number) => {
+    setActionLoading(id);
+    setDeleteConfirmId(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/applications/${id}`, {
+        method: 'DELETE',
+        headers: headers(),
+      });
+      if (res.status === 403) {
+        handleLogout();
+        return;
+      }
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || 'Delete failed');
+      }
+      await fetchApplications();
+      if (viewingSubmission) setViewingSubmission(null);
+      toast({ title: 'Deleted', description: 'Application permanently deleted.' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message || 'Delete failed', variant: 'destructive' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const copyLink = (url: string) => {
     navigator.clipboard.writeText(url);
     toast({
@@ -188,7 +268,9 @@ const DevopsManage = () => {
   const copyEmailTemplate = (name: string, url: string) => {
     const template = `Hi ${name},
 
-Thank you for your interest in OTCR Technologies. Please complete the technical assessment at your earliest convenience:
+We would like to invite you to complete the OTCR Technologies online assessment. It includes three components: Problem Solving, a Coding challenge, and a System Design section. We recommend setting aside about 30–45 minutes. Please use your Illinois or personal email on file to complete the assessment.
+
+You can take the assessment here:
 
 ${url}
 
@@ -338,6 +420,34 @@ OTCR Technologies`;
             </Card>
           )}
 
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-sm text-muted-foreground">Show:</span>
+            <Button
+              variant={archivedFilter === 'active' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setArchivedFilter('active')}
+              className="text-sm"
+            >
+              Active
+            </Button>
+            <Button
+              variant={archivedFilter === 'archived' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setArchivedFilter('archived')}
+              className="text-sm"
+            >
+              Archived
+            </Button>
+            <Button
+              variant={archivedFilter === 'all' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setArchivedFilter('all')}
+              className="text-sm"
+            >
+              All
+            </Button>
+          </div>
+
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -345,7 +455,7 @@ OTCR Technologies`;
           ) : applications.length === 0 ? (
             <Card className="bg-card/50">
               <CardContent className="py-12 text-center text-muted-foreground">
-                No applications yet.
+                {archivedFilter === 'archived' ? 'No archived applications.' : archivedFilter === 'all' ? 'No applications.' : 'No applications yet.'}
               </CardContent>
             </Card>
           ) : (
@@ -423,76 +533,140 @@ OTCR Technologies`;
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {app.status === 'pending' && (
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => approve(app.id)}
-                              disabled={actionLoading !== null}
-                              className="bg-primary hover:bg-primary/90"
-                            >
-                              {actionLoading === app.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-1" />}
-                              Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => reject(app.id)}
-                              disabled={actionLoading !== null}
-                            >
-                              {actionLoading === app.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4 mr-1" />}
-                              Reject
-                            </Button>
-                          </div>
-                        )}
-                        {app.status === 'approved' && app.has_assessment_link && (
-                          app.assessment_completed ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => app.assessment_token && viewSubmission(app.assessment_token)}
-                              disabled={loadingSubmission}
-                              className="text-green-500 hover:text-green-400 hover:bg-green-500/10 border-green-500/30"
-                            >
-                              {loadingSubmission ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Eye className="w-4 h-4 mr-1" />}
-                              View Submission
-                            </Button>
-                          ) : (
+                        <div className="flex flex-col gap-2">
+                          {app.status === 'pending' && (
                             <div className="flex gap-2">
                               <Button
                                 size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  if (app.assessment_token) {
-                                    const base = `${window.location.origin}${window.location.pathname || '/'}`.replace(/\/?$/, '');
-                                    const url = `${base}#/tech/assessment/${app.assessment_token}`;
-                                    copyLink(url);
-                                  }
-                                }}
-                                className="text-teal-primary hover:text-teal-primary/90 hover:bg-teal-primary/10 border-teal-primary/30"
+                                onClick={() => approve(app.id)}
+                                disabled={actionLoading !== null}
+                                className="bg-primary hover:bg-primary/90"
                               >
-                                <Copy className="w-4 h-4 mr-1" />
-                                Copy Link
+                                {actionLoading === app.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-1" />}
+                                Approve
                               </Button>
                               <Button
                                 size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  if (app.assessment_token) {
-                                    const base = `${window.location.origin}${window.location.pathname || '/'}`.replace(/\/?$/, '');
-                                    const url = `${base}#/tech/assessment/${app.assessment_token}`;
-                                    copyEmailTemplate(app.name, url);
-                                  }
-                                }}
-                                className="text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 border-blue-400/30"
-                                title="Copy email template"
+                                variant="destructive"
+                                onClick={() => reject(app.id)}
+                                disabled={actionLoading !== null}
                               >
-                                <FileText className="w-4 h-4 mr-1" />
-                                Email
+                                {actionLoading === app.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4 mr-1" />}
+                                Reject
                               </Button>
                             </div>
-                          )
-                        )}
+                          )}
+                          {app.status === 'approved' && app.has_assessment_link && (
+                            app.assessment_completed ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => app.assessment_token && viewSubmission(app.assessment_token)}
+                                disabled={loadingSubmission}
+                                className="text-green-500 hover:text-green-400 hover:bg-green-500/10 border-green-500/30 w-fit"
+                              >
+                                {loadingSubmission ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Eye className="w-4 h-4 mr-1" />}
+                                View Submission
+                              </Button>
+                            ) : (
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    if (app.assessment_token) {
+                                      const base = `${window.location.origin}${window.location.pathname || '/'}`.replace(/\/?$/, '');
+                                      const url = `${base}#/tech/assessment/${app.assessment_token}`;
+                                      copyLink(url);
+                                    }
+                                  }}
+                                  className="text-teal-primary hover:text-teal-primary/90 hover:bg-teal-primary/10 border-teal-primary/30"
+                                >
+                                  <Copy className="w-4 h-4 mr-1" />
+                                  Copy Link
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    if (app.assessment_token) {
+                                      const base = `${window.location.origin}${window.location.pathname || '/'}`.replace(/\/?$/, '');
+                                      const url = `${base}#/tech/assessment/${app.assessment_token}`;
+                                      copyEmailTemplate(app.name, url);
+                                    }
+                                  }}
+                                  className="text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 border-blue-400/30"
+                                  title="Copy email template"
+                                >
+                                  <FileText className="w-4 h-4 mr-1" />
+                                  Email
+                                </Button>
+                              </div>
+                            )
+                          )}
+                          <div className="flex items-center gap-1 pt-1 border-t border-border/30">
+                            {deleteConfirmId === app.id ? (
+                              <>
+                                <span className="text-xs text-muted-foreground mr-1">Delete?</span>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => deleteApp(app.id)}
+                                  disabled={actionLoading !== null}
+                                >
+                                  Yes
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => setDeleteConfirmId(null)}
+                                >
+                                  Cancel
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                {app.archived_at ? (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-xs text-muted-foreground hover:text-white"
+                                    onClick={() => unarchiveApp(app.id)}
+                                    disabled={actionLoading !== null}
+                                    title="Restore from archive"
+                                  >
+                                    {actionLoading === app.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArchiveRestore className="w-3 h-3 mr-0.5" />}
+                                    Unarchive
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-xs text-muted-foreground hover:text-white"
+                                    onClick={() => archiveApp(app.id)}
+                                    disabled={actionLoading !== null}
+                                    title="Archive (hide from active list)"
+                                  >
+                                    {actionLoading === app.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Archive className="w-3 h-3 mr-0.5" />}
+                                    Archive
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => setDeleteConfirmId(app.id)}
+                                  disabled={actionLoading !== null}
+                                  title="Permanently delete"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   ))}

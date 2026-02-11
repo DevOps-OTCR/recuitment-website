@@ -1,4 +1,7 @@
-"""Configuration management for the DevOps OA backend."""
+"""Configuration management for the DevOps OA backend.
+
+Author: Adeetya Upadhyay <adeeu2@illinois.edu>
+"""
 
 import os
 from pathlib import Path

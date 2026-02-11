@@ -241,7 +241,7 @@ const DevopsAssessment = () => {
     } catch (err: any) {
       console.error('Failed to verify email:', err);
       if (err.message?.includes('403') || err.message?.includes('does not match')) {
-        setEmailError('Email does not match. Please use the email you applied with.');
+        setEmailError('Email does not match. Please use the personal or Illinois email you signed up with.');
       } else if (err.message?.includes('400')) {
         setEmailError('Email verification required. Please enter your email.');
       } else {
@@ -252,30 +252,55 @@ const DevopsAssessment = () => {
     }
   };
 
+  const submitOneSection = async (section: Section, payload: any) => {
+    const payloadWithFlag = { ...payload, _aiDetectionFlag: aiDetectionFlag };
+    await assessmentApi.submitSection(token!, section, payloadWithFlag);
+    const newProgress = await assessmentApi.getProgress(token!);
+    setProgress(newProgress);
+    return newProgress;
+  };
+
   const handleSectionSubmit = async (section: Section, payload: any) => {
     if (!token) return;
-    
-    // Include AI detection flag in payload
-    const payloadWithFlag = {
-      ...payload,
-      _aiDetectionFlag: aiDetectionFlag,
-    };
-    
+
     setSubmitting(true);
     try {
-      const result = await assessmentApi.submitSection(token, section, payloadWithFlag);
-      
-      // Update progress
-      const newProgress = await assessmentApi.getProgress(token);
-      setProgress(newProgress);
-      
-      // Move to next section
+      // When submitting the last section (system_design), submit any earlier sections that aren't submitted yet
+      if (section === 'system_design') {
+        if (!sectionsCompleted.includes('problem_solving') && config?.problemSolving) {
+          const psPayload: Record<string, any> = {};
+          for (const q of config.problemSolving.questions) {
+            const val = problemSolvingDraft[q.id];
+            psPayload[q.id] = {
+              answer: val ?? '',
+              questionText: q.questionText,
+              type: q.type,
+              options: q.options || null,
+            };
+          }
+          await submitOneSection('problem_solving', psPayload);
+        }
+        if (!sectionsCompleted.includes('coding')) {
+          await submitOneSection('coding', {
+            code: codingDraft || config?.coding?.problem?.starterCode || '',
+            language: 'python3',
+          });
+        }
+      }
+
+      await submitOneSection(section, payload);
+
+      // Ensure we have latest progress (especially after submitting all parts on last section)
+      const latestProgress = await assessmentApi.getProgress(token);
+      setProgress(latestProgress);
+
+      // Move to next section (unless this was the last)
       const currentIndex = SECTION_ORDER.indexOf(section);
       if (currentIndex < SECTION_ORDER.length - 1) {
         setCurrentSection(SECTION_ORDER[currentIndex + 1]);
       }
-      
-      return result;
+
+      return latestProgress;
     } catch (err: any) {
       console.error('Failed to submit section:', err);
       throw err;
@@ -342,7 +367,7 @@ const DevopsAssessment = () => {
             </div>
             <CardTitle className="text-xl text-white">Verify Your Email</CardTitle>
             <CardDescription>
-              Please enter the email address you used when applying.
+              Please enter the personal or Illinois email address you used when you signed up.
               This helps us link your assessment to your application.
             </CardDescription>
           </CardHeader>
@@ -352,7 +377,7 @@ const DevopsAssessment = () => {
               <Input
                 id="email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder="Personal or Illinois email you signed up with"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleEmailVerify()}
@@ -456,6 +481,10 @@ const DevopsAssessment = () => {
                 <p className="text-xs text-muted-foreground">
                   <strong className="text-white block mb-2">Timing Information:</strong>
                   This assessment is <strong>untimed</strong>, but we recommend completing it within <strong>30-45 minutes</strong>. There is no time limit, and you can take as long as needed to complete all sections. A timer will track your elapsed time for reference.
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  <strong className="text-white block mb-1">Navigation:</strong>
+                  You can move back and forth between sections (Problem, Coding, Design). Once you submit a section, it is saved as is and cannot be changed.
                 </p>
               </div>
             </div>
@@ -603,6 +632,9 @@ const DevopsAssessment = () => {
             )}
           </div>
         </div>
+        <p className="text-xs text-muted-foreground text-center px-4 pb-2 max-w-2xl mx-auto">
+          You can move back and forth between sections. Once you submit a section, it is saved as is and cannot be changed.
+        </p>
       </header>
 
       {/* Main Content */}

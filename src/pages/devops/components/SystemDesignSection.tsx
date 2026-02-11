@@ -132,9 +132,8 @@ const SystemDesignSection = ({
               <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 mt-4">
                 <h4 className="text-sm font-medium text-white mb-2">Tips</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Keep it concise — about half a page or a few bullets per part</li>
-                  <li>• Focus on clear thinking, not specific tool names</li>
-                  <li>• Address all 5 parts: Scope, Data flow, Execution, Storage, Trade-off</li>
+                  <li>• Answer each of the five questions (Q1–Q5)</li>
+                  <li>• We don't need technical specifics, just your thought process</li>
                 </ul>
               </div>
             </CardContent>
@@ -159,17 +158,17 @@ const SystemDesignSection = ({
                   setResponse(e.target.value);
                   onResponseChange?.(e.target.value);
                 }}
-                placeholder="Write your system design response here...
+                placeholder="Write your response for each question (Q1–Q5). We don't need technical specifics, just your thought process.
 
-1. Scope – ...
+Q1 – ...
 
-2. Data flow – ...
+Q2 – ...
 
-3. Execution – ...
+Q3 – ...
 
-4. Storage – ...
+Q4 – ...
 
-5. One trade-off – ..."
+Q5 – ..."
                 className="flex-1 bg-background/50 border-border text-white placeholder:text-muted-foreground/50 resize-none leading-relaxed"
                 disabled={submitted}
               />

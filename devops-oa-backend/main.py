@@ -1,4 +1,7 @@
-"""FastAPI application for DevOps OA backend."""
+"""FastAPI application for DevOps OA backend.
+
+Author: Adeetya Upadhyay <adeeu2@illinois.edu>
+"""
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
