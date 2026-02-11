@@ -9,15 +9,18 @@ settings = get_settings()
 
 
 def _database_url() -> str:
-    """Use configured DATABASE_URL; ensure Supabase Postgres has SSL."""
+    """Use configured DATABASE_URL; ensure Supabase Postgres has SSL and pooler options."""
     url = settings.database_url
     if "supabase" in url:
         parsed = urlparse(url)
         qs = parse_qs(parsed.query)
         if "sslmode" not in qs:
             qs["sslmode"] = ["require"]
-            new_query = urlencode(qs, doseq=True)
-            url = urlunparse(parsed._replace(query=new_query))
+        if "pooler.supabase.com" in url and "prepare_threshold" not in qs:
+            # Transaction pooler does not support PREPARE; disable server-side prepared statements
+            qs["prepare_threshold"] = ["0"]
+        new_query = urlencode(qs, doseq=True)
+        url = urlunparse(parsed._replace(query=new_query))
     return url
 
 
@@ -26,9 +29,6 @@ _db_url = _database_url()
 connect_args = {}
 if "sqlite" in _db_url:
     connect_args["check_same_thread"] = False
-elif "pooler.supabase.com" in _db_url:
-    # Transaction pooler does not support PREPARE statements; disable server-side prepared statements
-    connect_args["prepare_threshold"] = 0
 engine = create_engine(_db_url, connect_args=connect_args)
 
 # Session factory
