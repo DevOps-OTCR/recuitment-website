@@ -51,10 +51,10 @@ def upload_resume(object_key: str, content: bytes, content_type: str = "applicat
     if not client:
         return False, "Supabase Storage not configured (SUPABASE_URL/SUPABASE_KEY)"
     try:
-        # upload(path, file, file_options=...) — no 'options' kwarg in supabase-py storage
+        # upload(path, file, file_options=...) — file must be bytes or path, not BytesIO
         client.storage.from_(RESUMES_BUCKET).upload(
             object_key,
-            BytesIO(content),
+            content,
             file_options={"content-type": content_type},
         )
         return True, ""
