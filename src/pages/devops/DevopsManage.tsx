@@ -32,6 +32,13 @@ interface ApplicationItem {
   archived_at: string | null;
 }
 
+interface ProgressSnapshotItem {
+  snapshot_at: string;
+  sections_completed: string[];
+  current_section: string | null;
+  elapsed_seconds: number;
+}
+
 interface SubmissionData {
   token: string;
   applicant_name: string | null;
@@ -49,6 +56,7 @@ interface SubmissionData {
     coding_result: any | null;
     notes: string | null;
   }[];
+  progress_snapshots?: ProgressSnapshotItem[];
 }
 
 const DevopsManage = () => {
@@ -721,6 +729,41 @@ OTCR Technologies`;
                   )}
                 </div>
               </div>
+
+              {/* Progress over time (5-min snapshots) */}
+              {viewingSubmission.progress_snapshots && viewingSubmission.progress_snapshots.length > 0 && (
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <div className="bg-[#0f0f1a] px-4 py-2 border-b border-border">
+                    <h3 className="font-medium text-white">Progress through assessment</h3>
+                    <p className="text-xs text-muted-foreground">Snapshots taken every 5 minutes</p>
+                  </div>
+                  <div className="p-4">
+                    <ul className="space-y-3">
+                      {viewingSubmission.progress_snapshots.map((snap, idx) => {
+                        const sectionLabel = snap.current_section
+                          ? snap.current_section.replace(/_/g, ' ')
+                          : '—';
+                        const completedCount = (snap.sections_completed || []).length;
+                        const min = Math.floor(snap.elapsed_seconds / 60);
+                        return (
+                          <li key={idx} className="flex items-center gap-3 text-sm border-l-2 border-border pl-3 py-1">
+                            <span className="text-muted-foreground shrink-0 w-16">{min} min</span>
+                            <span className="text-white">
+                              {completedCount} section{completedCount !== 1 ? 's' : ''} done
+                              {snap.current_section && (
+                                <> · on <span className="capitalize">{sectionLabel}</span></>
+                              )}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(snap.snapshot_at).toLocaleTimeString()}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                </div>
+              )}
 
               {/* Submissions by Section */}
               {viewingSubmission.submissions.map((sub, idx) => (

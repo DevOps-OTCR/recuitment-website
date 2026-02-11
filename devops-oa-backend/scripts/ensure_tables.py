@@ -40,10 +40,10 @@ def main():
         if not applications_exists:
             print("Table 'applications' not found. Creating all tables...")
             from database import Base
-            from models import Application, AssessmentLink, Attempt, Submission  # noqa: F401
+            from models import Application, AssessmentLink, Attempt, Submission, ProgressSnapshot  # noqa: F401
             Base.metadata.create_all(bind=engine)
             conn.commit()
-            print("Done. Created: applications, assessment_links, attempts, submissions")
+            print("Done. Created: applications, assessment_links, attempts, submissions, assessment_progress_snapshots")
         else:
             print("Table 'applications' exists.")
 

@@ -56,3 +56,14 @@ CREATE TABLE IF NOT EXISTS submissions (
     submitted_at TIMESTAMP DEFAULT NOW() NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_submissions_attempt_id ON submissions (attempt_id);
+
+-- 5. assessment_progress_snapshots (FK to attempts) - progress every 5 min during assessment
+CREATE TABLE IF NOT EXISTS assessment_progress_snapshots (
+    id SERIAL PRIMARY KEY,
+    attempt_id INTEGER NOT NULL REFERENCES attempts (id) ON DELETE CASCADE,
+    snapshot_at TIMESTAMP DEFAULT NOW() NOT NULL,
+    sections_completed JSONB DEFAULT '[]',
+    current_section VARCHAR(50),
+    elapsed_seconds INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_assessment_progress_snapshots_attempt_id ON assessment_progress_snapshots (attempt_id);

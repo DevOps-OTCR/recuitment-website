@@ -150,6 +150,19 @@ class AssessmentApiClient {
   }
 
   /**
+   * Record a progress snapshot (e.g. every 5 min) for submission review timeline.
+   */
+  async recordProgressSnapshot(
+    token: string,
+    data: { sections_completed: string[]; current_section: string | null; elapsed_seconds: number }
+  ): Promise<void> {
+    await this.fetch<{ ok: boolean }>(`/api/assessment/${token}/progress-snapshot`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
    * Test code without submitting (coding section only)
    */
   async testCode(

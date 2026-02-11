@@ -73,6 +73,21 @@ class Attempt(Base):
     # Relationships
     link = relationship("AssessmentLink", back_populates="attempts")
     submissions = relationship("Submission", back_populates="attempt", cascade="all, delete-orphan")
+    progress_snapshots = relationship("ProgressSnapshot", back_populates="attempt", cascade="all, delete-orphan")
+
+
+class ProgressSnapshot(Base):
+    """Periodic progress snapshot during an assessment (e.g. every 5 minutes)."""
+    __tablename__ = "assessment_progress_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    attempt_id = Column(Integer, ForeignKey("attempts.id"), nullable=False)
+    snapshot_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    sections_completed = Column(JSON, default=list)  # ["problem_solving", ...]
+    current_section = Column(String(50), nullable=True)  # section they were on at snapshot time
+    elapsed_seconds = Column(Integer, nullable=False)  # time since attempt started
+
+    attempt = relationship("Attempt", back_populates="progress_snapshots")
 
 
 class Submission(Base):

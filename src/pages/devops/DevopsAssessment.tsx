@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -135,6 +135,20 @@ const DevopsAssessment = () => {
     
     return () => clearInterval(interval);
   }, [assessmentStartTime]);
+
+  // Progress snapshot every 5 minutes (for submission review timeline)
+  const lastSnapshotMinutesRef = useRef<number>(0);
+  useEffect(() => {
+    if (!token || !assessmentStartTime || progress?.completed_at != null) return;
+    const minutes = Math.floor(elapsedSeconds / 300) * 5; // 0, 5, 10, 15...
+    if (minutes <= lastSnapshotMinutesRef.current) return;
+    lastSnapshotMinutesRef.current = minutes;
+    assessmentApi.recordProgressSnapshot(token, {
+      sections_completed: progress?.sections_completed ?? [],
+      current_section: currentSection,
+      elapsed_seconds: elapsedSeconds,
+    }).catch(() => { /* non-blocking */ });
+  }, [token, assessmentStartTime, elapsedSeconds, progress?.sections_completed, progress?.completed_at, currentSection]);
 
   // Persist drafts (and current section) to localStorage
   useEffect(() => {

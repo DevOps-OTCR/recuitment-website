@@ -11,7 +11,7 @@ from pydantic import BaseModel, EmailStr
 
 from config import get_settings
 from database import get_db
-from models import AssessmentLink, Attempt, Submission, Application, ApplicationStatus
+from models import AssessmentLink, Attempt, Submission, Application, ApplicationStatus, ProgressSnapshot
 from storage import upload_resume, download_resume, is_supabase_path, get_supabase_storage
 
 router = APIRouter()
@@ -530,6 +530,23 @@ async def get_submission(
         
         processed_submissions.append(sub_data)
     
+    # Progress snapshots (every 5 min during assessment) for timeline view
+    snapshots = (
+        db.query(ProgressSnapshot)
+        .filter(ProgressSnapshot.attempt_id == attempt.id)
+        .order_by(ProgressSnapshot.snapshot_at.asc())
+        .all()
+    )
+    progress_snapshots = [
+        {
+            "snapshot_at": s.snapshot_at.isoformat(),
+            "sections_completed": s.sections_completed or [],
+            "current_section": s.current_section,
+            "elapsed_seconds": s.elapsed_seconds,
+        }
+        for s in snapshots
+    ]
+
     return {
         "token": token,
         "applicant_name": applicant_name,
@@ -541,6 +558,7 @@ async def get_submission(
         "is_flagged": attempt.is_flagged,
         "integrity_notes": attempt.integrity_notes,
         "submissions": processed_submissions,
+        "progress_snapshots": progress_snapshots,
     }
 
 
@@ -937,6 +955,43 @@ async def test_code(
     })
     
     return result
+
+
+class ProgressSnapshotRequest(BaseModel):
+    """Progress snapshot sent every 5 minutes during assessment."""
+    sections_completed: List[str] = []
+    current_section: Optional[str] = None
+    elapsed_seconds: int = 0
+
+
+@router.post("/assessment/{token}/progress-snapshot")
+async def record_progress_snapshot(
+    token: str,
+    request: ProgressSnapshotRequest,
+    db: Session = Depends(get_db),
+):
+    """Record a progress snapshot (e.g. every 5 min). Used to show progression in submission review."""
+    link = get_link_or_404(token, db)
+    attempt = db.query(Attempt).filter(Attempt.link_id == link.id).first()
+    if not attempt:
+        raise HTTPException(status_code=404, detail="No attempt started yet")
+    if attempt.completed_at:
+        return {"ok": True}  # Ignore snapshots after completion
+
+    # Limit snapshots per attempt (e.g. 50 = ~4 hours at 5-min intervals)
+    existing = db.query(ProgressSnapshot).filter(ProgressSnapshot.attempt_id == attempt.id).count()
+    if existing >= 50:
+        return {"ok": True}
+
+    snapshot = ProgressSnapshot(
+        attempt_id=attempt.id,
+        sections_completed=request.sections_completed,
+        current_section=request.current_section,
+        elapsed_seconds=request.elapsed_seconds,
+    )
+    db.add(snapshot)
+    db.commit()
+    return {"ok": True}
 
 
 @router.post("/assessment/{token}/focus-loss")
