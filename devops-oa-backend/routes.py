@@ -12,7 +12,6 @@ from pydantic import BaseModel, EmailStr
 from config import get_settings
 from database import get_db
 from models import AssessmentLink, Attempt, Submission, Application, ApplicationStatus
-from assessment_content import get_mcq_answer_key
 from storage import upload_resume, download_resume, is_supabase_path, get_supabase_storage
 
 router = APIRouter()
@@ -1153,28 +1152,35 @@ async def execute_code_judge0(code: str, stdin: str, language: str) -> dict:
 # ============================================================================
 # Assessment content is loaded from a separate file that is GITIGNORED
 # to keep questions private. On Render, use Secret Files to upload
-# assessment_content.py. For local dev, copy assessment_content.example.py.
+# assessment_content.py. If missing, the app still starts using placeholders.
 
-import sys
+import os
 import importlib.util
 
-# Try to load from Render secret files first, then local file
-def _load_assessment_content():
+def _load_assessment_module():
+    """Load assessment_content.py from secret path or cwd; fall back to example or placeholders."""
     paths_to_try = [
         "/etc/secrets/assessment_content.py",  # Render secret files
-        "assessment_content.py",  # Local development
+        os.path.join(os.path.dirname(__file__), "assessment_content.py"),  # backend dir
+        "assessment_content.py",
+        os.path.join(os.path.dirname(__file__), "assessment_content.example.py"),
     ]
     for path in paths_to_try:
         try:
+            if not os.path.isfile(path):
+                continue
             spec = importlib.util.spec_from_file_location("assessment_content", path)
             if spec and spec.loader:
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
-                return module.get_assessment_content
-        except (FileNotFoundError, ImportError):
+                get_content = getattr(module, "get_assessment_content", None)
+                get_key = getattr(module, "get_mcq_answer_key", None)
+                if get_content is None:
+                    continue
+                return get_content, get_key if get_key else (lambda: {})
+        except (FileNotFoundError, ImportError, Exception):
             continue
-    # Fallback: return a placeholder if no file found
-    def placeholder():
+    def placeholder_content():
         return {
             "estimatedMinutes": 0,
             "timeLimitMinutes": 0,
@@ -1183,6 +1189,7 @@ def _load_assessment_content():
             "coding": {"title": "Not configured", "problem": {}, "testCases": []},
             "systemDesign": {"title": "Not configured", "prompt": ""},
         }
-    return placeholder
+    return placeholder_content, lambda: {}
 
-get_assessment_content = _load_assessment_content()
+_get_assessment_content, get_mcq_answer_key = _load_assessment_module()
+get_assessment_content = _get_assessment_content

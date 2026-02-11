@@ -9,7 +9,8 @@ import { Lock, Loader2, CheckCircle, XCircle, Clock, Copy, FileText, LogOut, Ext
 import { useToast } from '@/hooks/use-toast';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 
-const API_BASE_URL = import.meta.env.VITE_OA_API_URL || 'http://localhost:8000';
+import { getOaApiUrl } from '../../lib/oa-api-url';
+const API_BASE_URL = getOaApiUrl();
 const ADMIN_KEY_STORAGE = 'otcr_devops_admin_secret';
 
 interface ApplicationItem {

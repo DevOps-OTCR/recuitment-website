@@ -1,7 +1,7 @@
 #!/bin/sh
 # Run persistence checks using curl. Usage: ./check_persistence.sh [BASE_URL]
 set -e
-BASE="${1:-https://recuitment-website.onrender.com}"
+BASE="${1:-https://recuitment-usa.onrender.com}"
 API="${BASE%/}/api"
 
 echo "Checking $API ..."

@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { CheckCircle, Upload, Loader2, ArrowLeft, FileText, AlertCircle } from 'lucide-react';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 
-const API_BASE_URL = import.meta.env.VITE_OA_API_URL || 'http://localhost:8000';
+import { getOaApiUrl } from '../../lib/oa-api-url';
+const API_BASE_URL = getOaApiUrl();
 
 interface ApplicationResult {
   id: number;

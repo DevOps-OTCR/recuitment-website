@@ -2,8 +2,9 @@
  * API client for the DevOps OA backend
  */
 
-// API base URL - defaults to localhost for development
-const API_BASE_URL = import.meta.env.VITE_OA_API_URL || 'http://localhost:8000';
+import { getOaApiUrl } from './oa-api-url';
+
+const API_BASE_URL = getOaApiUrl();
 
 export interface QuestionOption {
   id: string;

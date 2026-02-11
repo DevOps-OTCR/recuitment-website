@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, CheckCircle, Loader2, Mail, AlertCircle, Clock } from 'lucide-react';
 import { assessmentApi, AssessmentConfig, ProgressResponse } from '@/lib/assessment-api';
+import { getOaApiUrl } from '@/lib/oa-api-url';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 import ProgressIndicator from './components/ProgressIndicator';
 import ProblemSolvingSection from './components/ProblemSolvingSection';
@@ -182,7 +183,7 @@ const DevopsAssessment = () => {
       if (!focusLossReported) {
         focusLossReported = true;
         // Report focus loss to backend
-        fetch(`${import.meta.env.VITE_OA_API_URL || 'http://localhost:8000'}/api/assessment/${assessmentToken}/focus-loss`, {
+        fetch(`${getOaApiUrl()}/api/assessment/${assessmentToken}/focus-loss`, {
           method: 'POST',
         }).catch(() => {
           // Silent fail, continue assessment

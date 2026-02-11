@@ -4,14 +4,14 @@ Run persistence checks against the DevOps OA backend.
 Exits 0 only if the backend reports persistent DB and storage (Postgres + Supabase).
 Usage:
   python scripts/check_persistence.py [BASE_URL]
-  BASE_URL defaults to https://recuitment-website.onrender.com
+  BASE_URL defaults to https://recuitment-usa.onrender.com
 """
 import json
 import sys
 import urllib.request
 import urllib.error
 
-DEFAULT_BASE = "https://recuitment-website.onrender.com"
+DEFAULT_BASE = "https://recuitment-usa.onrender.com"
 
 
 def main():

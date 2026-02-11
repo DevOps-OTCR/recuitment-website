@@ -71,3 +71,8 @@ def get_assessment_content() -> dict:
             "prompt": "Replace with actual system design prompt.",
         },
     }
+
+
+def get_mcq_answer_key() -> dict:
+    """MCQ answer key for scoring: { question_id: { questionText, correctAnswer } }. Empty if not configured."""
+    return {}

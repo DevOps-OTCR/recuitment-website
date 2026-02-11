@@ -14,7 +14,8 @@ import FadeContent from '@/reactbits/animations/FadeContent/FadeContent';
 import SplitText from '@/reactbits/textanimations/SplitText/SplitText';
 import chicagoSkyline from '@/assets/chicago_skyline.png';
 
-const API_BASE_URL = import.meta.env.VITE_OA_API_URL || 'http://localhost:8000';
+import { getOaApiUrl } from '../../lib/oa-api-url';
+const API_BASE_URL = getOaApiUrl();
 
 interface StatusCheckResult {
   found: boolean;
