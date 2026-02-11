@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Lock, Loader2, CheckCircle, XCircle, Clock, Copy, FileText, LogOut, ExternalLink, AlertCircle, Eye, Archive, ArchiveRestore, Trash2 } from 'lucide-react';
+import { Lock, Loader2, CheckCircle, XCircle, Clock, Copy, FileText, LogOut, ExternalLink, AlertCircle, Eye, Archive, ArchiveRestore, Trash2, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 
@@ -486,13 +486,13 @@ OTCR Technologies`;
                       <td className="px-4 py-3">
                         {app.resume_filename ? (
                           <Button
-                            size="sm"
+                            size="icon"
                             variant="ghost"
-                            className="text-teal-primary hover:text-teal-primary/90 hover:bg-teal-primary/10"
+                            className="h-8 w-8 text-teal-primary hover:text-teal-primary/90 hover:bg-teal-primary/10"
                             onClick={() => openResume(app.id)}
+                            title="Open resume"
                           >
-                            <ExternalLink className="w-4 h-4 mr-1" />
-                            Open
+                            <ExternalLink className="w-4 h-4" />
                           </Button>
                         ) : (
                           <span className="text-muted-foreground text-sm">—</span>
@@ -536,44 +536,46 @@ OTCR Technologies`;
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-2">
                           {app.status === 'pending' && (
-                            <div className="flex gap-2">
+                            <div className="flex gap-1">
                               <Button
-                                size="sm"
+                                size="icon"
+                                className="h-8 w-8 bg-primary hover:bg-primary/90"
                                 onClick={() => approve(app.id)}
                                 disabled={actionLoading !== null}
-                                className="bg-primary hover:bg-primary/90"
+                                title="Approve"
                               >
-                                {actionLoading === app.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-1" />}
-                                Approve
+                                {actionLoading === app.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                               </Button>
                               <Button
-                                size="sm"
+                                size="icon"
                                 variant="destructive"
+                                className="h-8 w-8"
                                 onClick={() => reject(app.id)}
                                 disabled={actionLoading !== null}
+                                title="Reject"
                               >
-                                {actionLoading === app.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4 mr-1" />}
-                                Reject
+                                {actionLoading === app.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
                               </Button>
                             </div>
                           )}
                           {app.status === 'approved' && app.has_assessment_link && (
                             app.assessment_completed ? (
                               <Button
-                                size="sm"
+                                size="icon"
                                 variant="outline"
+                                className="h-8 w-8 text-green-500 hover:text-green-400 hover:bg-green-500/10 border-green-500/30"
                                 onClick={() => app.assessment_token && viewSubmission(app.assessment_token)}
                                 disabled={loadingSubmission}
-                                className="text-green-500 hover:text-green-400 hover:bg-green-500/10 border-green-500/30 w-fit"
+                                title="View submission"
                               >
-                                {loadingSubmission ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Eye className="w-4 h-4 mr-1" />}
-                                View Submission
+                                {loadingSubmission ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
                               </Button>
                             ) : (
-                              <div className="flex gap-2">
+                              <div className="flex gap-1">
                                 <Button
-                                  size="sm"
+                                  size="icon"
                                   variant="outline"
+                                  className="h-8 w-8 text-teal-primary hover:text-teal-primary/90 hover:bg-teal-primary/10 border-teal-primary/30"
                                   onClick={() => {
                                     if (app.assessment_token) {
                                       const base = `${window.location.origin}${window.location.pathname || '/'}`.replace(/\/?$/, '');
@@ -581,14 +583,14 @@ OTCR Technologies`;
                                       copyLink(url);
                                     }
                                   }}
-                                  className="text-teal-primary hover:text-teal-primary/90 hover:bg-teal-primary/10 border-teal-primary/30"
+                                  title="Copy assessment link"
                                 >
-                                  <Copy className="w-4 h-4 mr-1" />
-                                  Copy Link
+                                  <Copy className="w-4 h-4" />
                                 </Button>
                                 <Button
-                                  size="sm"
+                                  size="icon"
                                   variant="outline"
+                                  className="h-8 w-8 text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 border-blue-400/30"
                                   onClick={() => {
                                     if (app.assessment_token) {
                                       const base = `${window.location.origin}${window.location.pathname || '/'}`.replace(/\/?$/, '');
@@ -596,11 +598,9 @@ OTCR Technologies`;
                                       copyEmailTemplate(app.name, url);
                                     }
                                   }}
-                                  className="text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 border-blue-400/30"
                                   title="Copy email template"
                                 >
-                                  <FileText className="w-4 h-4 mr-1" />
-                                  Email
+                                  <FileText className="w-4 h-4" />
                                 </Button>
                               </div>
                             )
@@ -610,54 +610,54 @@ OTCR Technologies`;
                               <>
                                 <span className="text-xs text-muted-foreground mr-1">Delete?</span>
                                 <Button
-                                  size="sm"
+                                  size="icon"
                                   variant="destructive"
-                                  className="h-7 px-2 text-xs"
+                                  className="h-7 w-7"
                                   onClick={() => deleteApp(app.id)}
                                   disabled={actionLoading !== null}
+                                  title="Confirm delete"
                                 >
-                                  Yes
+                                  <Check className="w-3 h-3" />
                                 </Button>
                                 <Button
-                                  size="sm"
+                                  size="icon"
                                   variant="ghost"
-                                  className="h-7 px-2 text-xs"
+                                  className="h-7 w-7"
                                   onClick={() => setDeleteConfirmId(null)}
+                                  title="Cancel"
                                 >
-                                  Cancel
+                                  <XCircle className="w-3 h-3" />
                                 </Button>
                               </>
                             ) : (
                               <>
                                 {app.archived_at ? (
                                   <Button
-                                    size="sm"
+                                    size="icon"
                                     variant="ghost"
-                                    className="h-7 px-2 text-xs text-muted-foreground hover:text-white"
+                                    className="h-7 w-7 text-muted-foreground hover:text-white"
                                     onClick={() => unarchiveApp(app.id)}
                                     disabled={actionLoading !== null}
-                                    title="Restore from archive"
+                                    title="Unarchive"
                                   >
-                                    {actionLoading === app.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArchiveRestore className="w-3 h-3 mr-0.5" />}
-                                    Unarchive
+                                    {actionLoading === app.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArchiveRestore className="w-3 h-3" />}
                                   </Button>
                                 ) : (
                                   <Button
-                                    size="sm"
+                                    size="icon"
                                     variant="ghost"
-                                    className="h-7 px-2 text-xs text-muted-foreground hover:text-white"
+                                    className="h-7 w-7 text-muted-foreground hover:text-white"
                                     onClick={() => archiveApp(app.id)}
                                     disabled={actionLoading !== null}
-                                    title="Archive (hide from active list)"
+                                    title="Archive"
                                   >
-                                    {actionLoading === app.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Archive className="w-3 h-3 mr-0.5" />}
-                                    Archive
+                                    {actionLoading === app.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Archive className="w-3 h-3" />}
                                   </Button>
                                 )}
                                 <Button
-                                  size="sm"
+                                  size="icon"
                                   variant="ghost"
-                                  className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
                                   onClick={() => setDeleteConfirmId(app.id)}
                                   disabled={actionLoading !== null}
                                   title="Permanently delete"
