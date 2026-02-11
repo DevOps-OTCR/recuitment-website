@@ -6,7 +6,7 @@ FastAPI backend for the OTCR DevOps online assessment (link generation, applicat
 
 - **Compute:** Python runs on a server (e.g. [Render](https://render.com)) the same way as any standard web app. No serverless or edge; one long-lived process.
 - **Data:** All persistent data lives in **Supabase**:
-  - **Postgres** – applications, assessment links, attempts, submissions (use Supabase’s Transaction pooler URL on Render).
+  - **Postgres** – applications, assessment links, attempts, submissions (use Supabase’s Transaction pooler URL on Render). Supabase pooled connections do **not** permit PREPARE; the app disables server-side prepared statements when using the pooler.
   - **Storage** – resume PDFs in a private bucket.
 
 So the app is “fully on Supabase” for data; the server only runs the Python API and talks to Supabase for DB and files. Local development can use SQLite and optional local file storage.

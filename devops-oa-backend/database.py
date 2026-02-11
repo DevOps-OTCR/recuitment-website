@@ -31,7 +31,7 @@ engine = create_engine(_db_url, connect_args=connect_args)
 
 @event.listens_for(engine, "connect")
 def _set_psycopg2_prepare_threshold(dbapi_conn, connection_record):
-    """Supabase transaction pooler does not support PREPARE; disable server-side prepared statements."""
+    """Supabase pooled connections do NOT permit PREPARE. Disable server-side prepared statements (psycopg2: 0 = never prepare)."""
     if "pooler.supabase.com" not in _db_url:
         return
     try:
