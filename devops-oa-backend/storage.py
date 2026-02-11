@@ -28,7 +28,7 @@ def get_supabase_storage():
 
 
 def ensure_resumes_bucket():
-    """Create the resumes bucket if it does not exist (idempotent)."""
+    """Create the resumes bucket if it does not exist (idempotent). Buckets are private by default (Supabase Storage Quickstart)."""
     import logging
     log = logging.getLogger(__name__)
     client = get_supabase_storage()
@@ -38,7 +38,8 @@ def ensure_resumes_bucket():
         buckets = client.storage.list_buckets() or []
         names = [getattr(b, "name", b.get("name") if isinstance(b, dict) else None) for b in buckets]
         if RESUMES_BUCKET not in names:
-            client.storage.create_bucket(RESUMES_BUCKET, options={"private": True})
+            # Quickstart: supabase.storage.create_bucket('avatars'); buckets are private by default
+            client.storage.create_bucket(RESUMES_BUCKET)
             log.info("Created storage bucket %s", RESUMES_BUCKET)
     except Exception as e:
         log.warning("Could not ensure bucket %s: %s. Create it in Supabase Dashboard → Storage if needed.", RESUMES_BUCKET, e)
