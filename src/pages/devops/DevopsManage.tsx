@@ -534,9 +534,9 @@ OTCR Technologies`;
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-col gap-2">
+                        <div className="flex flex-nowrap items-center gap-1">
                           {app.status === 'pending' && (
-                            <div className="flex gap-1">
+                            <>
                               <Button
                                 size="icon"
                                 className="h-8 w-8 bg-primary hover:bg-primary/90"
@@ -556,7 +556,7 @@ OTCR Technologies`;
                               >
                                 {actionLoading === app.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
                               </Button>
-                            </div>
+                            </>
                           )}
                           {app.status === 'approved' && app.has_assessment_link && (
                             app.assessment_completed ? (
@@ -571,7 +571,7 @@ OTCR Technologies`;
                                 {loadingSubmission ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
                               </Button>
                             ) : (
-                              <div className="flex gap-1">
+                              <>
                                 <Button
                                   size="icon"
                                   variant="outline"
@@ -602,71 +602,69 @@ OTCR Technologies`;
                                 >
                                   <FileText className="w-4 h-4" />
                                 </Button>
-                              </div>
+                              </>
                             )
                           )}
-                          <div className="flex items-center gap-1 pt-1 border-t border-border/30">
-                            {deleteConfirmId === app.id ? (
-                              <>
-                                <span className="text-xs text-muted-foreground mr-1">Delete?</span>
-                                <Button
-                                  size="icon"
-                                  variant="destructive"
-                                  className="h-7 w-7"
-                                  onClick={() => deleteApp(app.id)}
-                                  disabled={actionLoading !== null}
-                                  title="Confirm delete"
-                                >
-                                  <Check className="w-3 h-3" />
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7"
-                                  onClick={() => setDeleteConfirmId(null)}
-                                  title="Cancel"
-                                >
-                                  <XCircle className="w-3 h-3" />
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                {app.archived_at ? (
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-7 w-7 text-muted-foreground hover:text-white"
-                                    onClick={() => unarchiveApp(app.id)}
-                                    disabled={actionLoading !== null}
-                                    title="Unarchive"
-                                  >
-                                    {actionLoading === app.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArchiveRestore className="w-3 h-3" />}
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-7 w-7 text-muted-foreground hover:text-white"
-                                    onClick={() => archiveApp(app.id)}
-                                    disabled={actionLoading !== null}
-                                    title="Archive"
-                                  >
-                                    {actionLoading === app.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Archive className="w-3 h-3" />}
-                                  </Button>
-                                )}
+                          {deleteConfirmId === app.id ? (
+                            <>
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">Delete?</span>
+                              <Button
+                                size="icon"
+                                variant="destructive"
+                                className="h-7 w-7"
+                                onClick={() => deleteApp(app.id)}
+                                disabled={actionLoading !== null}
+                                title="Confirm delete"
+                              >
+                                <Check className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                onClick={() => setDeleteConfirmId(null)}
+                                title="Cancel"
+                              >
+                                <XCircle className="w-3 h-3" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              {app.archived_at ? (
                                 <Button
                                   size="icon"
                                   variant="ghost"
-                                  className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  onClick={() => setDeleteConfirmId(app.id)}
+                                  className="h-7 w-7 text-muted-foreground hover:text-white"
+                                  onClick={() => unarchiveApp(app.id)}
                                   disabled={actionLoading !== null}
-                                  title="Permanently delete"
+                                  title="Unarchive"
                                 >
-                                  <Trash2 className="w-3 h-3" />
+                                  {actionLoading === app.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArchiveRestore className="w-3 h-3" />}
                                 </Button>
-                              </>
-                            )}
-                          </div>
+                              ) : (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-muted-foreground hover:text-white"
+                                  onClick={() => archiveApp(app.id)}
+                                  disabled={actionLoading !== null}
+                                  title="Archive"
+                                >
+                                  {actionLoading === app.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Archive className="w-3 h-3" />}
+                                </Button>
+                              )}
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => setDeleteConfirmId(app.id)}
+                                disabled={actionLoading !== null}
+                                title="Permanently delete"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
