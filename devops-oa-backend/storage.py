@@ -29,6 +29,8 @@ def get_supabase_storage():
 
 def ensure_resumes_bucket():
     """Create the resumes bucket if it does not exist (idempotent)."""
+    import logging
+    log = logging.getLogger(__name__)
     client = get_supabase_storage()
     if not client:
         return
@@ -37,15 +39,16 @@ def ensure_resumes_bucket():
         names = [getattr(b, "name", b.get("name") if isinstance(b, dict) else None) for b in buckets]
         if RESUMES_BUCKET not in names:
             client.storage.create_bucket(RESUMES_BUCKET, options={"private": True})
-    except Exception:
-        pass
+            log.info("Created storage bucket %s", RESUMES_BUCKET)
+    except Exception as e:
+        log.warning("Could not ensure bucket %s: %s. Create it in Supabase Dashboard → Storage if needed.", RESUMES_BUCKET, e)
 
 
-def upload_resume(object_key: str, content: bytes, content_type: str = "application/pdf") -> bool:
-    """Upload resume bytes to Supabase Storage. Returns True on success."""
+def upload_resume(object_key: str, content: bytes, content_type: str = "application/pdf") -> tuple[bool, str]:
+    """Upload resume bytes to Supabase Storage. Returns (True, '') on success, (False, error_message) on failure."""
     client = get_supabase_storage()
     if not client:
-        return False
+        return False, "Supabase Storage not configured (SUPABASE_URL/SUPABASE_KEY)"
     try:
         client.storage.from_(RESUMES_BUCKET).upload(
             object_key,
@@ -53,9 +56,12 @@ def upload_resume(object_key: str, content: bytes, content_type: str = "applicat
             file_options={"content-type": content_type},
             options={"upsert": "true"},
         )
-        return True
-    except Exception:
-        return False
+        return True, ""
+    except Exception as e:
+        msg = str(e) or type(e).__name__
+        import logging
+        logging.getLogger(__name__).exception("Resume upload failed: %s", msg)
+        return False, msg
 
 
 def download_resume(object_key: str) -> Optional[bytes]:

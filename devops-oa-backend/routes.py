@@ -222,8 +222,9 @@ async def submit_application(
     content_type = "application/pdf" if file_ext.lower() == ".pdf" else "application/octet-stream"
 
     if get_supabase_storage():
-        if not upload_resume(safe_filename, contents, content_type):
-            raise HTTPException(status_code=500, detail="Failed to save resume to storage.")
+        ok, err = upload_resume(safe_filename, contents, content_type)
+        if not ok:
+            raise HTTPException(status_code=500, detail=f"Failed to save resume to storage. {err}".strip())
         resume_path = safe_filename  # storage object key
     else:
         file_path = os.path.join(UPLOAD_DIR, safe_filename)
