@@ -44,17 +44,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configure CORS
-origins = [origin.strip() for origin in settings.allowed_origins.split(",")]
-# Always include production origin
-if "https://recruit.otcr-consulting.com" not in origins:
-    origins.append("https://recruit.otcr-consulting.com")
+# Configure CORS: allow frontend origin(s); production is always included
+_production_origin = "https://recruit.otcr-consulting.com"
+origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
+if _production_origin not in origins:
+    origins.append(_production_origin)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Include routes

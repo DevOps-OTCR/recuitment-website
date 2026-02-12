@@ -46,8 +46,8 @@ class Settings(BaseSettings):
     code_exec_api_url: str = "https://judge0-ce.p.rapidapi.com"
     code_exec_api_key: str = ""
     
-    # CORS
-    allowed_origins: str = "http://localhost:5173,http://localhost:8080"
+    # CORS (comma-separated; production origin is always added in main.py)
+    allowed_origins: str = "http://localhost:5173,http://localhost:8080,https://recruit.otcr-consulting.com"
     
     # Database: Supabase Postgres in production (use pooler URL on Render)
     database_url: str = "sqlite:///./devops_oa.db"

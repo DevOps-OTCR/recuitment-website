@@ -958,12 +958,46 @@ async def test_code(
     return result
 
 
+# Max character counts for progress_detail content (avoid huge snapshots)
+PROGRESS_DETAIL_MAX_CODE = 100_000
+PROGRESS_DETAIL_MAX_SYSTEM_DESIGN = 50_000
+PROGRESS_DETAIL_MAX_ANSWER = 5_000
+
+
+def _truncate_progress_detail(detail: Optional[dict]) -> Optional[dict]:
+    """Truncate progress_detail content to avoid storing huge payloads."""
+    if not detail:
+        return detail
+    out = {}
+    if "problem_solving" in detail and isinstance(detail["problem_solving"], dict):
+        ps = detail["problem_solving"]
+        answers = ps.get("answers")
+        if isinstance(answers, list):
+            out["problem_solving"] = {
+                "answered_count": ps.get("answered_count"),
+                "total": ps.get("total"),
+                "answers": [
+                    {**a, "answer": (a.get("answer") or "")[:PROGRESS_DETAIL_MAX_ANSWER]}
+                    for a in answers
+                ],
+            }
+        else:
+            out["problem_solving"] = ps
+    if "coding" in detail and isinstance(detail["coding"], dict):
+        code = (detail["coding"].get("code") or "")[:PROGRESS_DETAIL_MAX_CODE]
+        out["coding"] = {"code": code}
+    if "system_design" in detail and isinstance(detail["system_design"], dict):
+        text = (detail["system_design"].get("response") or "")[:PROGRESS_DETAIL_MAX_SYSTEM_DESIGN]
+        out["system_design"] = {"response": text}
+    return out if out else detail
+
+
 class ProgressSnapshotRequest(BaseModel):
     """Progress snapshot sent every 5 minutes during assessment."""
     sections_completed: List[str] = []
     current_section: Optional[str] = None
     elapsed_seconds: int = 0
-    progress_detail: Optional[dict] = None  # MCQ answered count, coding/system_design lengths at snapshot time
+    progress_detail: Optional[dict] = None  # Full content: problem_solving.answers[], coding.code, system_design.response
 
 
 @router.post("/assessment/{token}/progress-snapshot")
@@ -985,12 +1019,13 @@ async def record_progress_snapshot(
     if existing >= 50:
         return {"ok": True}
 
+    progress_detail = _truncate_progress_detail(request.progress_detail)
     snapshot = ProgressSnapshot(
         attempt_id=attempt.id,
         sections_completed=request.sections_completed,
         current_section=request.current_section,
         elapsed_seconds=request.elapsed_seconds,
-        progress_detail=request.progress_detail,
+        progress_detail=progress_detail,
     )
     db.add(snapshot)
     db.commit()

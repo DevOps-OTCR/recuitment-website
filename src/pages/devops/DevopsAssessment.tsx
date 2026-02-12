@@ -144,14 +144,26 @@ const DevopsAssessment = () => {
     if (minutes <= lastSnapshotMinutesRef.current) return;
     lastSnapshotMinutesRef.current = minutes;
 
-    const psTotal = config?.problemSolving?.questions?.length ?? 0;
+    const questions = config?.problemSolving?.questions ?? [];
+    const psTotal = questions.length;
     const psAnswered = psTotal
-      ? Object.keys(problemSolvingDraft).filter((qId) => (problemSolvingDraft[qId] ?? '').trim().length > 0).length
+      ? questions.filter((q) => (problemSolvingDraft[q.id] ?? '').trim().length > 0).length
       : 0;
     const progress_detail = {
-      problem_solving: psTotal > 0 ? { answered_count: psAnswered, total: psTotal } : undefined,
-      coding: { length: (codingDraft || '').length },
-      system_design: { length: (systemDesignDraft || '').length },
+      problem_solving:
+        psTotal > 0
+          ? {
+              answered_count: psAnswered,
+              total: psTotal,
+              answers: questions.map((q) => ({
+                questionId: q.id,
+                questionText: q.questionText,
+                answer: problemSolvingDraft[q.id] ?? '',
+              })),
+            }
+          : undefined,
+      coding: { code: codingDraft || '' },
+      system_design: { response: systemDesignDraft || '' },
     };
 
     assessmentApi.recordProgressSnapshot(token, {

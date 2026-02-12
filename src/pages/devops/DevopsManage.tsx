@@ -33,9 +33,13 @@ interface ApplicationItem {
 }
 
 interface ProgressDetail {
-  problem_solving?: { answered_count: number; total: number };
-  coding?: { length: number };
-  system_design?: { length: number };
+  problem_solving?: {
+    answered_count?: number;
+    total?: number;
+    answers?: Array<{ questionId: string; questionText: string; answer: string }>;
+  };
+  coding?: { code: string };
+  system_design?: { response: string };
 }
 
 interface ProgressSnapshotItem {
@@ -79,6 +83,7 @@ const DevopsManage = () => {
   const [loadingSubmission, setLoadingSubmission] = useState(false);
   const [archivedFilter, setArchivedFilter] = useState<'active' | 'archived' | 'all'>('active');
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [expandedSnapshotIndex, setExpandedSnapshotIndex] = useState<number | null>(null);
 
   const formatDuration = (start?: string | null, end?: string | null) => {
     if (!start || !end) return '—';
@@ -94,6 +99,10 @@ const DevopsManage = () => {
     const key = sessionStorage.getItem(ADMIN_KEY_STORAGE);
     if (key) setStoredSecret(key);
   }, []);
+
+  useEffect(() => {
+    setExpandedSnapshotIndex(null);
+  }, [viewingSubmission?.token]);
 
   const headers = () => ({
     'X-Admin-Secret': storedSecret || '',
@@ -742,10 +751,10 @@ OTCR Technologies`;
                 <div className="border border-border rounded-lg overflow-hidden">
                   <div className="bg-[#0f0f1a] px-4 py-2 border-b border-border">
                     <h3 className="font-medium text-white">Progress through assessment</h3>
-                    <p className="text-xs text-muted-foreground">Snapshots taken every 5 minutes — MCQ/code/system design state at each time</p>
+                    <p className="text-xs text-muted-foreground">Snapshots every 5 min — expand to see code and answers at that time</p>
                   </div>
                   <div className="p-4">
-                    <ul className="space-y-3">
+                    <ul className="space-y-2">
                       {viewingSubmission.progress_snapshots.map((snap, idx) => {
                         const sectionLabel = snap.current_section
                           ? snap.current_section.replace(/_/g, ' ')
@@ -753,21 +762,16 @@ OTCR Technologies`;
                         const completedCount = (snap.sections_completed || []).length;
                         const min = Math.floor(snap.elapsed_seconds / 60);
                         const d = snap.progress_detail;
-                        const parts: string[] = [];
-                        if (d?.problem_solving && d.problem_solving.total > 0) {
-                          parts.push(`MCQ ${d.problem_solving.answered_count}/${d.problem_solving.total} answered`);
-                        }
-                        if (d?.coding !== undefined) {
-                          parts.push(d.coding.length === 0 ? 'Coding: not started' : `Coding: ${d.coding.length >= 1000 ? `${(d.coding.length / 1000).toFixed(1)}k` : d.coding.length} chars`);
-                        }
-                        if (d?.system_design !== undefined) {
-                          parts.push(d.system_design.length === 0 ? 'System design: not started' : `System design: ${d.system_design.length >= 1000 ? `${(d.system_design.length / 1000).toFixed(1)}k` : d.system_design.length} chars`);
-                        }
-                        const detailText = parts.length > 0 ? parts.join(' · ') : null;
+                        const isExpanded = expandedSnapshotIndex === idx;
+                        const hasContent = d && (
+                          (d.problem_solving?.answers && d.problem_solving.answers.length > 0) ||
+                          (d.coding?.code && d.coding.code.trim().length > 0) ||
+                          (d.system_design?.response && d.system_design.response.trim().length > 0)
+                        );
                         return (
-                          <li key={idx} className="border-l-2 border-border pl-3 py-2">
-                            <div className="flex items-center gap-3 text-sm flex-wrap">
-                              <span className="text-muted-foreground shrink-0 w-16">{min} min</span>
+                          <li key={idx} className="border border-border/50 rounded-lg overflow-hidden bg-[#0f0f1a]/50">
+                            <div className="flex items-center gap-3 text-sm flex-wrap p-3">
+                              <span className="text-muted-foreground shrink-0 w-14">{min} min</span>
                               <span className="text-white">
                                 {completedCount} section{completedCount !== 1 ? 's' : ''} done
                                 {snap.current_section && (
@@ -777,9 +781,52 @@ OTCR Technologies`;
                               <span className="text-xs text-muted-foreground">
                                 {new Date(snap.snapshot_at).toLocaleTimeString()}
                               </span>
+                              {hasContent && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="ml-auto h-7 text-xs text-muted-foreground hover:text-white"
+                                  onClick={() => setExpandedSnapshotIndex(isExpanded ? null : idx)}
+                                >
+                                  {isExpanded ? 'Hide content' : 'View content at this time'}
+                                </Button>
+                              )}
                             </div>
-                            {detailText && (
-                              <p className="text-xs text-muted-foreground mt-1 ml-16">{detailText}</p>
+                            {isExpanded && d && (
+                              <div className="border-t border-border p-4 space-y-6 bg-[#0a0a12]">
+                                {d.problem_solving?.answers && d.problem_solving.answers.length > 0 && (
+                                  <div>
+                                    <p className="text-sm font-medium text-muted-foreground mb-2">Problem solving (at this time)</p>
+                                    <div className="space-y-3">
+                                      {d.problem_solving.answers.map((a, i) => (
+                                        <div key={a.questionId} className="border border-border/50 rounded p-3 bg-[#0f0f1a]">
+                                          <p className="text-muted-foreground text-sm font-medium">Q{i + 1}: {a.questionText}</p>
+                                          <p className="text-white text-sm mt-2 ml-2">Answer: {a.answer || '(not answered yet)'}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {(d.coding?.code ?? '').trim().length > 0 && (
+                                  <div>
+                                    <p className="text-sm text-muted-foreground mb-2">Coding (at this time)</p>
+                                    <pre className="bg-[#0f0f1a] p-3 rounded text-sm text-white overflow-x-auto font-mono whitespace-pre">
+                                      {d.coding!.code}
+                                    </pre>
+                                  </div>
+                                )}
+                                {(d.system_design?.response ?? '').trim().length > 0 && (
+                                  <div>
+                                    <p className="text-sm text-muted-foreground mb-2">System design (at this time)</p>
+                                    <div className="bg-[#0f0f1a] p-3 rounded text-sm text-white whitespace-pre-wrap">
+                                      {d.system_design!.response}
+                                    </div>
+                                  </div>
+                                )}
+                                {!d.problem_solving?.answers?.length && !(d.coding?.code ?? '').trim() && !(d.system_design?.response ?? '').trim() && (
+                                  <p className="text-xs text-muted-foreground">No content recorded at this snapshot.</p>
+                                )}
+                              </div>
                             )}
                           </li>
                         );

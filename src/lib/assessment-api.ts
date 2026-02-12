@@ -151,7 +151,7 @@ class AssessmentApiClient {
 
   /**
    * Record a progress snapshot (e.g. every 5 min) for submission review timeline.
-   * progress_detail: MCQ answered count, coding/system_design character lengths at snapshot time.
+   * progress_detail: full content at snapshot time (MCQ answers, code, system design text) for display in review.
    */
   async recordProgressSnapshot(
     token: string,
@@ -160,9 +160,13 @@ class AssessmentApiClient {
       current_section: string | null;
       elapsed_seconds: number;
       progress_detail?: {
-        problem_solving?: { answered_count: number; total: number };
-        coding?: { length: number };
-        system_design?: { length: number };
+        problem_solving?: {
+          answered_count: number;
+          total: number;
+          answers?: Array<{ questionId: string; questionText: string; answer: string }>;
+        };
+        coding?: { code: string };
+        system_design?: { response: string };
       };
     }
   ): Promise<void> {
