@@ -521,10 +521,6 @@ const DevopsAssessment = () => {
                   <strong className="text-white block mb-2">Timing Information:</strong>
                   This assessment is <strong>untimed</strong>, but we recommend completing it within <strong>30-45 minutes</strong>. There is no time limit, and you can take as long as needed to complete all sections. A timer will track your elapsed time for reference.
                 </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  <strong className="text-white block mb-1">Navigation:</strong>
-                  You can move back and forth between sections (Problem, Coding, Design). Once you submit a section, it is saved as is and cannot be changed.
-                </p>
               </div>
             </div>
 
@@ -671,9 +667,6 @@ const DevopsAssessment = () => {
             )}
           </div>
         </div>
-        <p className="text-xs text-muted-foreground text-center px-4 pb-2 max-w-2xl mx-auto">
-          You can move back and forth between sections. Once you submit a section, it is saved as is and cannot be changed.
-        </p>
       </header>
 
       {/* Main Content */}
