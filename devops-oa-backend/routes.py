@@ -443,12 +443,16 @@ async def get_submission(
         applicant_name = application.name
     
     # Get MCQ answer key for scoring (maps question text to correct answer)
-    mcq_answer_key = get_mcq_answer_key()
+    try:
+        mcq_answer_key = get_mcq_answer_key() or {}
+    except Exception:
+        mcq_answer_key = {}
     
     # Build a lookup by question text for matching
     answer_key_by_text = {}
-    for q_id, info in mcq_answer_key.items():
-        answer_key_by_text[info["questionText"]] = info["correctAnswer"]
+    for q_id, info in (mcq_answer_key or {}).items():
+        if isinstance(info, dict) and "questionText" in info and "correctAnswer" in info:
+            answer_key_by_text[info["questionText"]] = info["correctAnswer"]
     
     # Process submissions to add MCQ scoring
     processed_submissions = []
@@ -462,7 +466,7 @@ async def get_submission(
         }
         
         # Add MCQ scoring for problem_solving section
-        if sub.section == "problem_solving" and sub.payload:
+        if sub.section == "problem_solving" and sub.payload and isinstance(sub.payload, dict):
             mcq_results = []
             correct_count = 0
             total_mcq = 0
@@ -531,22 +535,25 @@ async def get_submission(
         processed_submissions.append(sub_data)
     
     # Progress snapshots (every 5 min during assessment) for timeline view
-    snapshots = (
-        db.query(ProgressSnapshot)
-        .filter(ProgressSnapshot.attempt_id == attempt.id)
-        .order_by(ProgressSnapshot.snapshot_at.asc())
-        .all()
-    )
-    progress_snapshots = [
-        {
-            "snapshot_at": s.snapshot_at.isoformat(),
-            "sections_completed": s.sections_completed or [],
-            "current_section": s.current_section,
-            "elapsed_seconds": s.elapsed_seconds,
-            "progress_detail": s.progress_detail,
-        }
-        for s in snapshots
-    ]
+    progress_snapshots = []
+    try:
+        snapshots = (
+            db.query(ProgressSnapshot)
+            .filter(ProgressSnapshot.attempt_id == attempt.id)
+            .order_by(ProgressSnapshot.snapshot_at.asc())
+            .all()
+        )
+        for s in snapshots:
+            progress_snapshots.append({
+                "snapshot_at": s.snapshot_at.isoformat() if s.snapshot_at else None,
+                "sections_completed": s.sections_completed or [],
+                "current_section": s.current_section,
+                "elapsed_seconds": s.elapsed_seconds,
+                "progress_detail": s.progress_detail,
+            })
+    except Exception:
+        # Table may not exist yet (assessment_progress_snapshots); return empty list
+        progress_snapshots = []
 
     return {
         "token": token,
