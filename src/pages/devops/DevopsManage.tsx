@@ -763,11 +763,7 @@ OTCR Technologies`;
                         const min = Math.floor(snap.elapsed_seconds / 60);
                         const d = snap.progress_detail;
                         const isExpanded = expandedSnapshotIndex === idx;
-                        const hasContent = d && (
-                          (d.problem_solving?.answers && d.problem_solving.answers.length > 0) ||
-                          (d.coding?.code && d.coding.code.trim().length > 0) ||
-                          (d.system_design?.response && d.system_design.response.trim().length > 0)
-                        );
+                        const hasSnapshot = !!d;
                         return (
                           <li key={idx} className="border border-border/50 rounded-lg overflow-hidden bg-[#0f0f1a]/50">
                             <div className="flex items-center gap-3 text-sm flex-wrap p-3">
@@ -781,7 +777,7 @@ OTCR Technologies`;
                               <span className="text-xs text-muted-foreground">
                                 {new Date(snap.snapshot_at).toLocaleTimeString()}
                               </span>
-                              {hasContent && (
+                              {hasSnapshot && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -794,9 +790,9 @@ OTCR Technologies`;
                             </div>
                             {isExpanded && d && (
                               <div className="border-t border-border p-4 space-y-6 bg-[#0a0a12]">
-                                {d.problem_solving?.answers && d.problem_solving.answers.length > 0 && (
-                                  <div>
-                                    <p className="text-sm font-medium text-muted-foreground mb-2">Problem solving (at this time)</p>
+                                <div>
+                                  <p className="text-sm font-medium text-muted-foreground mb-2">Problem solving (at this time)</p>
+                                  {d.problem_solving?.answers && d.problem_solving.answers.length > 0 ? (
                                     <div className="space-y-3">
                                       {d.problem_solving.answers.map((a, i) => (
                                         <div key={a.questionId} className="border border-border/50 rounded p-3 bg-[#0f0f1a]">
@@ -805,27 +801,24 @@ OTCR Technologies`;
                                         </div>
                                       ))}
                                     </div>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground">No problem solving snapshot recorded at this time.</p>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <p className="text-sm text-muted-foreground mb-2">Coding (at this time)</p>
+                                  <pre className="bg-[#0f0f1a] p-3 rounded text-sm text-white overflow-x-auto font-mono whitespace-pre">
+                                    {(d.coding?.code ?? '').trim().length > 0 ? d.coding!.code : 'No code yet'}
+                                  </pre>
+                                </div>
+
+                                <div>
+                                  <p className="text-sm text-muted-foreground mb-2">System design (at this time)</p>
+                                  <div className="bg-[#0f0f1a] p-3 rounded text-sm text-white whitespace-pre-wrap">
+                                    {(d.system_design?.response ?? '').trim().length > 0 ? d.system_design!.response : 'No response yet'}
                                   </div>
-                                )}
-                                {(d.coding?.code ?? '').trim().length > 0 && (
-                                  <div>
-                                    <p className="text-sm text-muted-foreground mb-2">Coding (at this time)</p>
-                                    <pre className="bg-[#0f0f1a] p-3 rounded text-sm text-white overflow-x-auto font-mono whitespace-pre">
-                                      {d.coding!.code}
-                                    </pre>
-                                  </div>
-                                )}
-                                {(d.system_design?.response ?? '').trim().length > 0 && (
-                                  <div>
-                                    <p className="text-sm text-muted-foreground mb-2">System design (at this time)</p>
-                                    <div className="bg-[#0f0f1a] p-3 rounded text-sm text-white whitespace-pre-wrap">
-                                      {d.system_design!.response}
-                                    </div>
-                                  </div>
-                                )}
-                                {!d.problem_solving?.answers?.length && !(d.coding?.code ?? '').trim() && !(d.system_design?.response ?? '').trim() && (
-                                  <p className="text-xs text-muted-foreground">No content recorded at this snapshot.</p>
-                                )}
+                                </div>
                               </div>
                             )}
                           </li>

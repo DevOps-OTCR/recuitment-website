@@ -682,14 +682,30 @@ async def delete_application(
     link_id = application.assessment_link_id
     application.assessment_link_id = None
     db.flush()
-    if link_id:
-        for attempt in db.query(Attempt).filter(Attempt.link_id == link_id).all():
-            db.query(Submission).filter(Submission.attempt_id == attempt.id).delete()
-        db.query(Attempt).filter(Attempt.link_id == link_id).delete()
-        db.query(AssessmentLink).filter(AssessmentLink.id == link_id).delete()
-    db.delete(application)
-    db.commit()
-    return {"success": True, "application_id": application_id}
+    try:
+        if link_id:
+            attempts = db.query(Attempt).filter(Attempt.link_id == link_id).all()
+            attempt_ids = [a.id for a in attempts]
+
+            # Delete dependent rows first to avoid FK constraint failures
+            if attempt_ids:
+                # Newer deployments may have progress snapshots table
+                try:
+                    db.query(ProgressSnapshot).filter(ProgressSnapshot.attempt_id.in_(attempt_ids)).delete(synchronize_session=False)
+                except Exception:
+                    # Table may not exist yet
+                    pass
+                db.query(Submission).filter(Submission.attempt_id.in_(attempt_ids)).delete(synchronize_session=False)
+
+            db.query(Attempt).filter(Attempt.link_id == link_id).delete(synchronize_session=False)
+            db.query(AssessmentLink).filter(AssessmentLink.id == link_id).delete(synchronize_session=False)
+
+        db.delete(application)
+        db.commit()
+        return {"success": True, "application_id": application_id}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete application: {e}")
 
 
 @router.post("/links", response_model=CreateLinkResponse)
