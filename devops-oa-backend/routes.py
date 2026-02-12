@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form
 from fastapi.responses import FileResponse, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel, EmailStr
 
 from config import get_settings
@@ -315,7 +315,9 @@ async def list_applications(
     _: bool = Depends(verify_admin_secret),
 ):
     """List applications (admin only). archived=0 or omit = exclude archived; archived=1 = include; archived=only = only archived."""
-    query = db.query(Application)
+    query = db.query(Application).options(
+        joinedload(Application.assessment_link).joinedload(AssessmentLink.attempts)
+    )
     if status:
         query = query.filter(Application.status == status)
     if archived is None or archived == "0" or archived == "false":
@@ -323,19 +325,19 @@ async def list_applications(
     elif archived == "only":
         query = query.filter(Application.archived_at.isnot(None))
     # archived=1 or "true" = include all (no filter)
-    
+
     applications = query.order_by(Application.created_at.desc()).all()
-    
+
     result = []
     for app in applications:
         attempt = None
         assessment_token = None
-        if app.assessment_link_id:
-            attempt = db.query(Attempt).filter(Attempt.link_id == app.assessment_link_id).first()
-            link = db.query(AssessmentLink).filter(AssessmentLink.id == app.assessment_link_id).first()
-            if link:
-                assessment_token = link.token
-        
+        if app.assessment_link:
+            link = app.assessment_link
+            assessment_token = link.token
+            if link.attempts:
+                attempt = link.attempts[0]
+
         result.append(ApplicationListItem(
             id=app.id,
             name=app.name,
