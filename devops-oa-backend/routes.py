@@ -92,6 +92,8 @@ class ApplicationListItem(BaseModel):
     interest: Optional[str]
     resume_filename: Optional[str]
     status: str
+    final_decision: str
+    cycle_name: Optional[str]
     created_at: datetime
     reviewed_at: Optional[datetime]
     notes: Optional[str]
@@ -345,6 +347,8 @@ async def list_applications(
             interest=app.interest,
             resume_filename=app.resume_filename,
             status=app.status,
+            final_decision=app.final_decision.value,
+            cycle_name=app.cycle.name if app.cycle else None,
             created_at=app.created_at,
             reviewed_at=app.reviewed_at,
             notes=app.notes,
