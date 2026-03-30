@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel, EmailStr
 
@@ -91,6 +91,7 @@ class ApplicationListItem(BaseModel):
     email: str
     interest: Optional[str]
     resume_filename: Optional[str]
+    resume_url: Optional[str] = None
     status: str
     final_decision: str
     cycle_name: Optional[str]
@@ -109,6 +110,23 @@ class ApplicationListItem(BaseModel):
 class ApproveApplicationRequest(BaseModel):
     """Request to approve an application."""
     notes: Optional[str] = None
+
+
+def _extract_resume_url(application: Application) -> Optional[str]:
+    """Return a usable resume URL from stored file info or seeded spreadsheet metadata."""
+    if application.resume_path and not os.path.isfile(application.resume_path) and not is_supabase_path(application.resume_path):
+        # If a non-file URL was stored directly, use it.
+        if application.resume_path.startswith("http://") or application.resume_path.startswith("https://"):
+            return application.resume_path
+
+    data = application.application_data or {}
+    if isinstance(data, dict):
+        raw = data.get("Resume Link") or data.get("resume_link") or data.get("resumeUrl")
+        if isinstance(raw, str):
+            value = raw.strip()
+            if value.startswith("http://") or value.startswith("https://"):
+                return value
+    return None
 
 
 class CreateLinkRequest(BaseModel):
@@ -346,6 +364,7 @@ async def list_applications(
             email=app.email,
             interest=app.interest,
             resume_filename=app.resume_filename,
+            resume_url=_extract_resume_url(app),
             status=app.status,
             final_decision=app.final_decision.value,
             cycle_name=app.cycle.name if app.cycle else None,
@@ -381,6 +400,7 @@ async def get_application(
         "email": application.email,
         "resume_filename": application.resume_filename,
         "resume_path": application.resume_path,
+        "resume_url": _extract_resume_url(application),
         "status": application.status,
         "created_at": application.created_at,
         "reviewed_at": application.reviewed_at,
@@ -400,7 +420,12 @@ async def get_application_resume(
 ):
     """Stream resume file for admin (opens in new tab). From Supabase Storage or local disk."""
     application = db.query(Application).filter(Application.id == application_id).first()
-    if not application or not application.resume_path:
+    if not application:
+        raise HTTPException(status_code=404, detail="Resume not found")
+    if not application.resume_path:
+        resume_url = _extract_resume_url(application)
+        if resume_url:
+            return RedirectResponse(resume_url)
         raise HTTPException(status_code=404, detail="Resume not found")
     filename = application.resume_filename or "resume.pdf"
     media_type = "application/pdf" if filename.lower().endswith(".pdf") else "application/octet-stream"
@@ -416,6 +441,9 @@ async def get_application_resume(
             headers={"Content-Disposition": disposition},
         )
     if not os.path.isfile(application.resume_path):
+        resume_url = _extract_resume_url(application)
+        if resume_url:
+            return RedirectResponse(resume_url)
         raise HTTPException(status_code=404, detail="Resume file missing")
     return FileResponse(
         application.resume_path,
