@@ -65,7 +65,7 @@ const StatusSummary = ({
             Composite rubric score
           </div>
           <p className="mt-2 text-2xl font-semibold text-white">
-            {averageScore === null ? 'No scores yet' : `${averageScore.toFixed(1)} / 5`}
+            {averageScore === null ? 'No scores yet' : `${averageScore.toFixed(1)} / 3`}
           </p>
           <p className="mt-1 text-sm text-white/50">
             Average across the saved interview rubric bands. Status automatically becomes Rejected once two separate no-leaning votes are recorded.

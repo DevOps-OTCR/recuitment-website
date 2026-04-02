@@ -2,16 +2,27 @@
 
 import secrets
 import os
+import enum
 from datetime import datetime
-from typing import Optional, List
+from typing import Any, Optional, List, Literal
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form
 from fastapi.responses import FileResponse, Response, RedirectResponse
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session, joinedload
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, Field
 
 from config import get_settings
 from database import get_db
-from models import AssessmentLink, Attempt, Submission, Application, ApplicationStatus, ProgressSnapshot
+from models import (
+    AssessmentLink,
+    Attempt,
+    Submission,
+    Application,
+    ApplicationStatus,
+    Evaluation,
+    ProgressSnapshot,
+    DecisionStatus,
+)
 from storage import upload_resume, download_resume, is_supabase_path, get_supabase_storage
 
 router = APIRouter()
@@ -107,6 +118,75 @@ class ApplicationListItem(BaseModel):
     archived_at: Optional[datetime] = None
 
 
+class EvaluationRecommendation(str, enum.Enum):
+    YES = "YES"
+    LEAN_YES = "LEAN YES"
+    MAYBE = "MAYBE"
+    LEAN_NO = "LEAN NO"
+    NO = "NO"
+
+
+class EvaluationPayload(BaseModel):
+    interviewer_name: str = Field(min_length=1, max_length=100)
+    interviewee_name: str = Field(min_length=1, max_length=255)
+    interviewee_gender: Literal["Male", "Female", "Other"]
+    interviewer_role: Literal["Primary", "Secondary"]
+    leadership_score: int = Field(ge=1, le=3)
+    interest_in_otcr_score: int = Field(ge=1, le=3)
+    behavioral_performance_score: int = Field(ge=1, le=3)
+    business_acumen_score: int = Field(ge=1, le=3)
+    qualitative_creativity_score: int = Field(ge=1, le=3)
+    quantitative_structure_score: int = Field(ge=1, le=3)
+    case_performance_score: int = Field(ge=1, le=3)
+    creativity_conversation_score: int = Field(ge=1, le=3)
+    recommendation: EvaluationRecommendation
+    final_round_summary: str = Field(min_length=1)
+    overall_performance_overview: str = Field(min_length=1)
+
+
+class EvaluationResponse(BaseModel):
+    id: int
+    application_id: int
+    applicant_name: str
+    applicant_email: str
+    interviewer_name: str
+    interviewee_name: str
+    interviewee_gender: str
+    interviewer_role: str
+    leadership_score: int
+    interest_in_otcr_score: int
+    behavioral_performance_score: int
+    business_acumen_score: int
+    qualitative_creativity_score: int
+    quantitative_structure_score: int
+    case_performance_score: int
+    creativity_conversation_score: int
+    recommendation: str
+    recommendation_bucket: str
+    final_round_summary: Optional[str] = None
+    overall_performance_overview: Optional[str] = None
+    comments: Optional[str] = None
+    created_at: datetime
+
+
+class DatabaseTableSummary(BaseModel):
+    table: str
+    count: int
+
+
+class DatabaseOverviewResponse(BaseModel):
+    generated_at: datetime
+    persistence: dict[str, str]
+    tables: List[DatabaseTableSummary]
+
+
+class DatabaseTablePreviewResponse(BaseModel):
+    table: str
+    count: int
+    columns: List[str]
+    rows: List[dict[str, Any]]
+
+
 class ApproveApplicationRequest(BaseModel):
     """Request to approve an application."""
     notes: Optional[str] = None
@@ -127,6 +207,85 @@ def _extract_resume_url(application: Application) -> Optional[str]:
             if value.startswith("http://") or value.startswith("https://"):
                 return value
     return None
+
+
+def _recommendation_bucket(recommendation: EvaluationRecommendation | str) -> DecisionStatus:
+    if recommendation in (EvaluationRecommendation.YES, EvaluationRecommendation.LEAN_YES, "YES", "LEAN YES"):
+        return DecisionStatus.YES
+    if recommendation in (EvaluationRecommendation.NO, EvaluationRecommendation.LEAN_NO, "NO", "LEAN NO"):
+        return DecisionStatus.NO
+    return DecisionStatus.MAYBE
+
+
+def _evaluation_recommendation_label(evaluation: Evaluation) -> str:
+    if evaluation.recommendation_label:
+        return evaluation.recommendation_label
+    if evaluation.recommendation:
+        return evaluation.recommendation.value if isinstance(evaluation.recommendation, enum.Enum) else evaluation.recommendation
+    return EvaluationRecommendation.MAYBE.value
+
+
+def _normalize_rubric_score(score: Optional[int], default: int = 2) -> int:
+    if score is None:
+        return default
+    if score < 1:
+        return 1
+    if score > 3:
+        return 3
+    return score
+
+
+def _evaluation_to_response(evaluation: Evaluation) -> EvaluationResponse:
+    recommendation_label = _evaluation_recommendation_label(evaluation)
+    recommendation_bucket = (
+        evaluation.recommendation.value
+        if isinstance(evaluation.recommendation, enum.Enum)
+        else evaluation.recommendation or _recommendation_bucket(recommendation_label).value
+    )
+
+    return EvaluationResponse(
+        id=evaluation.id,
+        application_id=evaluation.application_id,
+        applicant_name=evaluation.application.name if evaluation.application else "",
+        applicant_email=evaluation.application.email if evaluation.application else "",
+        interviewer_name=evaluation.interviewer_name,
+        interviewee_name=evaluation.interviewee_name or (evaluation.application.name if evaluation.application else ""),
+        interviewee_gender=evaluation.interviewee_gender or "Other",
+        interviewer_role=evaluation.interviewer_role or "Primary",
+        leadership_score=_normalize_rubric_score(evaluation.leadership_score),
+        interest_in_otcr_score=_normalize_rubric_score(evaluation.interest_in_otcr_score),
+        behavioral_performance_score=_normalize_rubric_score(evaluation.behavioral_performance_score),
+        business_acumen_score=_normalize_rubric_score(evaluation.business_acumen_score),
+        qualitative_creativity_score=_normalize_rubric_score(evaluation.qualitative_creativity_score),
+        quantitative_structure_score=_normalize_rubric_score(evaluation.quantitative_structure_score),
+        case_performance_score=_normalize_rubric_score(evaluation.case_performance_score),
+        creativity_conversation_score=_normalize_rubric_score(evaluation.creativity_conversation_score),
+        recommendation=recommendation_label,
+        recommendation_bucket=recommendation_bucket,
+        final_round_summary=evaluation.final_round_summary,
+        overall_performance_overview=evaluation.overall_performance_overview,
+        comments=evaluation.comments,
+        created_at=evaluation.created_at,
+    )
+
+
+DATABASE_PREVIEW_TABLES = {
+    "applications": "created_at",
+    "evaluations": "created_at",
+    "assessment_links": "created_at",
+    "attempts": "started_at",
+    "submissions": "submitted_at",
+    "cycles": "id",
+    "assessment_progress_snapshots": "snapshot_at",
+}
+
+
+def _serialize_db_value(value: Any) -> Any:
+    if isinstance(value, enum.Enum):
+        return value.value
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return value
 
 
 class CreateLinkRequest(BaseModel):
@@ -450,6 +609,137 @@ async def get_application_resume(
         filename=filename,
         media_type=media_type,
         headers={"Content-Disposition": disposition},
+    )
+
+
+@router.get("/admin/evaluations", response_model=List[EvaluationResponse])
+async def list_evaluations(
+    application_id: Optional[int] = None,
+    limit: int = 250,
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_admin_secret),
+):
+    """List saved interviewer evaluations (admin only)."""
+    query = db.query(Evaluation).options(joinedload(Evaluation.application))
+    if application_id is not None:
+        query = query.filter(Evaluation.application_id == application_id)
+
+    evaluations = (
+        query.order_by(Evaluation.created_at.desc(), Evaluation.id.desc())
+        .limit(max(1, min(limit, 500)))
+        .all()
+    )
+
+    return [_evaluation_to_response(evaluation) for evaluation in evaluations]
+
+
+@router.post("/admin/applications/{application_id}/evaluations", response_model=EvaluationResponse)
+async def create_evaluation(
+    application_id: int,
+    payload: EvaluationPayload,
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_admin_secret),
+):
+    """Create an interviewer evaluation for an application (admin only)."""
+    application = db.query(Application).filter(Application.id == application_id).first()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    recommendation_bucket = _recommendation_bucket(payload.recommendation)
+    evaluation = Evaluation(
+        application_id=application.id,
+        interviewer_name=payload.interviewer_name.strip(),
+        interviewee_name=payload.interviewee_name.strip(),
+        interviewee_gender=payload.interviewee_gender,
+        interviewer_role=payload.interviewer_role,
+        leadership_score=payload.leadership_score,
+        interest_in_otcr_score=payload.interest_in_otcr_score,
+        behavioral_performance_score=payload.behavioral_performance_score,
+        business_acumen_score=payload.business_acumen_score,
+        qualitative_creativity_score=payload.qualitative_creativity_score,
+        quantitative_structure_score=payload.quantitative_structure_score,
+        case_performance_score=payload.case_performance_score,
+        creativity_conversation_score=payload.creativity_conversation_score,
+        recommendation=recommendation_bucket.value,
+        recommendation_label=payload.recommendation.value,
+        culture_fit_score=payload.behavioral_performance_score,
+        technical_score=payload.case_performance_score,
+        communication_score=payload.case_performance_score,
+        comments=payload.overall_performance_overview.strip(),
+        final_round_summary=payload.final_round_summary.strip(),
+        overall_performance_overview=payload.overall_performance_overview.strip(),
+    )
+
+    application.reviewed_at = datetime.utcnow()
+
+    db.add(evaluation)
+    db.commit()
+    db.refresh(evaluation)
+
+    evaluation = (
+        db.query(Evaluation)
+        .options(joinedload(Evaluation.application))
+        .filter(Evaluation.id == evaluation.id)
+        .first()
+    )
+    return _evaluation_to_response(evaluation)
+
+
+@router.get("/admin/database/overview", response_model=DatabaseOverviewResponse)
+async def get_database_overview(
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_admin_secret),
+):
+    """Return row counts for the main backend tables (admin only)."""
+    inspector = inspect(db.bind)
+    summaries: List[DatabaseTableSummary] = []
+
+    for table_name in DATABASE_PREVIEW_TABLES:
+        if not inspector.has_table(table_name):
+            continue
+        count = db.execute(text(f"SELECT COUNT(*) FROM {table_name}")).scalar() or 0
+        summaries.append(DatabaseTableSummary(table=table_name, count=int(count)))
+
+    return DatabaseOverviewResponse(
+        generated_at=datetime.utcnow(),
+        persistence=_persistence_info(),
+        tables=summaries,
+    )
+
+
+@router.get("/admin/database/tables/{table_name}", response_model=DatabaseTablePreviewResponse)
+async def get_database_table_preview(
+    table_name: str,
+    limit: int = 25,
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_admin_secret),
+):
+    """Return a preview of rows from a whitelisted table (admin only)."""
+    if table_name not in DATABASE_PREVIEW_TABLES:
+        raise HTTPException(status_code=404, detail="Unsupported table")
+
+    inspector = inspect(db.bind)
+    if not inspector.has_table(table_name):
+        raise HTTPException(status_code=404, detail="Table not found")
+
+    safe_limit = max(1, min(limit, 100))
+    order_column = DATABASE_PREVIEW_TABLES[table_name]
+
+    total_count = db.execute(text(f"SELECT COUNT(*) FROM {table_name}")).scalar() or 0
+    result = db.execute(
+        text(f"SELECT * FROM {table_name} ORDER BY {order_column} DESC LIMIT :limit"),
+        {"limit": safe_limit},
+    )
+
+    rows = []
+    for row in result.mappings().all():
+        rows.append({key: _serialize_db_value(value) for key, value in row.items()})
+
+    return DatabaseTablePreviewResponse(
+        table=table_name,
+        count=int(total_count),
+        columns=list(result.keys()),
+        rows=rows,
     )
 
 

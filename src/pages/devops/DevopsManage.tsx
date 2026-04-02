@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ClipboardList,
+  Database,
   FilePenLine,
   LayoutGrid,
   Loader2,
@@ -12,32 +13,34 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 
 import Footer from '@/components/Footer';
 import Navigation from '@/components/Navigation';
+import { adminApi, type AdminApplicationResponse, type AdminEvaluationResponse, type AdminEvaluationPayload } from '@/lib/admin-api';
+import { getOaApiUrl } from '@/lib/oa-api-url';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { getOaApiUrl } from '@/lib/oa-api-url';
-import { cn } from '@/lib/utils';
 import ApplicantDetail from '@/pages/devops/components/admin/ApplicantDetail';
 import ConsultantList from '@/pages/devops/components/admin/ConsultantList';
+import DatabaseView from '@/pages/devops/components/admin/DatabaseView';
 import FeedbackForm from '@/pages/devops/components/admin/FeedbackForm';
 import { mockApplicants, mockFeedback } from '@/pages/devops/components/admin/mockData';
 import {
   feedbackMetricFields,
+  normalizeRatingBand,
   type ApplicantRecord,
-  type DecisionValue,
+  type DatabaseOverview,
+  type DatabaseTableName,
+  type DatabaseTablePreview,
   type FeedbackEntry,
-  type RatingBand,
 } from '@/pages/devops/components/admin/types';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 
 const API_BASE_URL = getOaApiUrl();
 const ADMIN_KEY_STORAGE = 'otcr_devops_admin_secret';
-const FEEDBACK_STORAGE = 'otcr_recruitment_feedback_v2';
 
 const defaultExecRoster = ['Ava Patel', 'Mihika Rao', 'Isaiah Brooks', 'Laksh Shah'];
-
 const nameKey = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
 
 const deriveAssignedExec = (applicant: ApplicantRecord) =>
@@ -45,101 +48,94 @@ const deriveAssignedExec = (applicant: ApplicantRecord) =>
   applicant.notes?.match(/assigned[:\s]+([a-zA-Z\s]+)/i)?.[1]?.trim() ??
   defaultExecRoster[applicant.id % defaultExecRoster.length];
 
-const isDecisionValue = (value: unknown): value is DecisionValue =>
-  value === 'YES' || value === 'LEAN YES' || value === 'MAYBE' || value === 'LEAN NO' || value === 'NO';
-
-const normalizeRatingBand = (value: unknown): RatingBand => {
-  const numericValue = Number(value);
-  if (numericValue >= 1 && numericValue <= 5) return numericValue as RatingBand;
-  return 3;
+const normalizeErrorMessage = (error: unknown, fallback: string) => {
+  if (!(error instanceof Error)) return fallback;
+  const detail = error.message.replace(/^API Error \d+:\s*/i, '').trim();
+  return detail || fallback;
 };
 
-const normalizeFeedbackEntry = (raw: unknown, applicantId: number): FeedbackEntry | null => {
-  if (!raw || typeof raw !== 'object') return null;
-  const entry = raw as Record<string, unknown>;
+const mapApplication = (application: AdminApplicationResponse): ApplicantRecord => {
+  const mapped: ApplicantRecord = {
+    id: application.id,
+    name: application.name,
+    email: application.email,
+    interest: application.interest,
+    resume_filename: application.resume_filename,
+    resume_url: application.resume_url ?? null,
+    status: application.status,
+    final_decision: application.final_decision,
+    cycle_name: application.cycle_name,
+    created_at: application.created_at,
+    reviewed_at: application.reviewed_at,
+    notes: application.notes,
+    has_assessment_link: application.has_assessment_link,
+    assessment_completed: application.assessment_completed,
+    assessment_token: application.assessment_token,
+    focus_loss_events: application.focus_loss_events,
+    is_flagged: application.is_flagged,
+    integrity_notes: application.integrity_notes,
+    archived_at: application.archived_at,
+    assigned_exec: null,
+  };
 
-  if ('leadershipScore' in entry && 'overallPerformanceOverview' in entry) {
-    const applicantName =
-      typeof entry.applicantName === 'string'
-        ? entry.applicantName
-        : typeof entry.intervieweeName === 'string'
-          ? entry.intervieweeName
-          : '';
-
-    return {
-      id: typeof entry.id === 'string' ? entry.id : `${applicantId}-${Date.now()}`,
-      applicantId,
-      applicantName,
-      interviewerName: typeof entry.interviewerName === 'string' ? entry.interviewerName : 'Anonymous reviewer',
-      intervieweeName: typeof entry.intervieweeName === 'string' ? entry.intervieweeName : applicantName,
-      intervieweeGender:
-        entry.intervieweeGender === 'Male' || entry.intervieweeGender === 'Female' || entry.intervieweeGender === 'Other'
-          ? entry.intervieweeGender
-          : 'Other',
-      interviewerRole: entry.interviewerRole === 'Primary' || entry.interviewerRole === 'Secondary' ? entry.interviewerRole : 'Primary',
-      leadershipScore: normalizeRatingBand(entry.leadershipScore),
-      interestInOtcrScore: normalizeRatingBand(entry.interestInOtcrScore),
-      behavioralPerformanceScore: normalizeRatingBand(entry.behavioralPerformanceScore),
-      businessAcumenScore: normalizeRatingBand(entry.businessAcumenScore),
-      qualitativeCreativityScore: normalizeRatingBand(entry.qualitativeCreativityScore),
-      quantitativeStructureScore: normalizeRatingBand(entry.quantitativeStructureScore),
-      casePerformanceScore: normalizeRatingBand(entry.casePerformanceScore),
-      creativityConversationScore: normalizeRatingBand(entry.creativityConversationScore),
-      recommendation: isDecisionValue(entry.recommendation) ? entry.recommendation : 'MAYBE',
-      finalRoundSummary: typeof entry.finalRoundSummary === 'string' ? entry.finalRoundSummary : '',
-      overallPerformanceOverview:
-        typeof entry.overallPerformanceOverview === 'string' ? entry.overallPerformanceOverview : '',
-      submittedAt: typeof entry.submittedAt === 'string' ? entry.submittedAt : new Date().toISOString(),
-    };
-  }
-
-  if ('cultureFitScore' in entry || 'technicalScore' in entry || 'communicationScore' in entry || 'leadershipPotentialScore' in entry) {
-    return {
-      id: typeof entry.id === 'string' ? entry.id : `${applicantId}-${Date.now()}`,
-      applicantId,
-      applicantName: '',
-      interviewerName: typeof entry.interviewerName === 'string' ? entry.interviewerName : 'Anonymous reviewer',
-      intervieweeName: '',
-      intervieweeGender: 'Other',
-      interviewerRole: 'Primary',
-      leadershipScore: normalizeRatingBand(entry.leadershipPotentialScore),
-      interestInOtcrScore: normalizeRatingBand(entry.cultureFitScore),
-      behavioralPerformanceScore: normalizeRatingBand(entry.communicationScore),
-      businessAcumenScore: normalizeRatingBand(entry.technicalScore),
-      qualitativeCreativityScore: normalizeRatingBand(entry.technicalScore),
-      quantitativeStructureScore: normalizeRatingBand(entry.technicalScore),
-      casePerformanceScore: normalizeRatingBand(entry.communicationScore),
-      creativityConversationScore: normalizeRatingBand(entry.cultureFitScore),
-      recommendation: isDecisionValue(entry.recommendation) ? entry.recommendation : 'MAYBE',
-      finalRoundSummary:
-        [entry.strengths, entry.concerns].filter((value) => typeof value === 'string' && value.trim()).join(' '),
-      overallPerformanceOverview: typeof entry.comments === 'string' ? entry.comments : '',
-      submittedAt: typeof entry.submittedAt === 'string' ? entry.submittedAt : new Date().toISOString(),
-    };
-  }
-
-  return null;
+  return {
+    ...mapped,
+    assigned_exec: deriveAssignedExec(mapped),
+  };
 };
 
-const normalizeFeedback = (raw: unknown): Record<number, FeedbackEntry[]> => {
-  if (!raw || typeof raw !== 'object') return {};
-  const result: Record<number, FeedbackEntry[]> = {};
+const mapEvaluation = (evaluation: AdminEvaluationResponse): FeedbackEntry => ({
+  id: String(evaluation.id),
+  applicantId: evaluation.application_id,
+  applicantName: evaluation.applicant_name,
+  interviewerName: evaluation.interviewer_name,
+  intervieweeName: evaluation.interviewee_name,
+  intervieweeGender: evaluation.interviewee_gender,
+  interviewerRole: evaluation.interviewer_role,
+  leadershipScore: normalizeRatingBand(evaluation.leadership_score),
+  interestInOtcrScore: normalizeRatingBand(evaluation.interest_in_otcr_score),
+  behavioralPerformanceScore: normalizeRatingBand(evaluation.behavioral_performance_score),
+  businessAcumenScore: normalizeRatingBand(evaluation.business_acumen_score),
+  qualitativeCreativityScore: normalizeRatingBand(evaluation.qualitative_creativity_score),
+  quantitativeStructureScore: normalizeRatingBand(evaluation.quantitative_structure_score),
+  casePerformanceScore: normalizeRatingBand(evaluation.case_performance_score),
+  creativityConversationScore: normalizeRatingBand(evaluation.creativity_conversation_score),
+  recommendation: evaluation.recommendation,
+  finalRoundSummary: evaluation.final_round_summary ?? '',
+  overallPerformanceOverview: evaluation.overall_performance_overview ?? evaluation.comments ?? '',
+  submittedAt: evaluation.created_at,
+});
 
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    const applicantId = Number(key);
-    if (!Number.isFinite(applicantId) || !Array.isArray(value)) continue;
+const mapDatabaseOverview = (overview: Awaited<ReturnType<typeof adminApi.getDatabaseOverview>>): DatabaseOverview => ({
+  generatedAt: overview.generated_at,
+  persistence: overview.persistence,
+  tables: overview.tables,
+});
 
-    const normalizedEntries = value
-      .map((entry) => normalizeFeedbackEntry(entry, applicantId))
-      .filter((entry): entry is FeedbackEntry => Boolean(entry));
+const mapDatabasePreview = (preview: Awaited<ReturnType<typeof adminApi.getDatabaseTable>>): DatabaseTablePreview => ({
+  table: preview.table,
+  count: preview.count,
+  columns: preview.columns,
+  rows: preview.rows,
+});
 
-    if (normalizedEntries.length > 0) {
-      result[applicantId] = normalizedEntries;
-    }
-  }
+const fetchWorkspaceSnapshot = async (secret: string) => {
+  const [applicationResponse, evaluationResponse] = await Promise.all([
+    adminApi.listApplications(secret),
+    adminApi.listEvaluations(secret),
+  ]);
 
-  return result;
+  return {
+    applications: applicationResponse.map(mapApplication),
+    evaluations: evaluationResponse.map(mapEvaluation),
+  };
 };
+
+const groupFeedbackEntries = (entries: FeedbackEntry[]) =>
+  entries.reduce<Record<number, FeedbackEntry[]>>((acc, entry) => {
+    acc[entry.applicantId] = [entry, ...(acc[entry.applicantId] ?? [])];
+    return acc;
+  }, {});
 
 const getVoteCounts = (entries: FeedbackEntry[]) =>
   entries.reduce(
@@ -157,8 +153,7 @@ const getAverageScore = (entries: FeedbackEntry[]) => {
 
   const total = entries.reduce(
     (sum, entry) =>
-      sum +
-      feedbackMetricFields.reduce((entrySum, field) => entrySum + entry[field.key], 0),
+      sum + feedbackMetricFields.reduce((entrySum, field) => entrySum + entry[field.key], 0),
     0
   );
 
@@ -183,6 +178,8 @@ const buildFallbackApplicants = () =>
     assigned_exec: deriveAssignedExec(applicant),
   }));
 
+const initialFallbackApplicants = buildFallbackApplicants();
+
 const adminViewButtonClass = (active: boolean) =>
   cn(
     'h-11 rounded-xl border transition-all',
@@ -200,16 +197,23 @@ const DevopsManage = () => {
   const [adminSecret, setAdminSecret] = useState('');
   const [storedSecret, setStoredSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [applications, setApplications] = useState<ApplicantRecord[]>([]);
-  const [selectedApplicantId, setSelectedApplicantId] = useState<number | null>(null);
+  const [applications, setApplications] = useState<ApplicantRecord[]>(initialFallbackApplicants);
+  const [selectedApplicantId, setSelectedApplicantId] = useState<number | null>(initialFallbackApplicants[0]?.id ?? null);
   const [searchValue, setSearchValue] = useState('');
   const [cycleFilter, setCycleFilter] = useState<'all' | string>('all');
   const [feedbackByApplicant, setFeedbackByApplicant] = useState<Record<number, FeedbackEntry[]>>(mockFeedback);
-  const [usingMockData, setUsingMockData] = useState(false);
+  const [usingMockData, setUsingMockData] = useState(true);
+  const [databaseOverview, setDatabaseOverview] = useState<DatabaseOverview | null>(null);
+  const [databasePreview, setDatabasePreview] = useState<DatabaseTablePreview | null>(null);
+  const [databaseLoading, setDatabaseLoading] = useState(false);
+  const [databaseError, setDatabaseError] = useState<string | null>(null);
+  const [selectedDatabaseTable, setSelectedDatabaseTable] = useState<DatabaseTableName>('evaluations');
 
   const isApplicantsView = location.pathname === '/tech/manage/applicants';
   const isFeedbackView = location.pathname === '/tech/manage/feedback';
+  const isDatabaseView = location.pathname === '/tech/manage/database';
   const requestedApplicantIdParam = searchParams.get('applicantId');
   const requestedApplicantId =
     requestedApplicantIdParam && Number.isFinite(Number(requestedApplicantIdParam))
@@ -220,77 +224,85 @@ const DevopsManage = () => {
     'X-Admin-Secret': storedSecret || '',
   });
 
-  useEffect(() => {
-    const key = sessionStorage.getItem(ADMIN_KEY_STORAGE);
-    if (key) setStoredSecret(key);
-
-    const persisted = localStorage.getItem(FEEDBACK_STORAGE);
-    if (persisted) {
-      try {
-        setFeedbackByApplicant((current) => ({
-          ...current,
-          ...normalizeFeedback(JSON.parse(persisted)),
-        }));
-      } catch {
-        // Ignore invalid local storage payloads and keep seeded feedback.
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(FEEDBACK_STORAGE, JSON.stringify(feedbackByApplicant));
-  }, [feedbackByApplicant]);
-
-  const fetchApplications = async () => {
-    if (!storedSecret) return;
+  const fetchAdminWorkspace = async (secret: string) => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/applications`, { headers: headers() });
+      const { applications: mappedApplications, evaluations: mappedEvaluations } = await fetchWorkspaceSnapshot(secret);
 
-      if (response.status === 403) {
+      if (mappedApplications.length === 0) {
+        const fallback = buildFallbackApplicants();
+        setApplications(fallback);
+        setFeedbackByApplicant(mockFeedback);
+        setUsingMockData(true);
+        setSelectedApplicantId((current) => current ?? fallback[0]?.id ?? null);
+        setError('Backend is reachable but returned no applicants. Showing mock applicant data for the dashboard.');
+        return;
+      }
+
+      setApplications(mappedApplications);
+      setFeedbackByApplicant(groupFeedbackEntries(mappedEvaluations));
+      setUsingMockData(false);
+      setSelectedApplicantId((current) => current ?? mappedApplications[0]?.id ?? null);
+    } catch (fetchError: unknown) {
+      const fallback = buildFallbackApplicants();
+      setApplications(fallback);
+      setFeedbackByApplicant(mockFeedback);
+      setUsingMockData(true);
+      setSelectedApplicantId((current) => current ?? fallback[0]?.id ?? null);
+
+      const message = normalizeErrorMessage(fetchError, 'Backend unavailable. Showing mock applicant data.');
+      if (/invalid admin secret/i.test(message) || /invalid admin key/i.test(message)) {
         sessionStorage.removeItem(ADMIN_KEY_STORAGE);
         setStoredSecret(null);
+        setApplications(initialFallbackApplicants);
+        setFeedbackByApplicant(mockFeedback);
+        setUsingMockData(true);
         setError('Invalid admin key. Please enter it again.');
         navigate('/tech/manage', { replace: true });
         return;
       }
 
-      if (!response.ok) throw new Error('Failed to load applicants from backend');
-
-      const data = (await response.json()) as ApplicantRecord[];
-      if (data.length === 0) {
-        const fallback = buildFallbackApplicants();
-        setApplications(fallback);
-        setUsingMockData(true);
-        setSelectedApplicantId((current) => current ?? fallback[0]?.id ?? null);
-        setError('Backend is reachable but returned no applicants. Showing mock applicant data for the MVP dashboard.');
-        return;
-      }
-
-      const enriched = data.map((applicant) => ({
-        ...applicant,
-        assigned_exec: deriveAssignedExec(applicant),
-      }));
-
-      setApplications(enriched);
-      setUsingMockData(false);
-      setSelectedApplicantId((current) => current ?? enriched[0]?.id ?? null);
-    } catch (fetchError: unknown) {
-      const fallback = buildFallbackApplicants();
-      setApplications(fallback);
-      setUsingMockData(true);
-      setSelectedApplicantId((current) => current ?? fallback[0]?.id ?? null);
-      setError(fetchError instanceof Error ? fetchError.message : 'Backend unavailable. Showing mock applicant data.');
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchDatabasePreview = async (secret: string, table: DatabaseTableName) => {
+    setDatabaseLoading(true);
+    setDatabaseError(null);
+
+    try {
+      const [overviewResponse, previewResponse] = await Promise.all([
+        adminApi.getDatabaseOverview(secret),
+        adminApi.getDatabaseTable(secret, table),
+      ]);
+
+      setDatabaseOverview(mapDatabaseOverview(overviewResponse));
+      setDatabasePreview(mapDatabasePreview(previewResponse));
+    } catch (previewError: unknown) {
+      setDatabaseError(normalizeErrorMessage(previewError, 'Failed to load database preview.'));
+    } finally {
+      setDatabaseLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (storedSecret) fetchApplications();
+    const key = sessionStorage.getItem(ADMIN_KEY_STORAGE);
+    if (key) setStoredSecret(key);
+  }, []);
+
+  useEffect(() => {
+    if (!storedSecret) return;
+    void fetchAdminWorkspace(storedSecret);
   }, [storedSecret]);
+
+  useEffect(() => {
+    if (!storedSecret || !isDatabaseView) return;
+    void fetchDatabasePreview(storedSecret, selectedDatabaseTable);
+  }, [storedSecret, isDatabaseView, selectedDatabaseTable]);
 
   const cycleOptions = useMemo(() => {
     const cycles = Array.from(new Set(applications.map((applicant) => applicant.cycle_name).filter(Boolean)));
@@ -352,8 +364,12 @@ const DevopsManage = () => {
   const handleLogout = () => {
     sessionStorage.removeItem(ADMIN_KEY_STORAGE);
     setStoredSecret(null);
-    setApplications([]);
-    setSelectedApplicantId(null);
+    setApplications(initialFallbackApplicants);
+    setFeedbackByApplicant(mockFeedback);
+    setUsingMockData(true);
+    setDatabaseOverview(null);
+    setDatabasePreview(null);
+    setSelectedApplicantId(initialFallbackApplicants[0]?.id ?? null);
     navigate('/tech/manage', { replace: true });
   };
 
@@ -366,7 +382,7 @@ const DevopsManage = () => {
     if (!storedSecret || usingMockData) {
       toast({
         title: 'Resume unavailable',
-        description: 'This applicant is using local mock data, so there is no backend resume stream.',
+        description: 'This applicant is using fallback data, so there is no backend resume stream.',
       });
       return;
     }
@@ -390,22 +406,94 @@ const DevopsManage = () => {
     navigate(`/tech/manage/feedback?applicantId=${applicant.id}`);
   };
 
-  const handleSubmitFeedback = (entry: Omit<FeedbackEntry, 'id' | 'submittedAt'>) => {
-    const completeEntry: FeedbackEntry = {
-      ...entry,
-      id: `${entry.applicantId}-${Date.now()}`,
-      submittedAt: new Date().toISOString(),
-    };
+  const handleSubmitFeedback = async (entry: Omit<FeedbackEntry, 'id' | 'submittedAt'>) => {
+    if (!storedSecret) return;
 
-    setFeedbackByApplicant((current) => ({
-      ...current,
-      [entry.applicantId]: [completeEntry, ...(current[entry.applicantId] ?? [])],
-    }));
+    setSubmittingFeedback(true);
 
-    toast({
-      title: 'Feedback saved',
-      description: `${entry.intervieweeName} now has an updated review in the Applicants workspace.`,
-    });
+    try {
+      let targetApplicantId = entry.applicantId;
+
+      if (usingMockData) {
+        const { applications: liveApplications, evaluations: liveEvaluations } = await fetchWorkspaceSnapshot(storedSecret);
+
+        if (liveApplications.length === 0) {
+          throw new Error('Backend is reachable but returned no applicants, so feedback could not be attached.');
+        }
+
+        const liveApplicant =
+          liveApplications.find((applicant) => nameKey(applicant.name) === nameKey(entry.intervieweeName)) ??
+          liveApplications.find((applicant) => applicant.id === entry.applicantId) ??
+          null;
+
+        if (!liveApplicant) {
+          throw new Error('Could not match this interviewee to a live applicant record. Refresh the dashboard and try again.');
+        }
+
+        setApplications(liveApplications);
+        setFeedbackByApplicant(groupFeedbackEntries(liveEvaluations));
+        setUsingMockData(false);
+        setError(null);
+        setSelectedApplicantId(liveApplicant.id);
+        targetApplicantId = liveApplicant.id;
+
+        if (requestedApplicantId !== liveApplicant.id) {
+          navigate(`/tech/manage/feedback?applicantId=${liveApplicant.id}`, { replace: true });
+        }
+      }
+
+      const payload: AdminEvaluationPayload = {
+        interviewer_name: entry.interviewerName,
+        interviewee_name: entry.intervieweeName,
+        interviewee_gender: entry.intervieweeGender,
+        interviewer_role: entry.interviewerRole,
+        leadership_score: entry.leadershipScore,
+        interest_in_otcr_score: entry.interestInOtcrScore,
+        behavioral_performance_score: entry.behavioralPerformanceScore,
+        business_acumen_score: entry.businessAcumenScore,
+        qualitative_creativity_score: entry.qualitativeCreativityScore,
+        quantitative_structure_score: entry.quantitativeStructureScore,
+        case_performance_score: entry.casePerformanceScore,
+        creativity_conversation_score: entry.creativityConversationScore,
+        recommendation: entry.recommendation,
+        final_round_summary: entry.finalRoundSummary,
+        overall_performance_overview: entry.overallPerformanceOverview,
+      };
+
+      const createdEvaluation = await adminApi.createEvaluation(storedSecret, targetApplicantId, payload);
+      const mappedEntry = mapEvaluation(createdEvaluation);
+
+      setFeedbackByApplicant((current) => ({
+        ...current,
+        [mappedEntry.applicantId]: [mappedEntry, ...(current[mappedEntry.applicantId] ?? [])],
+      }));
+
+      if (isDatabaseView) {
+        void fetchDatabasePreview(storedSecret, selectedDatabaseTable);
+      }
+
+      toast({
+        title: 'Feedback saved',
+        description: `${entry.intervieweeName} now has a persisted review in the backend database.`,
+      });
+    } catch (submitError: unknown) {
+      toast({
+        title: 'Could not save feedback',
+        description: normalizeErrorMessage(submitError, 'The backend rejected the evaluation payload.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    if (!storedSecret) return;
+    if (isDatabaseView) {
+      void fetchDatabasePreview(storedSecret, selectedDatabaseTable);
+      return;
+    }
+    void fetchAdminWorkspace(storedSecret);
   };
 
   const voteCountsForApplicant = (applicantId: number) => getVoteCounts(feedbackByApplicant[applicantId] ?? []);
@@ -464,7 +552,7 @@ const DevopsManage = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_26%),radial-gradient(circle_at_80%_20%,rgba(34,197,94,0.10),transparent_18%),linear-gradient(180deg,rgba(3,8,17,0.92),rgba(3,8,17,1))]" />
         <div className="relative mx-auto max-w-7xl">
           <div className="mb-5 flex flex-wrap items-center gap-3">
-            <Button asChild variant="outline" className={adminViewButtonClass(!isApplicantsView && !isFeedbackView)}>
+            <Button asChild variant="outline" className={adminViewButtonClass(!isApplicantsView && !isFeedbackView && !isDatabaseView)}>
               <Link to="/tech/manage">
                 <LayoutGrid className="h-4 w-4" />
                 Dashboard
@@ -482,6 +570,12 @@ const DevopsManage = () => {
                 Feedback Form
               </Link>
             </Button>
+            <Button asChild variant="outline" className={adminViewButtonClass(isDatabaseView)}>
+              <Link to="/tech/manage/database">
+                <Database className="h-4 w-4" />
+                Database
+              </Link>
+            </Button>
           </div>
 
           <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -490,19 +584,23 @@ const DevopsManage = () => {
               <div className="mt-3 flex items-center gap-4">
                 <img src={otcrTechLogo} alt="OTCR Technologies" className="h-10 w-auto" />
                 <h1 className="text-3xl font-semibold text-white">
-                  {!isApplicantsView && !isFeedbackView
+                  {!isApplicantsView && !isFeedbackView && !isDatabaseView
                     ? 'Consultant review dashboard'
                     : isApplicantsView
                       ? 'Applicants'
-                      : 'Feedback form'}
+                      : isFeedbackView
+                        ? 'Feedback form'
+                        : 'Database'}
                 </h1>
               </div>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-white/60">
-                {!isApplicantsView && !isFeedbackView
-                  ? 'Choose between the existing applicant review workspace and the standalone interviewer feedback form.'
+                {!isApplicantsView && !isFeedbackView && !isDatabaseView
+                  ? 'Choose between applicant review, the standalone interviewer form, and a live database preview powered by the backend.'
                   : isApplicantsView
-                    ? 'This is the existing consultant review workspace, now grouped under the Applicants section.'
-                    : 'Capture the interview rubric, final-round push areas, and a clear yes / lean yes / lean no / no point of view.'}
+                    ? 'This is the applicant review workspace, now backed by persisted interviewer evaluations from the API.'
+                    : isFeedbackView
+                      ? 'Submit the consultant interview rubric and store it directly in the backend database.'
+                      : 'Inspect the live backend tables, row counts, and recent records without leaving the admin dashboard.'}
               </p>
               <p className="mt-2 text-xs uppercase tracking-[0.24em] text-white/40">
                 Visible under <span className="text-white/70">/tech/manage</span> and legacy redirects under <span className="text-white/70">/devops/manage</span>
@@ -527,10 +625,10 @@ const DevopsManage = () => {
                 type="button"
                 variant="outline"
                 className="h-11 border-white/10 bg-white/5 text-white hover:bg-white/10"
-                onClick={fetchApplications}
-                disabled={loading}
+                onClick={handleRefresh}
+                disabled={loading || databaseLoading || submittingFeedback}
               >
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
+                {loading || databaseLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
                 Refresh
               </Button>
               <Button variant="ghost" size="sm" onClick={handleLogout} className="text-white/65 hover:text-white">
@@ -548,13 +646,13 @@ const DevopsManage = () => {
 
           {usingMockData ? (
             <div className="mb-5 rounded-2xl border border-sky-400/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
-              Backend data was unavailable, so the dashboard is showing mock applicant records and local feedback state.
+              Backend data was unavailable, so the dashboard is showing mock applicant records and seeded feedback state.
             </div>
           ) : null}
 
-          {!isApplicantsView && !isFeedbackView ? (
-            <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-              <div className="grid gap-6 md:grid-cols-2">
+          {!isApplicantsView && !isFeedbackView && !isDatabaseView ? (
+            <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
+              <div className="grid gap-6 md:grid-cols-3">
                 <Link
                   to="/tech/manage/applicants"
                   className="group rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.98),rgba(8,13,22,0.99))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.34)] transition-all hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-[linear-gradient(180deg,rgba(19,34,55,0.98),rgba(8,13,22,0.99))]"
@@ -564,7 +662,7 @@ const DevopsManage = () => {
                   </span>
                   <h2 className="mt-6 text-2xl font-semibold text-white">Applicants</h2>
                   <p className="mt-3 text-sm leading-6 text-white/55">
-                    Open the existing review workspace with applicant search, resume access, status snapshots, and saved interviewer feedback.
+                    Open applicant review, search the pipeline, read resumes, and inspect persisted evaluations tied to each candidate.
                   </p>
                   <p className="mt-6 text-sm font-medium text-cyan-100">Open applicant workspace</p>
                 </Link>
@@ -578,9 +676,23 @@ const DevopsManage = () => {
                   </span>
                   <h2 className="mt-6 text-2xl font-semibold text-white">Feedback Form</h2>
                   <p className="mt-3 text-sm leading-6 text-white/55">
-                    Submit the standalone consultant interview rubric and attach it to an applicant by using the interviewee&apos;s exact name.
+                    Submit interview feedback directly into the backend `evaluations` table using the exact applicant name.
                   </p>
                   <p className="mt-6 text-sm font-medium text-cyan-100">Open feedback form</p>
+                </Link>
+
+                <Link
+                  to="/tech/manage/database"
+                  className="group rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.98),rgba(8,13,22,0.99))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.34)] transition-all hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-[linear-gradient(180deg,rgba(19,34,55,0.98),rgba(8,13,22,0.99))]"
+                >
+                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-100">
+                    <Database className="h-6 w-6" />
+                  </span>
+                  <h2 className="mt-6 text-2xl font-semibold text-white">Database</h2>
+                  <p className="mt-3 text-sm leading-6 text-white/55">
+                    Inspect row counts and preview live tables like applications, evaluations, attempts, and submissions.
+                  </p>
+                  <p className="mt-6 text-sm font-medium text-cyan-100">Open database view</p>
                 </Link>
               </div>
 
@@ -590,7 +702,7 @@ const DevopsManage = () => {
                   <CardTitle className="text-xl text-white">Current review state</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
                     <div className="rounded-2xl border border-white/8 bg-white/5 p-4">
                       <p className="text-xs uppercase tracking-[0.2em] text-white/45">Applicants</p>
                       <p className="mt-3 text-3xl font-semibold text-white">{applications.length}</p>
@@ -600,8 +712,10 @@ const DevopsManage = () => {
                       <p className="mt-3 text-3xl font-semibold text-white">{totalFeedbackCount}</p>
                     </div>
                     <div className="rounded-2xl border border-white/8 bg-white/5 p-4">
-                      <p className="text-xs uppercase tracking-[0.2em] text-white/45">Cycles</p>
-                      <p className="mt-3 text-3xl font-semibold text-white">{Math.max(cycleOptions.length - 1, 0)}</p>
+                      <p className="text-xs uppercase tracking-[0.2em] text-white/45">Persistence</p>
+                      <p className="mt-3 text-lg font-semibold text-white">
+                        {usingMockData ? 'Mock data' : 'Backend connected'}
+                      </p>
                     </div>
                   </div>
 
@@ -615,7 +729,7 @@ const DevopsManage = () => {
                           <div key={entry.id} className="rounded-2xl border border-white/8 bg-white/[0.04] p-3">
                             <div className="flex items-center justify-between gap-3">
                               <div>
-                                <p className="text-sm font-medium text-white">{entry.intervieweeName || entry.applicantName || 'Unnamed applicant'}</p>
+                                <p className="text-sm font-medium text-white">{entry.intervieweeName || entry.applicantName}</p>
                                 <p className="text-xs text-white/45">{entry.interviewerName}</p>
                               </div>
                               <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-100">
@@ -677,75 +791,93 @@ const DevopsManage = () => {
           ) : null}
 
           {isFeedbackView ? (
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-              <div>
-                <FeedbackForm
-                  applicants={applications}
-                  initialApplicantId={requestedFeedbackApplicant?.id ?? null}
-                  onSubmitFeedback={handleSubmitFeedback}
-                />
+            loading && applications.length === 0 ? (
+              <div className="flex items-center justify-center py-24">
+                <Loader2 className="h-8 w-8 animate-spin text-white/50" />
               </div>
+            ) : (
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <div>
+                  <FeedbackForm
+                    applicants={applications}
+                    initialApplicantId={requestedFeedbackApplicant?.id ?? null}
+                    onSubmitFeedback={handleSubmitFeedback}
+                    submitting={submittingFeedback}
+                  />
+                </div>
 
-              <div className="space-y-5">
-                <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.96),rgba(8,13,22,0.98))]">
-                  <CardHeader>
-                    <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/65">Linked applicant</p>
-                    <CardTitle className="text-xl text-white">
-                      {requestedFeedbackApplicant ? requestedFeedbackApplicant.name : 'No applicant preselected'}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-sm text-white/60">
-                    {requestedFeedbackApplicant ? (
-                      <>
-                        <p>Cycle: <span className="text-white">{requestedFeedbackApplicant.cycle_name ?? 'Unassigned'}</span></p>
-                        <p>Email: <span className="text-white">{requestedFeedbackApplicant.email}</span></p>
-                        <p>Assigned exec: <span className="text-white">{requestedFeedbackApplicant.assigned_exec ?? 'Unassigned'}</span></p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="mt-2 w-full border-white/10 bg-white/5 text-white hover:bg-white/10"
-                          onClick={() => navigate(`/tech/manage/applicants?applicantId=${requestedFeedbackApplicant.id}`)}
-                        >
-                          <ClipboardList className="h-4 w-4" />
-                          Open applicant profile
-                        </Button>
-                      </>
-                    ) : (
+                <div className="space-y-5">
+                  <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.96),rgba(8,13,22,0.98))]">
+                    <CardHeader>
+                      <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/65">Linked applicant</p>
+                      <CardTitle className="text-xl text-white">
+                        {requestedFeedbackApplicant ? requestedFeedbackApplicant.name : 'No applicant preselected'}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm text-white/60">
+                      {requestedFeedbackApplicant ? (
+                        <>
+                          <p>Cycle: <span className="text-white">{requestedFeedbackApplicant.cycle_name ?? 'Unassigned'}</span></p>
+                          <p>Email: <span className="text-white">{requestedFeedbackApplicant.email}</span></p>
+                          <p>Assigned exec: <span className="text-white">{requestedFeedbackApplicant.assigned_exec ?? 'Unassigned'}</span></p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="mt-2 w-full border-white/10 bg-white/5 text-white hover:bg-white/10"
+                            onClick={() => navigate(`/tech/manage/applicants?applicantId=${requestedFeedbackApplicant.id}`)}
+                          >
+                            <ClipboardList className="h-4 w-4" />
+                            Open applicant profile
+                          </Button>
+                        </>
+                      ) : (
+                        <p>
+                          You can open this form directly from an applicant profile, or type the exact interviewee name to attach the evaluation to a record.
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.96),rgba(8,13,22,0.98))]">
+                    <CardHeader>
+                      <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/65">Persistence</p>
+                      <CardTitle className="text-xl text-white">Save target</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm text-white/60">
                       <p>
-                        You can open this form directly from an applicant profile, or type the exact interviewee name to attach the feedback to a record.
+                        {usingMockData
+                          ? 'The backend is offline right now. Your in-progress form responses stay on this browser, but Save feedback will not write to the database until the API is reachable.'
+                          : 'Unsaved form responses stay on this browser while you move around the dashboard. New submissions are sent to the backend and stored in the evaluations table.'}
                       </p>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.96),rgba(8,13,22,0.98))]">
-                  <CardHeader>
-                    <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/65">Recent submissions</p>
-                    <CardTitle className="text-xl text-white">Latest feedback</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {recentFeedback.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-5 text-sm text-white/55">
-                        No feedback submitted yet.
-                      </div>
-                    ) : (
-                      recentFeedback.map((entry) => (
-                        <div key={entry.id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <p className="font-medium text-white">{entry.intervieweeName || entry.applicantName || 'Unnamed applicant'}</p>
-                              <p className="text-xs uppercase tracking-[0.18em] text-white/40">{entry.recommendation}</p>
-                            </div>
-                            <p className="text-xs text-white/40">{new Date(entry.submittedAt).toLocaleDateString()}</p>
-                          </div>
-                          <p className="mt-3 text-sm text-white/55">{entry.overallPerformanceOverview}</p>
+                      <p>
+                        Current table: <span className="text-white">evaluations</span>
+                      </p>
+                      {submittingFeedback ? (
+                        <div className="flex items-center gap-2 text-cyan-100">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Saving evaluation...
                         </div>
-                      ))
-                    )}
-                  </CardContent>
-                </Card>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
-            </div>
+            )
+          ) : null}
+
+          {isDatabaseView ? (
+            <DatabaseView
+              overview={databaseOverview}
+              preview={databasePreview}
+              selectedTable={selectedDatabaseTable}
+              loading={databaseLoading}
+              error={databaseError}
+              onSelectTable={setSelectedDatabaseTable}
+              onRefresh={() => {
+                if (!storedSecret) return;
+                void fetchDatabasePreview(storedSecret, selectedDatabaseTable);
+              }}
+            />
           ) : null}
         </div>
       </section>

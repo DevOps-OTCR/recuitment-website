@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +11,6 @@ import { cn } from '@/lib/utils';
 
 import {
   feedbackMetricFields,
-  ratingBandOptions,
   type ApplicantRecord,
   type DecisionValue,
   type FeedbackEntry,
@@ -22,7 +21,8 @@ import {
 interface FeedbackFormProps {
   applicants: ApplicantRecord[];
   initialApplicantId?: number | null;
-  onSubmitFeedback: (entry: Omit<FeedbackEntry, 'id' | 'submittedAt'>) => void;
+  onSubmitFeedback: (entry: Omit<FeedbackEntry, 'id' | 'submittedAt'>) => Promise<void> | void;
+  submitting?: boolean;
 }
 
 interface FeedbackFormState {
@@ -44,20 +44,21 @@ interface FeedbackFormState {
 }
 
 const nameKey = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
+const FEEDBACK_DRAFT_STORAGE = 'otcr_consultant_feedback_draft';
 
 const initialState = (intervieweeName = ''): FeedbackFormState => ({
   interviewerName: '',
   intervieweeName,
   intervieweeGender: 'Other',
   interviewerRole: 'Primary',
-  leadershipScore: '3',
-  interestInOtcrScore: '3',
-  behavioralPerformanceScore: '3',
-  businessAcumenScore: '3',
-  qualitativeCreativityScore: '3',
-  quantitativeStructureScore: '3',
-  casePerformanceScore: '3',
-  creativityConversationScore: '3',
+  leadershipScore: '2',
+  interestInOtcrScore: '2',
+  behavioralPerformanceScore: '2',
+  businessAcumenScore: '2',
+  qualitativeCreativityScore: '2',
+  quantitativeStructureScore: '2',
+  casePerformanceScore: '2',
+  creativityConversationScore: '2',
   recommendation: 'MAYBE',
   finalRoundSummary: '',
   overallPerformanceOverview: '',
@@ -70,6 +71,40 @@ const recommendationOptions: { value: DecisionValue; label: string; helper: stri
   { value: 'LEAN NO', label: 'Lean No', helper: 'Negative overall, but not a full stop.' },
   { value: 'NO', label: 'No', helper: 'Clear do-not-move-forward recommendation.' },
 ];
+
+const selectableRatingOptions = [
+  { value: '1', label: '1' },
+  { value: '2', label: '2' },
+  { value: '3', label: '3' },
+] as const;
+
+const restoreFeedbackDraft = (intervieweeName = ''): FeedbackFormState => {
+  const fallback = initialState(intervieweeName);
+  if (typeof window === 'undefined') return fallback;
+
+  try {
+    const stored = sessionStorage.getItem(FEEDBACK_DRAFT_STORAGE);
+    if (!stored) return fallback;
+
+    const parsed = JSON.parse(stored) as Partial<FeedbackFormState> | null;
+    if (!parsed || typeof parsed !== 'object') return fallback;
+
+    return {
+      ...fallback,
+      ...parsed,
+      intervieweeName:
+        typeof parsed.intervieweeName === 'string' && parsed.intervieweeName.trim().length > 0
+          ? parsed.intervieweeName
+          : fallback.intervieweeName,
+    };
+  } catch (error) {
+    console.warn('Failed to restore feedback draft', error);
+    return fallback;
+  }
+};
+
+const isPristineFeedbackDraft = (form: FeedbackFormState, intervieweeName = '') =>
+  JSON.stringify(form) === JSON.stringify(initialState(intervieweeName));
 
 const ChoicePillGroup = <T extends string>({
   value,
@@ -107,16 +142,50 @@ const ChoicePillGroup = <T extends string>({
   </RadioGroup>
 );
 
-const FeedbackForm = ({ applicants, initialApplicantId, onSubmitFeedback }: FeedbackFormProps) => {
+const FeedbackForm = ({ applicants, initialApplicantId, onSubmitFeedback, submitting = false }: FeedbackFormProps) => {
   const initialApplicant = useMemo(
     () => applicants.find((candidate) => candidate.id === initialApplicantId) ?? null,
     [applicants, initialApplicantId]
   );
-  const [form, setForm] = useState<FeedbackFormState>(initialState(initialApplicant?.name ?? ''));
+  const [form, setForm] = useState<FeedbackFormState>(() => restoreFeedbackDraft(initialApplicant?.name ?? ''));
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const previousInitialApplicantNameRef = useRef(initialApplicant?.name ?? '');
 
   useEffect(() => {
-    setForm(initialState(initialApplicant?.name ?? ''));
+    const nextInitialApplicantName = initialApplicant?.name ?? '';
+    const previousInitialApplicantName = previousInitialApplicantNameRef.current;
+    previousInitialApplicantNameRef.current = nextInitialApplicantName;
+
+    if (!nextInitialApplicantName) return;
+
+    setForm((current) => {
+      const currentIntervieweeName = current.intervieweeName.trim();
+      const previousInitialNameMatches =
+        previousInitialApplicantName.trim().length > 0 &&
+        nameKey(current.intervieweeName) === nameKey(previousInitialApplicantName);
+
+      if (!currentIntervieweeName || previousInitialNameMatches) {
+        return { ...current, intervieweeName: nextInitialApplicantName };
+      }
+
+      return current;
+    });
   }, [initialApplicant?.name]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      if (isPristineFeedbackDraft(form, initialApplicant?.name ?? '')) {
+        sessionStorage.removeItem(FEEDBACK_DRAFT_STORAGE);
+        return;
+      }
+
+      sessionStorage.setItem(FEEDBACK_DRAFT_STORAGE, JSON.stringify(form));
+    } catch (error) {
+      console.warn('Failed to save feedback draft', error);
+    }
+  }, [form, initialApplicant?.name]);
 
   const matchedApplicant = useMemo(() => {
     const lookup = nameKey(form.intervieweeName);
@@ -124,18 +193,23 @@ const FeedbackForm = ({ applicants, initialApplicantId, onSubmitFeedback }: Feed
     return applicants.find((candidate) => nameKey(candidate.name) === lookup) ?? null;
   }, [applicants, form.intervieweeName, initialApplicant]);
 
-  const canSubmit =
-    applicants.length > 0 &&
-    Boolean(matchedApplicant) &&
-    Boolean(form.interviewerName.trim()) &&
-    Boolean(form.finalRoundSummary.trim()) &&
-    Boolean(form.overallPerformanceOverview.trim());
-
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!matchedApplicant) return;
+    const missingFields: string[] = [];
 
-    onSubmitFeedback({
+    if (!form.interviewerName.trim()) missingFields.push('your name');
+    if (!matchedApplicant) missingFields.push("a valid interviewee name");
+    if (!form.finalRoundSummary.trim()) missingFields.push('the final-round summary');
+    if (!form.overallPerformanceOverview.trim()) missingFields.push('the overall performance overview');
+
+    if (missingFields.length > 0) {
+      setValidationMessage(`Missing: ${missingFields.join(', ')}.`);
+      return;
+    }
+
+    setValidationMessage(null);
+
+    await onSubmitFeedback({
       applicantId: matchedApplicant.id,
       applicantName: matchedApplicant.name,
       interviewerName: form.interviewerName.trim(),
@@ -156,6 +230,7 @@ const FeedbackForm = ({ applicants, initialApplicantId, onSubmitFeedback }: Feed
     });
 
     setForm(initialState(initialApplicant?.name ?? ''));
+    setValidationMessage(null);
   };
 
   const applicantNameOptions = applicants.map((candidate) => candidate.name);
@@ -167,6 +242,9 @@ const FeedbackForm = ({ applicants, initialApplicantId, onSubmitFeedback }: Feed
         <CardTitle className="text-2xl text-white">Consultant review form</CardTitle>
         <p className="text-sm leading-6 text-white/55">
           Use the interviewee&apos;s exact applicant name so the submission attaches to the correct profile in the Applicants view.
+        </p>
+        <p className="text-sm leading-6 text-white/45">
+          Unsaved responses stay on this browser if you switch pages and come back before submitting.
         </p>
       </CardHeader>
       <CardContent>
@@ -244,7 +322,7 @@ const FeedbackForm = ({ applicants, initialApplicantId, onSubmitFeedback }: Feed
             <div>
               <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/65">Ratings</p>
               <p className="mt-2 text-sm text-white/55">
-                Each rubric area uses the same scale: Below Expectations, 1, 2, 3, Above Expectations.
+                Each rubric area uses static end labels with only the numeric options selectable.
               </p>
             </div>
 
@@ -253,12 +331,16 @@ const FeedbackForm = ({ applicants, initialApplicantId, onSubmitFeedback }: Feed
                 <div key={field.key} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5">
                   <p className="text-sm font-medium text-white">{field.label}</p>
                   <p className="mt-2 text-sm leading-6 text-white/45">{field.description}</p>
+                  <div className="mt-4 flex items-center justify-between gap-4 text-xs uppercase tracking-[0.18em] text-white/35">
+                    <span>Below Expectations</span>
+                    <span>Above Expectations</span>
+                  </div>
                   <RadioGroup
                     value={form[field.key]}
                     onValueChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))}
-                    className="mt-4 grid gap-2 md:grid-cols-5"
+                    className="mt-3 grid gap-2 md:grid-cols-3"
                   >
-                    {ratingBandOptions.map((option) => {
+                    {selectableRatingOptions.map((option) => {
                       const optionId = `${field.key}-${option.value}`;
                       const isActive = form[field.key] === String(option.value);
 
@@ -326,12 +408,25 @@ const FeedbackForm = ({ applicants, initialApplicantId, onSubmitFeedback }: Feed
             />
           </div>
 
+          {validationMessage ? (
+            <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+              {validationMessage}
+            </div>
+          ) : null}
+
           <Button
             type="submit"
-            className="w-full rounded-xl bg-cyan-300 text-slate-950 hover:bg-cyan-200"
-            disabled={!canSubmit}
+            className="w-full cursor-pointer rounded-xl border border-cyan-100/50 bg-cyan-300 text-slate-950 shadow-[0_14px_34px_rgba(34,211,238,0.24)] transition-all duration-200 hover:bg-cyan-100 hover:shadow-[0_0_42px_rgba(103,232,249,0.55)] hover:ring-2 hover:ring-cyan-200/70 hover:ring-offset-2 hover:ring-offset-slate-950"
+            disabled={submitting}
           >
-            Save feedback
+            {submitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Saving feedback...
+              </>
+            ) : (
+              'Save feedback'
+            )}
           </Button>
         </form>
       </CardContent>

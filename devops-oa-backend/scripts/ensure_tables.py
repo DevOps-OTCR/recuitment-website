@@ -15,60 +15,12 @@ import os
 # Run from backend root so config/database resolve
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import text
-from database import engine
+from database import engine, init_db
 
 def main():
-    url = str(engine.url)
-    is_sqlite = "sqlite" in url
-
-    with engine.connect() as conn:
-        if is_sqlite:
-            # SQLite: check if applications table exists
-            r = conn.execute(text(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='applications'"
-            ))
-            applications_exists = r.fetchone() is not None
-        else:
-            # Postgres: check public.applications
-            r = conn.execute(text("""
-                SELECT 1 FROM information_schema.tables
-                WHERE table_schema = 'public' AND table_name = 'applications'
-            """))
-            applications_exists = r.fetchone() is not None
-
-        if not applications_exists:
-            print("Table 'applications' not found. Creating all tables...")
-            from database import Base
-            from models import Application, AssessmentLink, Attempt, Submission, ProgressSnapshot  # noqa: F401
-            Base.metadata.create_all(bind=engine)
-            conn.commit()
-            print("Done. Created: applications, assessment_links, attempts, submissions, assessment_progress_snapshots")
-        else:
-            print("Table 'applications' exists.")
-
-        # Ensure archived_at column exists (for tables created before we added it)
-        if is_sqlite:
-            r = conn.execute(text("PRAGMA table_info(applications)"))
-            columns = [row[1] for row in r.fetchall()]
-        else:
-            r = conn.execute(text("""
-                SELECT column_name FROM information_schema.columns
-                WHERE table_schema = 'public' AND table_name = 'applications'
-            """))
-            columns = [row[0] for row in r.fetchall()]
-
-        if "archived_at" not in columns:
-            print("Adding column 'archived_at' to applications...")
-            if is_sqlite:
-                conn.execute(text("ALTER TABLE applications ADD COLUMN archived_at DATETIME"))
-            else:
-                conn.execute(text("ALTER TABLE applications ADD COLUMN archived_at TIMESTAMP"))
-            conn.commit()
-            print("Done.")
-        else:
-            print("Column 'archived_at' already exists.")
-
+    print(f"Ensuring schema for {engine.url} ...")
+    init_db()
+    print("Done. Verified base tables and applied additive runtime schema upgrades.")
     return 0
 
 if __name__ == "__main__":

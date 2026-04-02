@@ -50,6 +50,7 @@ const App = () => (
         <Route path="/tech/manage" element={<DevopsManage />} />
         <Route path="/tech/manage/applicants" element={<DevopsManage />} />
         <Route path="/tech/manage/feedback" element={<DevopsManage />} />
+        <Route path="/tech/manage/database" element={<DevopsManage />} />
         {/* Redirect old /devops paths to /tech */}
         <Route path="/devops" element={<Navigate to="/tech" replace />} />
         <Route path="/devops/apply" element={<Navigate to="/tech/apply" replace />} />
@@ -57,6 +58,7 @@ const App = () => (
         <Route path="/devops/manage" element={<Navigate to="/tech/manage" replace />} />
         <Route path="/devops/manage/applicants" element={<Navigate to="/tech/manage/applicants" replace />} />
         <Route path="/devops/manage/feedback" element={<Navigate to="/tech/manage/feedback" replace />} />
+        <Route path="/devops/manage/database" element={<Navigate to="/tech/manage/database" replace />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </TooltipProvider>
