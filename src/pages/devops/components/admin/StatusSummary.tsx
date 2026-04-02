@@ -62,13 +62,13 @@ const StatusSummary = ({
         <div className="rounded-2xl border border-white/8 bg-black/20 p-4">
           <div className="flex items-center gap-2 text-sm text-white/70">
             <MessageSquareWarning className="h-4 w-4 text-cyan-200" />
-            Composite evaluator score
+            Composite rubric score
           </div>
           <p className="mt-2 text-2xl font-semibold text-white">
             {averageScore === null ? 'No scores yet' : `${averageScore.toFixed(1)} / 5`}
           </p>
           <p className="mt-1 text-sm text-white/50">
-            Status automatically becomes Rejected once two separate “No” votes are recorded.
+            Average across the saved interview rubric bands. Status automatically becomes Rejected once two separate no-leaning votes are recorded.
           </p>
         </div>
       </CardContent>

@@ -1,4 +1,7 @@
-export type DecisionValue = 'YES' | 'NO' | 'MAYBE';
+export type DecisionValue = 'YES' | 'LEAN YES' | 'MAYBE' | 'LEAN NO' | 'NO';
+export type RatingBand = 1 | 2 | 3 | 4 | 5;
+export type IntervieweeGender = 'Male' | 'Female' | 'Other';
+export type InterviewerRole = 'Primary' | 'Secondary';
 
 export interface ApplicantRecord {
   id: number;
@@ -26,16 +29,77 @@ export interface ApplicantRecord {
 export interface FeedbackEntry {
   id: string;
   applicantId: number;
+  applicantName: string;
   interviewerName: string;
-  assignedExec: string;
-  round: string;
-  cultureFitScore: number;
-  technicalScore: number;
-  communicationScore: number;
-  leadershipPotentialScore: number;
+  intervieweeName: string;
+  intervieweeGender: IntervieweeGender;
+  interviewerRole: InterviewerRole;
+  leadershipScore: RatingBand;
+  interestInOtcrScore: RatingBand;
+  behavioralPerformanceScore: RatingBand;
+  businessAcumenScore: RatingBand;
+  qualitativeCreativityScore: RatingBand;
+  quantitativeStructureScore: RatingBand;
+  casePerformanceScore: RatingBand;
+  creativityConversationScore: RatingBand;
   recommendation: DecisionValue;
-  strengths: string;
-  concerns: string;
-  comments: string;
+  finalRoundSummary: string;
+  overallPerformanceOverview: string;
   submittedAt: string;
 }
+
+export const ratingBandOptions = [
+  { value: 1, label: 'Below Expectations' },
+  { value: 2, label: '1' },
+  { value: 3, label: '2' },
+  { value: 4, label: '3' },
+  { value: 5, label: 'Above Expectations' },
+] as const;
+
+export const feedbackMetricFields = [
+  {
+    key: 'leadershipScore',
+    label: 'Leadership skills',
+    description: 'Ambition, work ethic, ability to make impact, and ownership.',
+  },
+  {
+    key: 'interestInOtcrScore',
+    label: "Interest in OTCR",
+    description: 'Signals genuine motivation and fit for the organization.',
+  },
+  {
+    key: 'behavioralPerformanceScore',
+    label: 'General behavioral performance',
+    description: 'Professionalism, maturity, clarity, and judgment.',
+  },
+  {
+    key: 'businessAcumenScore',
+    label: 'Business acumen',
+    description: 'Commercial intuition and business reasoning.',
+  },
+  {
+    key: 'qualitativeCreativityScore',
+    label: 'Qualitative creativity',
+    description: 'Idea quality, structure, and originality.',
+  },
+  {
+    key: 'quantitativeStructureScore',
+    label: 'Quantitative structural ability',
+    description: 'How they structured the market sizing or quant work.',
+  },
+  {
+    key: 'casePerformanceScore',
+    label: 'Overall case performance',
+    description: 'Communication, organization, composure, and recovery.',
+  },
+  {
+    key: 'creativityConversationScore',
+    label: 'Creativity / conversation test',
+    description: 'Overall performance on the creativity and conversation test.',
+  },
+] as const;
+
+export type FeedbackMetricKey = (typeof feedbackMetricFields)[number]['key'];
+
+export const formatRatingBand = (value: RatingBand) =>
+  ratingBandOptions.find((option) => option.value === value)?.label ?? 'Not rated';
