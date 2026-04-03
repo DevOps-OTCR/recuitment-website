@@ -796,7 +796,7 @@ const DevopsManage = () => {
                 <Loader2 className="h-8 w-8 animate-spin text-white/50" />
               </div>
             ) : (
-              <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+              <div className="mx-auto w-full max-w-[1240px]">
                 <div>
                   <FeedbackForm
                     applicants={applications}
@@ -804,62 +804,6 @@ const DevopsManage = () => {
                     onSubmitFeedback={handleSubmitFeedback}
                     submitting={submittingFeedback}
                   />
-                </div>
-
-                <div className="space-y-5">
-                  <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.96),rgba(8,13,22,0.98))]">
-                    <CardHeader>
-                      <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/65">Linked applicant</p>
-                      <CardTitle className="text-xl text-white">
-                        {requestedFeedbackApplicant ? requestedFeedbackApplicant.name : 'No applicant preselected'}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3 text-sm text-white/60">
-                      {requestedFeedbackApplicant ? (
-                        <>
-                          <p>Cycle: <span className="text-white">{requestedFeedbackApplicant.cycle_name ?? 'Unassigned'}</span></p>
-                          <p>Email: <span className="text-white">{requestedFeedbackApplicant.email}</span></p>
-                          <p>Assigned exec: <span className="text-white">{requestedFeedbackApplicant.assigned_exec ?? 'Unassigned'}</span></p>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="mt-2 w-full border-white/10 bg-white/5 text-white hover:bg-white/10"
-                            onClick={() => navigate(`/tech/manage/applicants?applicantId=${requestedFeedbackApplicant.id}`)}
-                          >
-                            <ClipboardList className="h-4 w-4" />
-                            Open applicant profile
-                          </Button>
-                        </>
-                      ) : (
-                        <p>
-                          You can open this form directly from an applicant profile, or type the exact interviewee name to attach the evaluation to a record.
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.96),rgba(8,13,22,0.98))]">
-                    <CardHeader>
-                      <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/65">Persistence</p>
-                      <CardTitle className="text-xl text-white">Save target</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3 text-sm text-white/60">
-                      <p>
-                        {usingMockData
-                          ? 'The backend is offline right now. Your in-progress form responses stay on this browser, but Save feedback will not write to the database until the API is reachable.'
-                          : 'Unsaved form responses stay on this browser while you move around the dashboard. New submissions are sent to the backend and stored in the evaluations table.'}
-                      </p>
-                      <p>
-                        Current table: <span className="text-white">evaluations</span>
-                      </p>
-                      {submittingFeedback ? (
-                        <div className="flex items-center gap-2 text-cyan-100">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Saving evaluation...
-                        </div>
-                      ) : null}
-                    </CardContent>
-                  </Card>
                 </div>
               </div>
             )
