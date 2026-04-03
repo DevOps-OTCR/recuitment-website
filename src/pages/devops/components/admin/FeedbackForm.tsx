@@ -326,7 +326,7 @@ const FeedbackForm = ({ applicants, initialApplicantId, onSubmitFeedback, submit
               </p>
             </div>
 
-            <div className="space-y-5">
+            <div className="grid gap-5 xl:grid-cols-2">
               {feedbackMetricFields.map((field) => (
                 <div key={field.key} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5">
                   <p className="text-sm font-medium text-white">{field.label}</p>

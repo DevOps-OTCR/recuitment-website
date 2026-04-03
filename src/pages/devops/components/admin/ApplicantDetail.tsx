@@ -1,4 +1,4 @@
-import { ExternalLink, FilePenLine, FileText, ShieldAlert, Sparkles } from 'lucide-react';
+import { ExternalLink, FilePenLine, FileText, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -141,15 +141,6 @@ const ApplicantDetail = ({
               ))
           )}
 
-          <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm text-white/55">
-            <div className="flex items-center gap-2 text-white/70">
-              <ShieldAlert className="h-4 w-4 text-cyan-200" />
-              Integrity and interview notes
-            </div>
-            <p className="mt-2">Focus loss events: {applicant.focus_loss_events}</p>
-            <p className="mt-1">{applicant.is_flagged ? 'Flagged for integrity review.' : 'No integrity flag.'}</p>
-            {applicant.integrity_notes && <p className="mt-2 text-amber-200/90">{applicant.integrity_notes}</p>}
-          </div>
         </CardContent>
       </Card>
 

@@ -796,7 +796,7 @@ const DevopsManage = () => {
                 <Loader2 className="h-8 w-8 animate-spin text-white/50" />
               </div>
             ) : (
-              <div className="mx-auto w-full max-w-[1240px]">
+              <div className="mx-auto w-full max-w-[1360px]">
                 <div>
                   <FeedbackForm
                     applicants={applications}
