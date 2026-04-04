@@ -816,6 +816,8 @@ const DevopsManage = () => {
               selectedTable={selectedDatabaseTable}
               loading={databaseLoading}
               error={databaseError}
+              applicants={applications}
+              feedbackByApplicant={feedbackByApplicant}
               onSelectTable={setSelectedDatabaseTable}
               onRefresh={() => {
                 if (!storedSecret) return;
