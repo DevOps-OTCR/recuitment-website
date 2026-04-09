@@ -131,6 +131,7 @@ class EvaluationPayload(BaseModel):
     interviewee_name: str = Field(min_length=1, max_length=255)
     interviewee_gender: Literal["Male", "Female", "Other"]
     interviewer_role: Literal["Primary", "Secondary"]
+    round: Literal["Round 1", "Round 2"]
     leadership_score: int = Field(ge=1, le=3)
     interest_in_otcr_score: int = Field(ge=1, le=3)
     behavioral_performance_score: int = Field(ge=1, le=3)
@@ -153,6 +154,7 @@ class EvaluationResponse(BaseModel):
     interviewee_name: str
     interviewee_gender: str
     interviewer_role: str
+    round: str
     leadership_score: int
     interest_in_otcr_score: int
     behavioral_performance_score: int
@@ -252,6 +254,7 @@ def _evaluation_to_response(evaluation: Evaluation) -> EvaluationResponse:
         interviewee_name=evaluation.interviewee_name or (evaluation.application.name if evaluation.application else ""),
         interviewee_gender=evaluation.interviewee_gender or "Other",
         interviewer_role=evaluation.interviewer_role or "Primary",
+        round=evaluation.round or "Round 1",
         leadership_score=_normalize_rubric_score(evaluation.leadership_score),
         interest_in_otcr_score=_normalize_rubric_score(evaluation.interest_in_otcr_score),
         behavioral_performance_score=_normalize_rubric_score(evaluation.behavioral_performance_score),
@@ -649,6 +652,7 @@ async def create_evaluation(
     evaluation = Evaluation(
         application_id=application.id,
         interviewer_name=payload.interviewer_name.strip(),
+        round=payload.round,
         interviewee_name=payload.interviewee_name.strip(),
         interviewee_gender=payload.interviewee_gender,
         interviewer_role=payload.interviewer_role,

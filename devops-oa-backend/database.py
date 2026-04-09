@@ -98,6 +98,7 @@ def ensure_runtime_schema():
         )
 
         evaluation_columns = [
+            ("round", "ALTER TABLE evaluations ADD COLUMN round VARCHAR(50)", "ALTER TABLE evaluations ADD COLUMN round VARCHAR(50)"),
             ("interviewee_name", "ALTER TABLE evaluations ADD COLUMN interviewee_name VARCHAR(255)", "ALTER TABLE evaluations ADD COLUMN interviewee_name VARCHAR(255)"),
             ("interviewee_gender", "ALTER TABLE evaluations ADD COLUMN interviewee_gender VARCHAR(20)", "ALTER TABLE evaluations ADD COLUMN interviewee_gender VARCHAR(20)"),
             ("interviewer_role", "ALTER TABLE evaluations ADD COLUMN interviewer_role VARCHAR(20)", "ALTER TABLE evaluations ADD COLUMN interviewer_role VARCHAR(20)"),
@@ -122,6 +123,9 @@ def ensure_runtime_schema():
                 sqlite_ddl=sqlite_ddl,
                 postgres_ddl=postgres_ddl,
             )
+
+        # Older evaluation rows may predate round support. Treat them as first-round reviews.
+        connection.execute(text("UPDATE evaluations SET round = 'Round 1' WHERE round IS NULL OR TRIM(round) = ''"))
 
 
 def init_db():

@@ -15,12 +15,14 @@ import {
   type DecisionValue,
   type FeedbackEntry,
   type IntervieweeGender,
+  type InterviewRound,
   type InterviewerRole,
 } from './types';
 
 interface FeedbackFormProps {
   applicants: ApplicantRecord[];
   initialApplicantId?: number | null;
+  initialRound?: InterviewRound;
   onSubmitFeedback: (entry: Omit<FeedbackEntry, 'id' | 'submittedAt'>) => Promise<void> | void;
   submitting?: boolean;
 }
@@ -30,6 +32,7 @@ interface FeedbackFormState {
   intervieweeName: string;
   intervieweeGender: IntervieweeGender;
   interviewerRole: InterviewerRole;
+  round: InterviewRound;
   leadershipScore: string;
   interestInOtcrScore: string;
   behavioralPerformanceScore: string;
@@ -46,11 +49,12 @@ interface FeedbackFormState {
 const nameKey = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
 const FEEDBACK_DRAFT_STORAGE = 'otcr_consultant_feedback_draft';
 
-const initialState = (intervieweeName = ''): FeedbackFormState => ({
+const initialState = (intervieweeName = '', round: InterviewRound = 'Round 1'): FeedbackFormState => ({
   interviewerName: '',
   intervieweeName,
   intervieweeGender: 'Other',
   interviewerRole: 'Primary',
+  round,
   leadershipScore: '2',
   interestInOtcrScore: '2',
   behavioralPerformanceScore: '2',
@@ -78,8 +82,8 @@ const selectableRatingOptions = [
   { value: '3', label: '3' },
 ] as const;
 
-const restoreFeedbackDraft = (intervieweeName = ''): FeedbackFormState => {
-  const fallback = initialState(intervieweeName);
+const restoreFeedbackDraft = (intervieweeName = '', round: InterviewRound = 'Round 1'): FeedbackFormState => {
+  const fallback = initialState(intervieweeName, round);
   if (typeof window === 'undefined') return fallback;
 
   try {
@@ -103,8 +107,8 @@ const restoreFeedbackDraft = (intervieweeName = ''): FeedbackFormState => {
   }
 };
 
-const isPristineFeedbackDraft = (form: FeedbackFormState, intervieweeName = '') =>
-  JSON.stringify(form) === JSON.stringify(initialState(intervieweeName));
+const isPristineFeedbackDraft = (form: FeedbackFormState, intervieweeName = '', round: InterviewRound = 'Round 1') =>
+  JSON.stringify(form) === JSON.stringify(initialState(intervieweeName, round));
 
 const ChoicePillGroup = <T extends string>({
   value,
@@ -142,12 +146,12 @@ const ChoicePillGroup = <T extends string>({
   </RadioGroup>
 );
 
-const FeedbackForm = ({ applicants, initialApplicantId, onSubmitFeedback, submitting = false }: FeedbackFormProps) => {
+const FeedbackForm = ({ applicants, initialApplicantId, initialRound = 'Round 1', onSubmitFeedback, submitting = false }: FeedbackFormProps) => {
   const initialApplicant = useMemo(
     () => applicants.find((candidate) => candidate.id === initialApplicantId) ?? null,
     [applicants, initialApplicantId]
   );
-  const [form, setForm] = useState<FeedbackFormState>(() => restoreFeedbackDraft(initialApplicant?.name ?? ''));
+  const [form, setForm] = useState<FeedbackFormState>(() => restoreFeedbackDraft(initialApplicant?.name ?? '', initialRound));
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const previousInitialApplicantNameRef = useRef(initialApplicant?.name ?? '');
 
@@ -173,10 +177,17 @@ const FeedbackForm = ({ applicants, initialApplicantId, onSubmitFeedback, submit
   }, [initialApplicant?.name]);
 
   useEffect(() => {
+    setForm((current) => {
+      if (current.round === initialRound) return current;
+      return { ...current, round: initialRound };
+    });
+  }, [initialRound]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
 
     try {
-      if (isPristineFeedbackDraft(form, initialApplicant?.name ?? '')) {
+      if (isPristineFeedbackDraft(form, initialApplicant?.name ?? '', initialRound)) {
         sessionStorage.removeItem(FEEDBACK_DRAFT_STORAGE);
         return;
       }
@@ -185,7 +196,7 @@ const FeedbackForm = ({ applicants, initialApplicantId, onSubmitFeedback, submit
     } catch (error) {
       console.warn('Failed to save feedback draft', error);
     }
-  }, [form, initialApplicant?.name]);
+  }, [form, initialApplicant?.name, initialRound]);
 
   const matchedApplicant = useMemo(() => {
     const lookup = nameKey(form.intervieweeName);
@@ -216,6 +227,7 @@ const FeedbackForm = ({ applicants, initialApplicantId, onSubmitFeedback, submit
       intervieweeName: matchedApplicant.name,
       intervieweeGender: form.intervieweeGender,
       interviewerRole: form.interviewerRole,
+      round: form.round,
       leadershipScore: Number(form.leadershipScore) as FeedbackEntry['leadershipScore'],
       interestInOtcrScore: Number(form.interestInOtcrScore) as FeedbackEntry['interestInOtcrScore'],
       behavioralPerformanceScore: Number(form.behavioralPerformanceScore) as FeedbackEntry['behavioralPerformanceScore'],
@@ -229,7 +241,7 @@ const FeedbackForm = ({ applicants, initialApplicantId, onSubmitFeedback, submit
       overallPerformanceOverview: form.overallPerformanceOverview.trim(),
     });
 
-    setForm(initialState(initialApplicant?.name ?? ''));
+    setForm(initialState(initialApplicant?.name ?? '', initialRound));
     setValidationMessage(null);
   };
 
@@ -316,6 +328,19 @@ const FeedbackForm = ({ applicants, initialApplicantId, onSubmitFeedback, submit
                 columnsClassName="sm:grid-cols-2"
               />
             </div>
+          </div>
+
+          <div className="space-y-3">
+            <Label className="text-white/70">Interview round</Label>
+            <ChoicePillGroup
+              value={form.round}
+              onChange={(value) => setForm((current) => ({ ...current, round: value }))}
+              options={[
+                { value: 'Round 1', label: 'Round 1' },
+                { value: 'Round 2', label: 'Round 2' },
+              ]}
+              columnsClassName="sm:grid-cols-2"
+            />
           </div>
 
           <div className="space-y-4">

@@ -13,6 +13,8 @@ interface ConsultantListProps {
   onSelectApplicant: (id: number) => void;
   getStatusLabel: (applicant: ApplicantRecord) => string;
   getVoteCounts: (applicantId: number) => { yes: number; no: number; maybe: number };
+  getAverageScore: (applicantId: number) => number | null;
+  overallAverageScore: number | null;
 }
 
 const ConsultantList = ({
@@ -23,10 +25,38 @@ const ConsultantList = ({
   onSelectApplicant,
   getStatusLabel,
   getVoteCounts,
-}: ConsultantListProps) => (
-  <div className="flex h-full flex-col rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(14,23,37,0.96),rgba(10,15,27,0.98))] shadow-[0_18px_50px_rgba(0,0,0,0.32)]">
-    <div className="border-b border-white/10 p-5">
-      <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/65">Applicants</p>
+  getAverageScore,
+  overallAverageScore,
+}: ConsultantListProps) => {
+  const scoreValues = applicants
+    .map((applicant) => ({ applicantId: applicant.id, score: getAverageScore(applicant.id) }))
+    .filter((entry): entry is { applicantId: number; score: number } => entry.score !== null);
+
+  const getScoreToneClassName = (applicantId: number, score: number) => {
+    const comparisonPool = scoreValues.filter((entry) => entry.applicantId !== applicantId);
+    const benchmark =
+      comparisonPool.length > 0
+        ? comparisonPool.reduce((sum, entry) => sum + entry.score, 0) / comparisonPool.length
+        : overallAverageScore;
+
+    if (benchmark === null) return 'border-cyan-300/20 bg-cyan-300/10 text-cyan-100';
+
+    if (score > benchmark + 0.05) return 'border-emerald-300/25 bg-emerald-400/10 text-emerald-100';
+    if (score < benchmark - 0.05) return 'border-red-300/25 bg-red-400/10 text-red-100';
+    return 'border-amber-300/25 bg-amber-400/10 text-amber-100';
+  };
+
+  return (
+    <div className="flex h-full flex-col rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(14,23,37,0.96),rgba(10,15,27,0.98))] shadow-[0_18px_50px_rgba(0,0,0,0.32)]">
+      <div className="border-b border-white/10 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/65">Applicants</p>
+          {overallAverageScore !== null ? (
+            <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-white/70">
+              Avg {overallAverageScore.toFixed(1)}
+            </div>
+          ) : null}
+        </div>
       <div className="relative mt-4">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
         <Input
@@ -49,6 +79,7 @@ const ConsultantList = ({
             const isActive = applicant.id === selectedApplicantId;
             const statusLabel = getStatusLabel(applicant);
             const counts = getVoteCounts(applicant.id);
+            const averageScore = getAverageScore(applicant.id);
 
             return (
               <button
@@ -69,7 +100,17 @@ const ConsultantList = ({
                         <UserRound className="h-4 w-4 text-cyan-200" />
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-white">{applicant.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="truncate font-medium text-white">{applicant.name}</p>
+                          {averageScore !== null ? (
+                            <span className={cn(
+                              'shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-[0.18em]',
+                              getScoreToneClassName(applicant.id, averageScore)
+                            )}>
+                              {averageScore.toFixed(1)}
+                            </span>
+                          ) : null}
+                        </div>
                         <p className="truncate text-xs text-white/45">{applicant.email}</p>
                       </div>
                     </div>
@@ -93,6 +134,7 @@ const ConsultantList = ({
       )}
     </div>
   </div>
-);
+  );
+};
 
 export default ConsultantList;

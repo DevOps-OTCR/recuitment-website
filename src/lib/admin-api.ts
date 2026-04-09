@@ -7,6 +7,7 @@ export interface AdminEvaluationPayload {
   interviewee_name: string;
   interviewee_gender: 'Male' | 'Female' | 'Other';
   interviewer_role: 'Primary' | 'Secondary';
+  round: 'Round 1' | 'Round 2';
   leadership_score: number;
   interest_in_otcr_score: number;
   behavioral_performance_score: number;
@@ -51,6 +52,7 @@ export interface AdminEvaluationResponse {
   interviewee_name: string;
   interviewee_gender: 'Male' | 'Female' | 'Other';
   interviewer_role: 'Primary' | 'Secondary';
+  round: 'Round 1' | 'Round 2' | null;
   leadership_score: number;
   interest_in_otcr_score: number;
   behavioral_performance_score: number;

@@ -2,6 +2,7 @@ export type DecisionValue = 'YES' | 'LEAN YES' | 'MAYBE' | 'LEAN NO' | 'NO';
 export type RatingBand = 1 | 2 | 3;
 export type IntervieweeGender = 'Male' | 'Female' | 'Other';
 export type InterviewerRole = 'Primary' | 'Secondary';
+export type InterviewRound = 'Round 1' | 'Round 2';
 export type DatabaseTableName =
   | 'applications'
   | 'evaluations'
@@ -42,6 +43,7 @@ export interface FeedbackEntry {
   intervieweeName: string;
   intervieweeGender: IntervieweeGender;
   interviewerRole: InterviewerRole;
+  round: InterviewRound;
   leadershipScore: RatingBand;
   interestInOtcrScore: RatingBand;
   behavioralPerformanceScore: RatingBand;

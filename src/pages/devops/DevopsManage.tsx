@@ -34,6 +34,7 @@ import {
   type DatabaseTableName,
   type DatabaseTablePreview,
   type FeedbackEntry,
+  type InterviewRound,
 } from '@/pages/devops/components/admin/types';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 
@@ -92,6 +93,7 @@ const mapEvaluation = (evaluation: AdminEvaluationResponse): FeedbackEntry => ({
   intervieweeName: evaluation.interviewee_name,
   intervieweeGender: evaluation.interviewee_gender,
   interviewerRole: evaluation.interviewer_role,
+  round: evaluation.round === 'Round 2' ? 'Round 2' : 'Round 1',
   leadershipScore: normalizeRatingBand(evaluation.leadership_score),
   interestInOtcrScore: normalizeRatingBand(evaluation.interest_in_otcr_score),
   behavioralPerformanceScore: normalizeRatingBand(evaluation.behavioral_performance_score),
@@ -148,17 +150,31 @@ const getVoteCounts = (entries: FeedbackEntry[]) =>
     { yes: 0, no: 0, maybe: 0 }
   );
 
+const getEntryAverageScore = (entry: FeedbackEntry) =>
+  feedbackMetricFields.reduce((sum, field) => sum + entry[field.key], 0) / feedbackMetricFields.length;
+
 const getAverageScore = (entries: FeedbackEntry[]) => {
   if (entries.length === 0) return null;
 
-  const total = entries.reduce(
-    (sum, entry) =>
-      sum + feedbackMetricFields.reduce((entrySum, field) => entrySum + entry[field.key], 0),
-    0
+  const uniqueReviewerEntries = Array.from(
+    entries
+      .slice()
+      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
+      .reduce<Map<string, FeedbackEntry>>((acc, entry) => {
+        const reviewerKey = `${entry.interviewerRole}:${nameKey(entry.interviewerName)}`;
+        if (!acc.has(reviewerKey)) acc.set(reviewerKey, entry);
+        return acc;
+      }, new Map())
+      .values()
   );
 
-  return total / (entries.length * feedbackMetricFields.length);
+  const reviewerAverages = uniqueReviewerEntries.map(getEntryAverageScore);
+  const total = reviewerAverages.reduce((sum, value) => sum + value, 0);
+
+  return total / reviewerAverages.length;
 };
+
+const interviewRounds: InterviewRound[] = ['Round 1', 'Round 2'];
 
 const getOverallStatus = (applicant: ApplicantRecord, entries: FeedbackEntry[]) => {
   const votes = getVoteCounts(entries);
@@ -210,15 +226,18 @@ const DevopsManage = () => {
   const [databaseLoading, setDatabaseLoading] = useState(false);
   const [databaseError, setDatabaseError] = useState<string | null>(null);
   const [selectedDatabaseTable, setSelectedDatabaseTable] = useState<DatabaseTableName>('evaluations');
+  const [selectedRoundsByApplicant, setSelectedRoundsByApplicant] = useState<Record<number, InterviewRound>>({});
 
   const isApplicantsView = location.pathname === '/tech/manage/applicants';
   const isFeedbackView = location.pathname === '/tech/manage/feedback';
   const isDatabaseView = location.pathname === '/tech/manage/database';
   const requestedApplicantIdParam = searchParams.get('applicantId');
+  const requestedRoundParam = searchParams.get('round');
   const requestedApplicantId =
     requestedApplicantIdParam && Number.isFinite(Number(requestedApplicantIdParam))
       ? Number(requestedApplicantIdParam)
       : null;
+  const requestedFeedbackRound: InterviewRound = requestedRoundParam === 'Round 2' ? 'Round 2' : 'Round 1';
 
   const headers = () => ({
     'X-Admin-Secret': storedSecret || '',
@@ -338,6 +357,13 @@ const DevopsManage = () => {
   const requestedFeedbackApplicant =
     requestedApplicantId !== null ? applications.find((applicant) => applicant.id === requestedApplicantId) ?? null : null;
 
+  const getAvailableRounds = (_applicantId: number): InterviewRound[] => interviewRounds;
+
+  const getSelectedRound = (applicantId: number): InterviewRound => selectedRoundsByApplicant[applicantId] ?? 'Round 1';
+
+  const getEntriesForRound = (applicantId: number, round: InterviewRound) =>
+    (feedbackByApplicant[applicantId] ?? []).filter((entry) => entry.round === round);
+
   const totalFeedbackCount = useMemo(
     () => Object.values(feedbackByApplicant).reduce((sum, entries) => sum + entries.length, 0),
     [feedbackByApplicant]
@@ -402,8 +428,8 @@ const DevopsManage = () => {
     }
   };
 
-  const handleOpenFeedbackForm = (applicant: ApplicantRecord) => {
-    navigate(`/tech/manage/feedback?applicantId=${applicant.id}`);
+  const handleOpenFeedbackForm = (applicant: ApplicantRecord, round: InterviewRound = 'Round 1') => {
+    navigate(`/tech/manage/feedback?applicantId=${applicant.id}&round=${encodeURIComponent(round)}`);
   };
 
   const handleSubmitFeedback = async (entry: Omit<FeedbackEntry, 'id' | 'submittedAt'>) => {
@@ -447,6 +473,7 @@ const DevopsManage = () => {
         interviewee_name: entry.intervieweeName,
         interviewee_gender: entry.intervieweeGender,
         interviewer_role: entry.interviewerRole,
+        round: entry.round,
         leadership_score: entry.leadershipScore,
         interest_in_otcr_score: entry.interestInOtcrScore,
         behavioral_performance_score: entry.behavioralPerformanceScore,
@@ -466,6 +493,10 @@ const DevopsManage = () => {
       setFeedbackByApplicant((current) => ({
         ...current,
         [mappedEntry.applicantId]: [mappedEntry, ...(current[mappedEntry.applicantId] ?? [])],
+      }));
+      setSelectedRoundsByApplicant((current) => ({
+        ...current,
+        [mappedEntry.applicantId]: mappedEntry.round,
       }));
 
       if (isDatabaseView) {
@@ -498,6 +529,15 @@ const DevopsManage = () => {
 
   const voteCountsForApplicant = (applicantId: number) => getVoteCounts(feedbackByApplicant[applicantId] ?? []);
   const statusForApplicant = (applicant: ApplicantRecord) => getOverallStatus(applicant, feedbackByApplicant[applicant.id] ?? []);
+  const scoreForApplicant = (applicantId: number) => getAverageScore(feedbackByApplicant[applicantId] ?? []);
+  const overallApplicantAverageScore = useMemo(() => {
+    const scores = filteredApplicants
+      .map((applicant) => scoreForApplicant(applicant.id))
+      .filter((score): score is number => score !== null);
+
+    if (scores.length === 0) return null;
+    return scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  }, [filteredApplicants, feedbackByApplicant]);
 
   if (!storedSecret) {
     return (
@@ -755,17 +795,33 @@ const DevopsManage = () => {
               <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_380px]">
                 <div className="order-2 xl:order-1">
                   {selectedApplicant ? (
-                    <ApplicantDetail
-                      applicant={selectedApplicant}
-                      feedbackEntries={feedbackByApplicant[selectedApplicant.id] ?? []}
-                      yesCount={voteCountsForApplicant(selectedApplicant.id).yes}
-                      noCount={voteCountsForApplicant(selectedApplicant.id).no}
-                      maybeCount={voteCountsForApplicant(selectedApplicant.id).maybe}
-                      overallStatus={statusForApplicant(selectedApplicant)}
-                      averageScore={getAverageScore(feedbackByApplicant[selectedApplicant.id] ?? [])}
-                      onOpenResume={handleOpenResume}
-                      onOpenFeedbackForm={handleOpenFeedbackForm}
-                    />
+                    (() => {
+                      const selectedRound = getSelectedRound(selectedApplicant.id);
+                      const roundEntries = getEntriesForRound(selectedApplicant.id, selectedRound);
+                      const roundVoteCounts = getVoteCounts(roundEntries);
+
+                      return (
+                        <ApplicantDetail
+                          applicant={selectedApplicant}
+                          feedbackEntries={roundEntries}
+                          yesCount={roundVoteCounts.yes}
+                          noCount={roundVoteCounts.no}
+                          maybeCount={roundVoteCounts.maybe}
+                          overallStatus={getOverallStatus(selectedApplicant, roundEntries)}
+                          averageScore={getAverageScore(roundEntries)}
+                          selectedRound={selectedRound}
+                          availableRounds={getAvailableRounds(selectedApplicant.id)}
+                          onSelectRound={(round) =>
+                            setSelectedRoundsByApplicant((current) => ({
+                              ...current,
+                              [selectedApplicant.id]: round,
+                            }))
+                          }
+                          onOpenResume={handleOpenResume}
+                          onOpenFeedbackForm={(applicant) => handleOpenFeedbackForm(applicant, selectedRound)}
+                        />
+                      );
+                    })()
                   ) : (
                     <Card className="border-white/10 bg-white/[0.03]">
                       <CardContent className="p-10 text-center text-white/55">
@@ -784,6 +840,8 @@ const DevopsManage = () => {
                     onSelectApplicant={setSelectedApplicantId}
                     getStatusLabel={statusForApplicant}
                     getVoteCounts={voteCountsForApplicant}
+                    getAverageScore={scoreForApplicant}
+                    overallAverageScore={overallApplicantAverageScore}
                   />
                 </div>
               </div>
@@ -801,6 +859,7 @@ const DevopsManage = () => {
                   <FeedbackForm
                     applicants={applications}
                     initialApplicantId={requestedFeedbackApplicant?.id ?? null}
+                    initialRound={requestedFeedbackRound}
                     onSubmitFeedback={handleSubmitFeedback}
                     submitting={submittingFeedback}
                   />

@@ -1,10 +1,10 @@
-import { ExternalLink, FilePenLine, FileText, Sparkles } from 'lucide-react';
+import { ExternalLink, FilePenLine, FileText } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 import StatusSummary from './StatusSummary';
-import { feedbackMetricFields, formatRatingBand, type ApplicantRecord, type FeedbackEntry } from './types';
+import { feedbackMetricFields, formatRatingBand, type ApplicantRecord, type FeedbackEntry, type InterviewRound } from './types';
 
 interface ApplicantDetailProps {
   applicant: ApplicantRecord;
@@ -14,6 +14,9 @@ interface ApplicantDetailProps {
   maybeCount: number;
   overallStatus: string;
   averageScore: number | null;
+  selectedRound: InterviewRound;
+  availableRounds: InterviewRound[];
+  onSelectRound: (round: InterviewRound) => void;
   onOpenResume: (applicant: ApplicantRecord) => void;
   onOpenFeedbackForm: (applicant: ApplicantRecord) => void;
 }
@@ -26,6 +29,9 @@ const ApplicantDetail = ({
   maybeCount,
   overallStatus,
   averageScore,
+  selectedRound,
+  availableRounds,
+  onSelectRound,
   onOpenResume,
   onOpenFeedbackForm,
 }: ApplicantDetailProps) => (
@@ -37,6 +43,22 @@ const ApplicantDetail = ({
             <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/65">Applicant detail</p>
             <CardTitle className="mt-2 text-3xl text-white">{applicant.name}</CardTitle>
             <p className="mt-2 max-w-2xl text-sm text-white/60">{applicant.interest ?? 'No written interest statement on file.'}</p>
+            <div className="mt-4 inline-flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
+              {availableRounds.map((round) => (
+                <button
+                  key={round}
+                  type="button"
+                  onClick={() => onSelectRound(round)}
+                  className={
+                    round === selectedRound
+                      ? 'rounded-xl bg-cyan-300 px-4 py-2 text-sm font-medium text-slate-950'
+                      : 'rounded-xl px-4 py-2 text-sm font-medium text-white/60 transition-colors hover:text-white'
+                  }
+                >
+                  {round}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="grid gap-2 text-sm text-white/65">
             <div><span className="text-white/35">Cycle</span> {applicant.cycle_name ?? 'Unassigned'}</div>
@@ -69,7 +91,7 @@ const ApplicantDetail = ({
               <span>
                 {applicant.resume_filename
                   ? 'Resume is available for review from the admin panel.'
-                  : 'No uploaded resume found. This area acts as the placeholder section requested for the MVP.'}
+                  : 'No uploaded resume found.'}
               </span>
             </div>
             {applicant.notes && (
@@ -92,12 +114,12 @@ const ApplicantDetail = ({
       <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.96),rgba(8,13,22,0.98))]">
         <CardHeader>
           <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/65">Evaluation summary</p>
-          <CardTitle className="text-xl text-white">Existing feedback</CardTitle>
+          <CardTitle className="text-xl text-white">{selectedRound} feedback</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {feedbackEntries.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-5 text-sm text-white/55">
-              No interviewer feedback saved yet. Open the feedback form to add the first review.
+              No {selectedRound.toLowerCase()} feedback saved yet.
             </div>
           ) : (
             feedbackEntries
@@ -150,10 +172,7 @@ const ApplicantDetail = ({
             <div className="flex items-start gap-3">
               <FilePenLine className="mt-1 h-5 w-5 text-cyan-200" />
               <div>
-                <p className="font-medium text-white">Submit a new review</p>
-                <p className="mt-2 text-sm leading-6 text-white/55">
-                  The feedback form now lives on its own page. Open it to record the interview rubric, final-round push areas, and an overall move-forward recommendation.
-                </p>
+                <p className="font-medium text-white">Submit a new {selectedRound.toLowerCase()} review</p>
                 <Button
                   type="button"
                   className="mt-4 rounded-xl bg-cyan-300 text-slate-950 hover:bg-cyan-200"
@@ -162,19 +181,6 @@ const ApplicantDetail = ({
                   <FilePenLine className="h-4 w-4" />
                   Open feedback form
                 </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.96),rgba(8,13,22,0.98))]">
-          <CardContent className="p-5">
-            <div className="flex items-start gap-3">
-              <Sparkles className="mt-1 h-5 w-5 text-cyan-200" />
-              <div>
-                <p className="font-medium text-white">How status is derived</p>
-                <p className="mt-2 text-sm leading-6 text-white/55">
-                  Backend application status is shown when it is already definitive. Otherwise the admin MVP uses saved interviewer recommendations to compute a working review status, and two “No” votes immediately mark the applicant as Rejected.
-                </p>
               </div>
             </div>
           </CardContent>
