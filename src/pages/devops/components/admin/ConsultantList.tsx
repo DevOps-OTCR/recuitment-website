@@ -3,7 +3,7 @@ import { Search, UserRound } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
-import type { ApplicantRecord } from './types';
+import type { ApplicantRecord, InterviewRound } from './types';
 
 interface ConsultantListProps {
   applicants: ApplicantRecord[];
@@ -12,9 +12,9 @@ interface ConsultantListProps {
   onSearchChange: (value: string) => void;
   onSelectApplicant: (id: number) => void;
   getStatusLabel: (applicant: ApplicantRecord) => string;
-  getVoteCounts: (applicantId: number) => { yes: number; no: number; maybe: number };
   getAverageScore: (applicantId: number) => number | null;
   overallAverageScore: number | null;
+  activeRound: InterviewRound;
 }
 
 const ConsultantList = ({
@@ -24,9 +24,9 @@ const ConsultantList = ({
   onSearchChange,
   onSelectApplicant,
   getStatusLabel,
-  getVoteCounts,
   getAverageScore,
   overallAverageScore,
+  activeRound,
 }: ConsultantListProps) => {
   const scoreValues = applicants
     .map((applicant) => ({ applicantId: applicant.id, score: getAverageScore(applicant.id) }))
@@ -57,83 +57,79 @@ const ConsultantList = ({
             </div>
           ) : null}
         </div>
-      <div className="relative mt-4">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
-        <Input
-          value={searchValue}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Search by name"
-          className="h-11 rounded-xl border-white/10 bg-white/5 pl-10 text-white placeholder:text-white/35"
-        />
-      </div>
-    </div>
-
-    <div className="flex-1 overflow-y-auto p-3">
-      {applicants.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-6 text-sm text-white/55">
-          No applicants match this search.
+        <div className="relative mt-4">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+          <Input
+            value={searchValue}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="Search by name"
+            className="h-11 rounded-xl border-white/10 bg-white/5 pl-10 text-white placeholder:text-white/35"
+          />
         </div>
-      ) : (
-        <div className="space-y-2">
-          {applicants.map((applicant) => {
-            const isActive = applicant.id === selectedApplicantId;
-            const statusLabel = getStatusLabel(applicant);
-            const counts = getVoteCounts(applicant.id);
-            const averageScore = getAverageScore(applicant.id);
+      </div>
 
-            return (
-              <button
-                key={applicant.id}
-                type="button"
-                onClick={() => onSelectApplicant(applicant.id)}
-                className={cn(
-                  'w-full rounded-2xl border p-4 text-left transition-all',
-                  isActive
-                    ? 'border-cyan-300/40 bg-cyan-400/10 shadow-[0_10px_30px_rgba(56,189,248,0.18)]'
-                    : 'border-white/8 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]'
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5">
-                        <UserRound className="h-4 w-4 text-cyan-200" />
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="truncate font-medium text-white">{applicant.name}</p>
-                          {averageScore !== null ? (
-                            <span className={cn(
-                              'shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-[0.18em]',
-                              getScoreToneClassName(applicant.id, averageScore)
-                            )}>
-                              {averageScore.toFixed(1)}
-                            </span>
-                          ) : null}
+      <div className="flex-1 overflow-y-auto p-3">
+        {applicants.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-6 text-sm text-white/55">
+            No applicants match this search.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {applicants.map((applicant) => {
+              const isActive = applicant.id === selectedApplicantId;
+              const statusLabel = getStatusLabel(applicant);
+              const averageScore = getAverageScore(applicant.id);
+
+              return (
+                <button
+                  key={applicant.id}
+                  type="button"
+                  onClick={() => onSelectApplicant(applicant.id)}
+                  className={cn(
+                    'w-full rounded-2xl border p-4 text-left transition-all',
+                    isActive
+                      ? 'border-cyan-300/40 bg-cyan-400/10 shadow-[0_10px_30px_rgba(56,189,248,0.18)]'
+                      : 'border-white/8 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]'
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5">
+                          <UserRound className="h-4 w-4 text-cyan-200" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-200/65">{activeRound}</p>
+                          <div className="mt-1 flex items-center gap-2">
+                            <p className="truncate font-medium text-white">{applicant.name}</p>
+                            {averageScore !== null ? (
+                              <span className={cn(
+                                'shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-[0.18em]',
+                                getScoreToneClassName(applicant.id, averageScore)
+                              )}>
+                                {averageScore.toFixed(1)}
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="truncate text-xs text-white/45">{applicant.email}</p>
                         </div>
-                        <p className="truncate text-xs text-white/45">{applicant.email}</p>
                       </div>
                     </div>
+                    <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-white/60">
+                      {statusLabel}
+                    </span>
                   </div>
-                  <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-white/60">
-                    {statusLabel}
-                  </span>
-                </div>
 
-                <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-white/55">
-                  <span>{applicant.cycle_name ?? 'No cycle'}</span>
-                  <span className="text-white/20">•</span>
-                  <span>Y {counts.yes}</span>
-                  <span>N {counts.no}</span>
-                  <span>M {counts.maybe}</span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
+                  <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-white/55">
+                    <span>{applicant.cycle_name ?? 'No cycle'}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
-  </div>
   );
 };
 

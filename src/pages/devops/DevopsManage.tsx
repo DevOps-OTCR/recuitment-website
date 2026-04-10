@@ -227,6 +227,7 @@ const DevopsManage = () => {
   const [databaseError, setDatabaseError] = useState<string | null>(null);
   const [selectedDatabaseTable, setSelectedDatabaseTable] = useState<DatabaseTableName>('evaluations');
   const [selectedRoundsByApplicant, setSelectedRoundsByApplicant] = useState<Record<number, InterviewRound>>({});
+  const [listRound, setListRound] = useState<InterviewRound>('Round 1');
 
   const isApplicantsView = location.pathname === '/tech/manage/applicants';
   const isFeedbackView = location.pathname === '/tech/manage/feedback';
@@ -529,7 +530,7 @@ const DevopsManage = () => {
 
   const voteCountsForApplicant = (applicantId: number) => getVoteCounts(feedbackByApplicant[applicantId] ?? []);
   const statusForApplicant = (applicant: ApplicantRecord) => getOverallStatus(applicant, feedbackByApplicant[applicant.id] ?? []);
-  const scoreForApplicant = (applicantId: number) => getAverageScore(feedbackByApplicant[applicantId] ?? []);
+  const scoreForApplicant = (applicantId: number) => getAverageScore(getEntriesForRound(applicantId, listRound));
   const overallApplicantAverageScore = useMemo(() => {
     const scores = filteredApplicants
       .map((applicant) => scoreForApplicant(applicant.id))
@@ -537,7 +538,7 @@ const DevopsManage = () => {
 
     if (scores.length === 0) return null;
     return scores.reduce((sum, score) => sum + score, 0) / scores.length;
-  }, [filteredApplicants, feedbackByApplicant]);
+  }, [filteredApplicants, feedbackByApplicant, listRound]);
 
   if (!storedSecret) {
     return (
@@ -649,17 +650,36 @@ const DevopsManage = () => {
 
             <div className="flex flex-wrap items-center gap-3">
               {isApplicantsView ? (
-                <select
-                  value={cycleFilter}
-                  onChange={(event) => setCycleFilter(event.target.value)}
-                  className="h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none"
-                >
-                  {cycleOptions.map((cycle) => (
-                    <option key={cycle} value={cycle} className="bg-slate-900 text-white">
-                      {cycle === 'all' ? 'All cycles' : cycle}
-                    </option>
-                  ))}
-                </select>
+                <>
+                  <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1">
+                    {interviewRounds.map((round) => (
+                      <button
+                        key={round}
+                        type="button"
+                        onClick={() => setListRound(round)}
+                        className={cn(
+                          'rounded-lg px-3 py-2 text-sm transition-colors',
+                          listRound === round
+                            ? 'bg-cyan-300 text-slate-950'
+                            : 'text-white/70 hover:text-white'
+                        )}
+                      >
+                        {round}
+                      </button>
+                    ))}
+                  </div>
+                  <select
+                    value={cycleFilter}
+                    onChange={(event) => setCycleFilter(event.target.value)}
+                    className="h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none"
+                  >
+                    {cycleOptions.map((cycle) => (
+                      <option key={cycle} value={cycle} className="bg-slate-900 text-white">
+                        {cycle === 'all' ? 'All cycles' : cycle}
+                      </option>
+                    ))}
+                  </select>
+                </>
               ) : null}
               <Button
                 type="button"
@@ -839,9 +859,9 @@ const DevopsManage = () => {
                     onSearchChange={setSearchValue}
                     onSelectApplicant={setSelectedApplicantId}
                     getStatusLabel={statusForApplicant}
-                    getVoteCounts={voteCountsForApplicant}
                     getAverageScore={scoreForApplicant}
                     overallAverageScore={overallApplicantAverageScore}
+                    activeRound={listRound}
                   />
                 </div>
               </div>
