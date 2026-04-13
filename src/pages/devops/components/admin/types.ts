@@ -78,17 +78,17 @@ export const feedbackMetricFields = [
   },
   {
     key: 'interestInOtcrScore',
-    label: "Interest in OTCR",
+    label: "Interest\nin OTCR",
     description: 'Signals genuine motivation and fit for the organization.',
   },
   {
     key: 'behavioralPerformanceScore',
-    label: 'General behavioral performance',
+    label: 'Behavioral performance',
     description: 'Professionalism, maturity, clarity, and judgment.',
   },
   {
     key: 'businessAcumenScore',
-    label: 'Business acumen',
+    label: 'Business\nacumen',
     description: 'Commercial intuition and business reasoning.',
   },
   {
@@ -98,7 +98,7 @@ export const feedbackMetricFields = [
   },
   {
     key: 'quantitativeStructureScore',
-    label: 'Quantitative structural ability',
+    label: 'Quantitative ability',
     description: 'How they structured the market sizing or quant work.',
   },
   {
@@ -108,7 +108,7 @@ export const feedbackMetricFields = [
   },
   {
     key: 'creativityConversationScore',
-    label: 'Creativity / conversation test',
+    label: 'Creative\ntest',
     description: 'Overall performance on the creativity and conversation test.',
   },
 ] as const;

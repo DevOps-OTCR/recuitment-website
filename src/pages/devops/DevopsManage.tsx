@@ -139,8 +139,35 @@ const groupFeedbackEntries = (entries: FeedbackEntry[]) =>
     return acc;
   }, {});
 
+const normalizeRoundEntries = (entries: FeedbackEntry[]) => {
+  const orderedEntries = entries
+    .slice()
+    .sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
+
+  const assignedRoles = new Set<'Primary' | 'Secondary'>();
+
+  return orderedEntries.map((entry) => {
+    let normalizedRole = entry.interviewerRole;
+
+    if (assignedRoles.has(normalizedRole)) {
+      normalizedRole = normalizedRole === 'Primary' ? 'Secondary' : 'Primary';
+    }
+
+    if (!assignedRoles.has(normalizedRole)) {
+      assignedRoles.add(normalizedRole);
+    }
+
+    return normalizedRole === entry.interviewerRole
+      ? entry
+      : {
+          ...entry,
+          interviewerRole: normalizedRole,
+        };
+  });
+};
+
 const getVoteCounts = (entries: FeedbackEntry[]) =>
-  entries.reduce(
+  normalizeRoundEntries(entries).reduce(
     (acc, entry) => {
       if (entry.recommendation === 'YES' || entry.recommendation === 'LEAN YES') acc.yes += 1;
       if (entry.recommendation === 'NO' || entry.recommendation === 'LEAN NO') acc.no += 1;
@@ -156,17 +183,7 @@ const getEntryAverageScore = (entry: FeedbackEntry) =>
 const getAverageScore = (entries: FeedbackEntry[]) => {
   if (entries.length === 0) return null;
 
-  const uniqueReviewerEntries = Array.from(
-    entries
-      .slice()
-      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
-      .reduce<Map<string, FeedbackEntry>>((acc, entry) => {
-        const reviewerKey = `${entry.interviewerRole}:${nameKey(entry.interviewerName)}`;
-        if (!acc.has(reviewerKey)) acc.set(reviewerKey, entry);
-        return acc;
-      }, new Map())
-      .values()
-  );
+  const uniqueReviewerEntries = normalizeRoundEntries(entries);
 
   const reviewerAverages = uniqueReviewerEntries.map(getEntryAverageScore);
   const total = reviewerAverages.reduce((sum, value) => sum + value, 0);
@@ -179,11 +196,13 @@ const interviewRounds: InterviewRound[] = ['Round 1', 'Round 2'];
 const getOverallStatus = (applicant: ApplicantRecord, entries: FeedbackEntry[]) => {
   const votes = getVoteCounts(entries);
 
-  if (votes.no >= 2) return 'Rejected';
-  if (applicant.status === 'approved') return 'Approved';
-  if (applicant.status === 'rejected') return 'Rejected';
-  if (applicant.final_decision && applicant.final_decision !== 'MAYBE') return applicant.final_decision;
+  if (votes.yes >= 2) return 'YES';
+  if (votes.no >= 2) return 'NO';
+  if (entries.length === 0) {
+    return 'Pending';
+  }
   if (votes.yes > votes.no && votes.yes > 0) return 'YES';
+  if (votes.no > votes.yes && votes.no > 0) return 'NO';
   if (votes.maybe > 0) return 'Pending';
   return 'Pending';
 };
@@ -363,7 +382,7 @@ const DevopsManage = () => {
   const getSelectedRound = (applicantId: number): InterviewRound => selectedRoundsByApplicant[applicantId] ?? 'Round 1';
 
   const getEntriesForRound = (applicantId: number, round: InterviewRound) =>
-    (feedbackByApplicant[applicantId] ?? []).filter((entry) => entry.round === round);
+    normalizeRoundEntries((feedbackByApplicant[applicantId] ?? []).filter((entry) => entry.round === round));
 
   const totalFeedbackCount = useMemo(
     () => Object.values(feedbackByApplicant).reduce((sum, entries) => sum + entries.length, 0),
@@ -528,8 +547,8 @@ const DevopsManage = () => {
     void fetchAdminWorkspace(storedSecret);
   };
 
-  const voteCountsForApplicant = (applicantId: number) => getVoteCounts(feedbackByApplicant[applicantId] ?? []);
-  const statusForApplicant = (applicant: ApplicantRecord) => getOverallStatus(applicant, feedbackByApplicant[applicant.id] ?? []);
+  const voteCountsForApplicant = (applicantId: number) => getVoteCounts(getEntriesForRound(applicantId, listRound));
+  const statusForApplicant = (applicant: ApplicantRecord) => getOverallStatus(applicant, getEntriesForRound(applicant.id, listRound));
   const scoreForApplicant = (applicantId: number) => getAverageScore(getEntriesForRound(applicantId, listRound));
   const overallApplicantAverageScore = useMemo(() => {
     const scores = filteredApplicants
@@ -651,26 +670,6 @@ const DevopsManage = () => {
             <div className="flex flex-wrap items-center gap-3">
               {isApplicantsView ? (
                 <>
-                  <div className="rounded-2xl border border-cyan-300/15 bg-cyan-400/[0.06] px-3 py-2">
-                    <p className="text-[10px] uppercase tracking-[0.22em] text-cyan-200/65">List Round</p>
-                    <div className="mt-2 inline-flex rounded-xl border border-white/10 bg-slate-950/30 p-1">
-                      {interviewRounds.map((round) => (
-                        <button
-                          key={round}
-                          type="button"
-                          onClick={() => setListRound(round)}
-                          className={cn(
-                            'rounded-lg px-3 py-2 text-sm transition-colors',
-                            listRound === round
-                              ? 'bg-cyan-300 text-slate-950'
-                              : 'text-white/70 hover:text-white'
-                          )}
-                        >
-                          {round}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                   <select
                     value={cycleFilter}
                     onChange={(event) => setCycleFilter(event.target.value)}
@@ -841,7 +840,6 @@ const DevopsManage = () => {
                             }))
                           }
                           onOpenResume={handleOpenResume}
-                          onOpenFeedbackForm={(applicant) => handleOpenFeedbackForm(applicant, selectedRound)}
                         />
                       );
                     })()
@@ -860,11 +858,13 @@ const DevopsManage = () => {
                     selectedApplicantId={selectedApplicantId}
                     searchValue={searchValue}
                     onSearchChange={setSearchValue}
+                    rounds={interviewRounds}
+                    activeRound={listRound}
+                    onRoundChange={setListRound}
                     onSelectApplicant={setSelectedApplicantId}
                     getStatusLabel={statusForApplicant}
                     getAverageScore={scoreForApplicant}
                     overallAverageScore={overallApplicantAverageScore}
-                    activeRound={listRound}
                   />
                 </div>
               </div>
