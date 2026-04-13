@@ -43,21 +43,25 @@ const ApplicantDetail = ({
             <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/65">Applicant detail</p>
             <CardTitle className="mt-2 text-3xl text-white">{applicant.name}</CardTitle>
             <p className="mt-2 max-w-2xl text-sm text-white/60">{applicant.interest ?? 'No written interest statement on file.'}</p>
-            <div className="mt-4 inline-flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
-              {availableRounds.map((round) => (
-                <button
-                  key={round}
-                  type="button"
-                  onClick={() => onSelectRound(round)}
-                  className={
-                    round === selectedRound
-                      ? 'rounded-xl bg-cyan-300 px-4 py-2 text-sm font-medium text-slate-950'
-                      : 'rounded-xl px-4 py-2 text-sm font-medium text-white/60 transition-colors hover:text-white'
-                  }
-                >
-                  {round}
-                </button>
-              ))}
+            <div className="mt-5 max-w-fit rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-[10px] uppercase tracking-[0.22em] text-white/45">Applicant History</p>
+              <div className="mt-2 inline-flex rounded-xl border border-white/10 bg-slate-950/35 p-1">
+                {availableRounds.map((round) => (
+                  <button
+                    key={round}
+                    type="button"
+                    onClick={() => onSelectRound(round)}
+                    className={
+                      round === selectedRound
+                        ? 'rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-950'
+                        : 'rounded-xl px-4 py-2 text-sm font-medium text-white/60 transition-colors hover:text-white'
+                    }
+                  >
+                    {round}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-white/45">Switch this applicant only.</p>
             </div>
           </div>
           <div className="grid gap-2 text-sm text-white/65">
