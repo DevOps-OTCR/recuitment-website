@@ -38,6 +38,7 @@ interface ApplicantDetailProps {
   maybeCount: number;
   overallStatus: string;
   averageScore: number | null;
+  comparisonAverage?: number | null;
   selectedRound: InterviewRound;
   availableRounds: InterviewRound[];
   onSelectRound: (round: InterviewRound) => void;
@@ -52,6 +53,7 @@ const ApplicantDetail = ({
   maybeCount,
   overallStatus,
   averageScore,
+  comparisonAverage = null,
   selectedRound,
   availableRounds,
   onSelectRound,
@@ -103,6 +105,7 @@ const ApplicantDetail = ({
             maybeCount={maybeCount}
             statusLabel={overallStatus}
             averageScore={averageScore}
+            comparisonAverage={comparisonAverage}
           />
         </div>
       </CardContent>

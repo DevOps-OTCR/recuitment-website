@@ -831,6 +831,7 @@ const DevopsManage = () => {
                           maybeCount={roundVoteCounts.maybe}
                           overallStatus={getOverallStatus(selectedApplicant, roundEntries)}
                           averageScore={getAverageScore(roundEntries)}
+                          comparisonAverage={overallApplicantAverageScore}
                           selectedRound={selectedRound}
                           availableRounds={getAvailableRounds(selectedApplicant.id)}
                           onSelectRound={(round) =>

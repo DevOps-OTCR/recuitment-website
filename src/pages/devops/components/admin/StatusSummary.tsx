@@ -2,6 +2,7 @@ import { CheckCircle2, Clock3, XCircle } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { feedbackMetricFields } from './types';
 
 interface StatusSummaryProps {
   yesCount: number;
@@ -9,6 +10,7 @@ interface StatusSummaryProps {
   maybeCount: number;
   statusLabel: string;
   averageScore: number | null;
+  comparisonAverage?: number | null;
 }
 
 const toneByStatus: Record<string, string> = {
@@ -26,6 +28,7 @@ const StatusSummary = ({
   maybeCount,
   statusLabel,
   averageScore,
+  comparisonAverage = null,
 }: StatusSummaryProps) => {
   const normalized = statusLabel.toLowerCase();
   const statusTone = toneByStatus[normalized] ?? 'text-slate-200 border-white/10 bg-white/5';
@@ -37,11 +40,19 @@ const StatusSummary = ({
   ];
 
   const scorePercent = averageScore === null ? 0 : Math.max(0, Math.min(100, (averageScore / 3) * 100));
+  const maxTotalScore = feedbackMetricFields.length * 3;
+  const totalScore = averageScore === null ? null : averageScore * feedbackMetricFields.length;
+  const averageTotalScore =
+    comparisonAverage === null ? null : comparisonAverage * feedbackMetricFields.length;
+  const scoreDelta =
+    totalScore === null || averageTotalScore === null ? null : totalScore - averageTotalScore;
+  const deltaTone =
+    scoreDelta === null ? 'text-white/40' : scoreDelta > 0.25 ? 'text-emerald-300' : scoreDelta < -0.25 ? 'text-rose-300' : 'text-white/45';
 
   return (
     <Card className="overflow-hidden border-white/10 bg-[linear-gradient(180deg,rgba(18,29,47,0.96),rgba(10,16,28,0.98))] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
       <CardContent className="p-4">
-        <div className="flex items-center gap-2 overflow-hidden">
+        <div className="flex w-full items-center gap-2 overflow-hidden">
           <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.03]">
             <div
               className="absolute inset-0 rounded-full"
@@ -51,7 +62,9 @@ const StatusSummary = ({
                 WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 5px), white 0)',
               }}
             />
-            <span className="text-sm font-semibold text-white">{`${Math.round(scorePercent)}%`}</span>
+            <span className="text-xs font-semibold text-white">
+              {totalScore === null ? `--/${maxTotalScore}` : `${totalScore.toFixed(1)}/${maxTotalScore}`}
+            </span>
           </div>
 
           <div className="min-w-[112px] shrink-0">
@@ -74,7 +87,14 @@ const StatusSummary = ({
             </div>
           ))}
 
-          <div className={cn('shrink-0 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]', statusTone)}>
+          <div className="min-w-[92px] text-right">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-white/40">vs avg</p>
+            <p className={cn('mt-1 text-lg font-semibold', deltaTone)}>
+              {scoreDelta === null ? '--' : `${scoreDelta >= 0 ? '+' : ''}${scoreDelta.toFixed(1)}`}
+            </p>
+          </div>
+
+          <div className={cn('ml-auto shrink-0 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]', statusTone)}>
             {statusLabel}
           </div>
         </div>

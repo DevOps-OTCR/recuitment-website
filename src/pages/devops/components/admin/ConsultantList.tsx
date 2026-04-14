@@ -3,7 +3,7 @@ import { Search, UserRound } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
-import type { ApplicantRecord, InterviewRound } from './types';
+import { feedbackMetricFields, type ApplicantRecord, type InterviewRound } from './types';
 
 interface ConsultantListProps {
   applicants: ApplicantRecord[];
@@ -32,6 +32,7 @@ const ConsultantList = ({
   getAverageScore,
   overallAverageScore,
 }: ConsultantListProps) => {
+  const maxTotalScore = feedbackMetricFields.length * 3;
   const scoreValues = applicants
     .map((applicant) => ({ applicantId: applicant.id, score: getAverageScore(applicant.id) }))
     .filter((entry): entry is { applicantId: number; score: number } => entry.score !== null);
@@ -74,7 +75,7 @@ const ConsultantList = ({
           </div>
           {overallAverageScore !== null ? (
             <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-white/70">
-              Avg {overallAverageScore.toFixed(1)}
+              Avg {(overallAverageScore * feedbackMetricFields.length).toFixed(1)}/{maxTotalScore}
             </div>
           ) : null}
         </div>
