@@ -2,6 +2,7 @@ import { CheckCircle2, ExternalLink, FileText, HelpCircle, XCircle } from 'lucid
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { RecruitingDecisionAction, RecruitingRole } from '@/features/recruiting';
 
 import StatusSummary from './StatusSummary';
 import { feedbackMetricFields, formatRatingBand, type ApplicantRecord, type FeedbackEntry, type InterviewRound } from './types';
@@ -43,7 +44,62 @@ interface ApplicantDetailProps {
   availableRounds: InterviewRound[];
   onSelectRound: (round: InterviewRound) => void;
   onOpenResume: (applicant: ApplicantRecord) => void;
+  viewerRole: RecruitingRole;
+  canManageDecisions: boolean;
+  onOpenDecisionConfirmation: (action: RecruitingDecisionAction, applicant: ApplicantRecord) => void;
 }
+
+const recruitingStatusToneClasses: Record<string, string> = {
+  applied: 'border-white/10 bg-white/[0.04] text-white/75',
+  round_1: 'border-sky-300/25 bg-sky-400/10 text-sky-100',
+  round_2: 'border-cyan-300/25 bg-cyan-400/10 text-cyan-100',
+  accepted: 'border-emerald-300/25 bg-emerald-400/10 text-emerald-100',
+  rejected: 'border-rose-300/25 bg-rose-400/10 text-rose-100',
+};
+
+const recruitingDecisionOptions: Array<{
+  action: RecruitingDecisionAction;
+  label: string;
+  helper: string;
+  toneClassName: string;
+}> = [
+  {
+    action: 'reject_after_application_review',
+    label: 'Reject after application review',
+    helper: 'Set the candidate to rejected before any interview round.',
+    toneClassName: 'border-rose-300/25 bg-rose-400/10 text-rose-100 hover:bg-rose-400/15',
+  },
+  {
+    action: 'advance_to_round_1',
+    label: 'Advance to Round 1',
+    helper: 'Move the applicant from applied into the first interview round.',
+    toneClassName: 'border-sky-300/25 bg-sky-400/10 text-sky-100 hover:bg-sky-400/15',
+  },
+  {
+    action: 'reject_after_round_1',
+    label: 'Reject after Round 1',
+    helper: 'Mark the candidate rejected after first-round interviews.',
+    toneClassName: 'border-rose-300/25 bg-rose-400/10 text-rose-100 hover:bg-rose-400/15',
+  },
+  {
+    action: 'advance_to_round_2',
+    label: 'Advance to Round 2',
+    helper: 'Advance the candidate to the final interview round.',
+    toneClassName: 'border-cyan-300/25 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/15',
+  },
+  {
+    action: 'reject_after_round_2',
+    label: 'Reject after Round 2',
+    helper: 'End the process after the second interview round.',
+    toneClassName: 'border-rose-300/25 bg-rose-400/10 text-rose-100 hover:bg-rose-400/15',
+  },
+  {
+    action: 'accept_final',
+    label: 'Accept final',
+    helper: 'Finalize the applicant as accepted.',
+    toneClassName: 'border-emerald-300/25 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/15',
+  },
+];
 
 const ApplicantDetail = ({
   applicant,
@@ -58,6 +114,9 @@ const ApplicantDetail = ({
   availableRounds,
   onSelectRound,
   onOpenResume,
+  viewerRole,
+  canManageDecisions,
+  onOpenDecisionConfirmation,
 }: ApplicantDetailProps) => {
   const sortedEntries = feedbackEntries
     .slice()
@@ -108,6 +167,66 @@ const ApplicantDetail = ({
             comparisonAverage={comparisonAverage}
           />
         </div>
+      </CardContent>
+    </Card>
+
+    <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.96),rgba(8,13,22,0.98))]">
+      <CardHeader className="border-b border-white/8">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/65">Recruiting decision</p>
+            <CardTitle className="mt-2 text-xl text-white">Pipeline controls</CardTitle>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/55">
+              Manual recruiting decisions sit alongside evaluator feedback so PM and Partner reviewers can move applicants through the pipeline without changing the interview rubric flow.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${recruitingStatusToneClasses[applicant.status] ?? recruitingStatusToneClasses.applied}`}>
+              {applicant.status.replace(/_/g, ' ')}
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/65">
+              Viewer: {viewerRole}
+            </span>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4 p-6">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-100/65">Current status</p>
+            <p className="mt-2 text-sm font-medium text-white">{applicant.status.replace(/_/g, ' ')}</p>
+          </div>
+          <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-100/65">Final decision</p>
+            <p className="mt-2 text-sm font-medium text-white">{applicant.final_decision || 'PENDING'}</p>
+          </div>
+          <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-100/65">Last reviewed</p>
+            <p className="mt-2 text-sm font-medium text-white">
+              {applicant.reviewed_at ? new Date(applicant.reviewed_at).toLocaleDateString() : 'Not yet reviewed'}
+            </p>
+          </div>
+        </div>
+
+        {canManageDecisions ? (
+          <div className="grid gap-3 xl:grid-cols-2">
+            {recruitingDecisionOptions.map((option) => (
+              <button
+                key={option.action}
+                type="button"
+                onClick={() => onOpenDecisionConfirmation(option.action, applicant)}
+                className={`rounded-2xl border p-4 text-left transition-all ${option.toneClassName}`}
+              >
+                <p className="text-sm font-semibold uppercase tracking-[0.16em]">{option.label}</p>
+                <p className="mt-2 text-sm leading-6 opacity-80">{option.helper}</p>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-white/55">
+            Decision controls are visible only to PM and Partner reviewers. LC and Consultant users can still review resumes and submit interview feedback from this dashboard.
+          </div>
+        )}
       </CardContent>
     </Card>
 

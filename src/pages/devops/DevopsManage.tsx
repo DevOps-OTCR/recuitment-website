@@ -27,6 +27,12 @@ import DatabaseView from '@/pages/devops/components/admin/DatabaseView';
 import FeedbackForm from '@/pages/devops/components/admin/FeedbackForm';
 import { mockApplicants, mockFeedback } from '@/pages/devops/components/admin/mockData';
 import {
+  applyRecruitingDecision,
+  mergeApplicantWithRecruitingDecision,
+  type RecruitingDecisionAction,
+  type RecruitingRole,
+} from '@/features/recruiting';
+import {
   feedbackMetricFields,
   normalizeRatingBand,
   type ApplicantRecord,
@@ -40,6 +46,7 @@ import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 
 const API_BASE_URL = getOaApiUrl();
 const ADMIN_KEY_STORAGE = 'otcr_devops_admin_secret';
+const MANAGE_VIEWER_ROLE_STORAGE = 'otcr_manage_viewer_role';
 
 const defaultExecRoster = ['Ava Patel', 'Mihika Rao', 'Isaiah Brooks', 'Laksh Shah'];
 const nameKey = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -209,11 +216,24 @@ const getOverallStatus = (applicant: ApplicantRecord, entries: FeedbackEntry[]) 
 
 const buildFallbackApplicants = () =>
   mockApplicants.map((applicant) => ({
-    ...applicant,
+    ...mergeApplicantWithRecruitingDecision(applicant),
     assigned_exec: deriveAssignedExec(applicant),
   }));
 
 const initialFallbackApplicants = buildFallbackApplicants();
+
+const viewerRoles: RecruitingRole[] = ['partner', 'pm', 'lc', 'consultant'];
+
+const recruitingDecisionLabels: Record<RecruitingDecisionAction, string> = {
+  reject_after_application_review: 'reject this applicant after application review',
+  advance_to_round_1: 'advance this applicant to Round 1',
+  reject_after_round_1: 'reject this applicant after Round 1',
+  advance_to_round_2: 'advance this applicant to Round 2',
+  reject_after_round_2: 'reject this applicant after Round 2',
+  accept_final: 'mark this applicant as accepted',
+};
+
+const isDecisionMaker = (role: RecruitingRole) => role === 'partner' || role === 'pm';
 
 const adminViewButtonClass = (active: boolean) =>
   cn(
@@ -247,6 +267,8 @@ const DevopsManage = () => {
   const [selectedDatabaseTable, setSelectedDatabaseTable] = useState<DatabaseTableName>('evaluations');
   const [selectedRoundsByApplicant, setSelectedRoundsByApplicant] = useState<Record<number, InterviewRound>>({});
   const [listRound, setListRound] = useState<InterviewRound>('Round 1');
+  const [viewerRole, setViewerRole] = useState<RecruitingRole>('consultant');
+  const [pendingDecision, setPendingDecision] = useState<{ applicant: ApplicantRecord; action: RecruitingDecisionAction } | null>(null);
 
   const isApplicantsView = location.pathname === '/tech/manage/applicants';
   const isFeedbackView = location.pathname === '/tech/manage/feedback';
@@ -280,7 +302,7 @@ const DevopsManage = () => {
         return;
       }
 
-      setApplications(mappedApplications);
+      setApplications(mappedApplications.map((applicant) => mergeApplicantWithRecruitingDecision(applicant)));
       setFeedbackByApplicant(groupFeedbackEntries(mappedEvaluations));
       setUsingMockData(false);
       setSelectedApplicantId((current) => current ?? mappedApplications[0]?.id ?? null);
@@ -331,6 +353,14 @@ const DevopsManage = () => {
   useEffect(() => {
     const key = sessionStorage.getItem(ADMIN_KEY_STORAGE);
     if (key) setStoredSecret(key);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedViewerRole = window.localStorage.getItem(MANAGE_VIEWER_ROLE_STORAGE);
+    if (storedViewerRole && viewerRoles.includes(storedViewerRole as RecruitingRole)) {
+      setViewerRole(storedViewerRole as RecruitingRole);
+    }
   }, []);
 
   useEffect(() => {
@@ -419,6 +449,13 @@ const DevopsManage = () => {
     navigate('/tech/manage', { replace: true });
   };
 
+  const handleViewerRoleChange = (nextRole: RecruitingRole) => {
+    setViewerRole(nextRole);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(MANAGE_VIEWER_ROLE_STORAGE, nextRole);
+    }
+  };
+
   const handleOpenResume = async (applicant: ApplicantRecord) => {
     if (applicant.resume_url) {
       window.open(applicant.resume_url, '_blank', 'noopener,noreferrer');
@@ -476,7 +513,7 @@ const DevopsManage = () => {
           throw new Error('Could not match this interviewee to a live applicant record. Refresh the dashboard and try again.');
         }
 
-        setApplications(liveApplications);
+        setApplications(liveApplications.map((applicant) => mergeApplicantWithRecruitingDecision(applicant)));
         setFeedbackByApplicant(groupFeedbackEntries(liveEvaluations));
         setUsingMockData(false);
         setError(null);
@@ -545,6 +582,31 @@ const DevopsManage = () => {
       return;
     }
     void fetchAdminWorkspace(storedSecret);
+  };
+
+  const handleConfirmDecision = () => {
+    if (!pendingDecision) return;
+
+    const decisionRecord = applyRecruitingDecision(pendingDecision.applicant, pendingDecision.action);
+
+    setApplications((current) =>
+      current.map((applicant) =>
+        applicant.id === pendingDecision.applicant.id
+          ? mergeApplicantWithRecruitingDecision({
+              ...applicant,
+              status: decisionRecord.status,
+              final_decision: decisionRecord.final_decision,
+              reviewed_at: decisionRecord.reviewed_at,
+            })
+          : applicant
+      )
+    );
+
+    setPendingDecision(null);
+    toast({
+      title: 'Decision saved locally',
+      description: `${pendingDecision.applicant.name} was updated to ${decisionRecord.status.replace(/_/g, ' ')} in local recruiting state.`,
+    });
   };
 
   const voteCountsForApplicant = (applicantId: number) => getVoteCounts(getEntriesForRound(applicantId, listRound));
@@ -678,6 +740,17 @@ const DevopsManage = () => {
                     {cycleOptions.map((cycle) => (
                       <option key={cycle} value={cycle} className="bg-slate-900 text-white">
                         {cycle === 'all' ? 'All cycles' : cycle}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={viewerRole}
+                    onChange={(event) => handleViewerRoleChange(event.target.value as RecruitingRole)}
+                    className="h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none"
+                  >
+                    {viewerRoles.map((role) => (
+                      <option key={role} value={role} className="bg-slate-900 text-white">
+                        {role.toUpperCase()} view
                       </option>
                     ))}
                   </select>
@@ -841,6 +914,9 @@ const DevopsManage = () => {
                             }))
                           }
                           onOpenResume={handleOpenResume}
+                          viewerRole={viewerRole}
+                          canManageDecisions={isDecisionMaker(viewerRole)}
+                          onOpenDecisionConfirmation={(action, applicant) => setPendingDecision({ action, applicant })}
                         />
                       );
                     })()
@@ -910,6 +986,33 @@ const DevopsManage = () => {
           ) : null}
         </div>
       </section>
+      {pendingDecision ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 px-4">
+          <Card className="w-full max-w-lg border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.99),rgba(8,13,22,1))] shadow-[0_28px_80px_rgba(0,0,0,0.42)]">
+            <CardHeader>
+              <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/70">Confirm decision</p>
+              <CardTitle className="text-2xl text-white">Commit recruiting update?</CardTitle>
+              <p className="text-sm leading-6 text-white/60">
+                This updates only the local recruiting store for <span className="font-medium text-white">{pendingDecision.applicant.name}</span>.
+                Existing evaluations, resume access, and the database preview stay unchanged.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/70">
+                You are about to {recruitingDecisionLabels[pendingDecision.action]}.
+              </div>
+              <div className="flex flex-wrap justify-end gap-3">
+                <Button type="button" variant="outline" className="border-white/10 bg-white/5 text-white hover:bg-white/10" onClick={() => setPendingDecision(null)}>
+                  Cancel
+                </Button>
+                <Button type="button" onClick={handleConfirmDecision}>
+                  Confirm decision
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
       <Footer />
     </div>
   );

@@ -14,6 +14,7 @@ import DevopsLanding from "./pages/devops/DevopsLanding";
 import DevopsApply from "./pages/devops/DevopsApply";
 import DevopsAssessment from "./pages/devops/DevopsAssessment";
 import DevopsManage from "./pages/devops/DevopsManage";
+import DevopsStatus from "./pages/devops/DevopsStatus";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
         <Route path="/recruitment-resources" element={<RecruitmentResources />} />
         <Route path="/tech" element={<DevopsLanding />} />
         <Route path="/tech/apply" element={<DevopsApply />} />
+        <Route path="/tech/status" element={<DevopsStatus />} />
         <Route path="/tech/assessment/:token" element={<DevopsAssessment />} />
         <Route path="/tech/manage" element={<DevopsManage />} />
         <Route path="/tech/manage/applicants" element={<DevopsManage />} />
@@ -54,6 +56,7 @@ const App = () => (
         {/* Redirect old /devops paths to /tech */}
         <Route path="/devops" element={<Navigate to="/tech" replace />} />
         <Route path="/devops/apply" element={<Navigate to="/tech/apply" replace />} />
+        <Route path="/devops/status" element={<Navigate to="/tech/status" replace />} />
         <Route path="/devops/assessment/:token" element={<RedirectDevopsAssessment />} />
         <Route path="/devops/manage" element={<Navigate to="/tech/manage" replace />} />
         <Route path="/devops/manage/applicants" element={<Navigate to="/tech/manage/applicants" replace />} />
