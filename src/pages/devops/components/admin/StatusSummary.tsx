@@ -1,6 +1,6 @@
-import { CheckCircle2, Clock3, MessageSquareWarning, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock3, XCircle } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 interface StatusSummaryProps {
@@ -36,37 +36,47 @@ const StatusSummary = ({
     { label: 'Maybe', value: maybeCount, icon: Clock3, tone: 'text-sky-200' },
   ];
 
+  const scorePercent = averageScore === null ? 0 : Math.max(0, Math.min(100, (averageScore / 3) * 100));
+
   return (
-    <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(18,29,47,0.96),rgba(10,16,28,0.98))] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/70">Vote summary</p>
-          <CardTitle className="mt-2 text-xl text-white">Review snapshot</CardTitle>
-        </div>
-        <div className={cn('rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]', statusTone)}>
-          {statusLabel}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-3">
+    <Card className="overflow-hidden border-white/10 bg-[linear-gradient(180deg,rgba(18,29,47,0.96),rgba(10,16,28,0.98))] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 overflow-hidden">
+          <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.03]">
+            <div
+              className="absolute inset-0 rounded-full"
+              style={{
+                background: `conic-gradient(rgba(103,232,249,0.95) ${scorePercent}%, rgba(255,255,255,0.08) ${scorePercent}% 100%)`,
+                mask: 'radial-gradient(farthest-side, transparent calc(100% - 5px), white 0)',
+                WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 5px), white 0)',
+              }}
+            />
+            <span className="text-sm font-semibold text-white">{`${Math.round(scorePercent)}%`}</span>
+          </div>
+
+          <div className="min-w-[112px] shrink-0">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Composite</p>
+            <p className="mt-1 text-2xl font-semibold text-cyan-300">
+              {averageScore === null ? '--' : averageScore.toFixed(1)}
+              <span className="ml-1 text-lg font-medium text-white/35">/3.0</span>
+            </p>
+          </div>
+
           {stats.map(({ label, value, icon: Icon, tone }) => (
-            <div key={label} className="rounded-2xl border border-white/8 bg-white/5 p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs uppercase tracking-[0.2em] text-white/55">{label}</span>
-                <Icon className={cn('h-4 w-4', tone)} />
+            <div key={label} className="min-w-0 shrink rounded-2xl border border-white/8 bg-white/5 px-3 py-2.5">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-white/45">{label}</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <Icon className={cn('h-4 w-4 shrink-0', tone)} />
+                  <p className="text-xl font-semibold leading-none text-white">{value}</p>
+                </div>
               </div>
-              <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
             </div>
           ))}
-        </div>
-        <div className="rounded-2xl border border-white/8 bg-black/20 p-4">
-          <div className="flex items-center gap-2 text-sm text-white/70">
-            <MessageSquareWarning className="h-4 w-4 text-cyan-200" />
-            Composite rubric score
+
+          <div className={cn('shrink-0 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]', statusTone)}>
+            {statusLabel}
           </div>
-          <p className="mt-2 text-2xl font-semibold text-white">
-            {averageScore === null ? 'No scores yet' : `${averageScore.toFixed(1)} / 3`}
-          </p>
         </div>
       </CardContent>
     </Card>

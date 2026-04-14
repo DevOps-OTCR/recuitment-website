@@ -73,25 +73,7 @@ const ApplicantDetail = ({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/65">Applicant detail</p>
-            <div className="mt-2 flex flex-col gap-3 xl:flex-row xl:items-center xl:gap-4">
-              <CardTitle className="text-3xl text-white">{applicant.name}</CardTitle>
-              <div className="inline-flex max-w-fit rounded-xl border border-white/10 bg-slate-950/35 p-1">
-                {availableRounds.map((round) => (
-                  <button
-                    key={round}
-                    type="button"
-                    onClick={() => onSelectRound(round)}
-                    className={
-                      round === selectedRound
-                        ? 'rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-950'
-                        : 'rounded-xl px-4 py-2 text-sm font-medium text-white/60 transition-colors hover:text-white'
-                    }
-                  >
-                    {round}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <CardTitle className="mt-2 text-3xl text-white">{applicant.name}</CardTitle>
             <p className="mt-2 max-w-2xl text-sm text-white/60">{applicant.interest ?? 'No written interest statement on file.'}</p>
           </div>
           <div className="grid gap-2 text-sm text-white/65">
@@ -101,47 +83,52 @@ const ApplicantDetail = ({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-4 p-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-white/45">Resume</p>
-              <h3 className="mt-2 text-lg font-semibold text-white">{applicant.resume_filename ?? 'Resume placeholder'}</h3>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="border-white/10 bg-white/5 text-white hover:bg-white/10"
-              onClick={() => onOpenResume(applicant)}
-            >
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Open resume
-            </Button>
-          </div>
-          <div className="mt-5 rounded-[20px] border border-dashed border-white/10 bg-black/20 p-6">
-            <div className="flex items-center gap-3 text-white/65">
-              <FileText className="h-5 w-5 text-cyan-200" />
-              <span>
-                {applicant.resume_filename
-                  ? 'Resume is available for review from the admin panel.'
-                  : 'No uploaded resume found.'}
-              </span>
-            </div>
-            {applicant.notes && (
-              <p className="mt-4 text-sm leading-6 text-white/55">{applicant.notes}</p>
-            )}
-          </div>
+      <CardContent className="grid gap-4 p-6 lg:grid-cols-[auto_minmax(0,1fr)]">
+        <div className="flex items-center">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-14 border-white/10 bg-white/5 px-6 text-white hover:bg-white/10"
+            onClick={() => onOpenResume(applicant)}
+          >
+            <ExternalLink className="mr-2 h-4 w-4" />
+            View resume
+          </Button>
         </div>
 
-        <StatusSummary
-          yesCount={yesCount}
-          noCount={noCount}
-          maybeCount={maybeCount}
-          statusLabel={overallStatus}
-          averageScore={averageScore}
-        />
+        <div>
+          <StatusSummary
+            yesCount={yesCount}
+            noCount={noCount}
+            maybeCount={maybeCount}
+            statusLabel={overallStatus}
+            averageScore={averageScore}
+          />
+        </div>
       </CardContent>
     </Card>
+
+    <div>
+      <div className="inline-flex rounded-2xl border border-white/10 bg-white/[0.03] p-1">
+        {availableRounds.map((round) => (
+          <button
+            key={round}
+            type="button"
+            onClick={() => onSelectRound(round)}
+            className={
+              round === selectedRound
+                ? 'rounded-xl bg-cyan-300 px-8 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-slate-950'
+                : 'rounded-xl px-8 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-white/60 transition-colors hover:text-white'
+            }
+          >
+            {round}
+          </button>
+        ))}
+      </div>
+      <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200/70">
+        Detailed evaluation feedback
+      </p>
+    </div>
 
     <div>
       <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.96),rgba(8,13,22,0.98))]">
