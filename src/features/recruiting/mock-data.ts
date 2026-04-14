@@ -222,6 +222,8 @@ export const assignments: Assignment[] = [
     interviewerId: 'user-pm-sana',
     assignedByUserId: 'user-partner-maya',
     assignedAt: '2026-04-04T19:35:00.000Z',
+    room: 'Innovation 2A',
+    scheduledTime: '2026-04-09T18:30',
   },
   {
     id: 'assign-daniel-r1-secondary',
@@ -231,6 +233,8 @@ export const assignments: Assignment[] = [
     interviewerId: 'user-consultant-lila',
     assignedByUserId: 'user-partner-maya',
     assignedAt: '2026-04-04T19:36:00.000Z',
+    room: 'Innovation 2A',
+    scheduledTime: '2026-04-09T18:30',
   },
   {
     id: 'assign-emma-r1-primary',
@@ -240,6 +244,8 @@ export const assignments: Assignment[] = [
     interviewerId: 'user-partner-jonah',
     assignedByUserId: 'user-pm-ethan',
     assignedAt: '2026-04-05T15:55:00.000Z',
+    room: 'North Interview Pod',
+    scheduledTime: '2026-04-10T17:00',
   },
   {
     id: 'assign-emma-r1-secondary',
@@ -249,6 +255,8 @@ export const assignments: Assignment[] = [
     interviewerId: 'user-lc-riya',
     assignedByUserId: 'user-pm-ethan',
     assignedAt: '2026-04-05T15:56:00.000Z',
+    room: 'North Interview Pod',
+    scheduledTime: '2026-04-10T17:00',
   },
   {
     id: 'assign-farah-r2-primary',
@@ -258,6 +266,8 @@ export const assignments: Assignment[] = [
     interviewerId: 'user-partner-maya',
     assignedByUserId: 'user-partner-jonah',
     assignedAt: '2026-04-08T15:10:00.000Z',
+    room: 'Exec Room',
+    scheduledTime: '2026-04-12T16:00',
   },
   {
     id: 'assign-farah-r2-secondary',
@@ -267,6 +277,8 @@ export const assignments: Assignment[] = [
     interviewerId: 'user-consultant-noah',
     assignedByUserId: 'user-partner-jonah',
     assignedAt: '2026-04-08T15:11:00.000Z',
+    room: 'Exec Room',
+    scheduledTime: '2026-04-12T16:00',
   },
   {
     id: 'assign-gabriel-r2-primary',
@@ -276,6 +288,8 @@ export const assignments: Assignment[] = [
     interviewerId: 'user-pm-ethan',
     assignedByUserId: 'user-partner-maya',
     assignedAt: '2026-04-09T18:45:00.000Z',
+    room: 'War Room B',
+    scheduledTime: '2026-04-13T19:15',
   },
   {
     id: 'assign-gabriel-r2-secondary',
@@ -285,6 +299,8 @@ export const assignments: Assignment[] = [
     interviewerId: 'user-lc-mateo',
     assignedByUserId: 'user-partner-maya',
     assignedAt: '2026-04-09T18:46:00.000Z',
+    room: 'War Room B',
+    scheduledTime: '2026-04-13T19:15',
   },
 ];
 

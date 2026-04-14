@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  CalendarPlus2,
   ClipboardList,
   Database,
   FilePenLine,
@@ -29,6 +30,7 @@ import { mockApplicants, mockFeedback } from '@/pages/devops/components/admin/mo
 import {
   applyRecruitingDecision,
   mergeApplicantWithRecruitingDecision,
+  useRecruitingStore,
   type RecruitingDecisionAction,
   type RecruitingRole,
 } from '@/features/recruiting';
@@ -221,6 +223,11 @@ const buildFallbackApplicants = () =>
   }));
 
 const initialFallbackApplicants = buildFallbackApplicants();
+const syncApplicantsWithRecruitingState = (records: ApplicantRecord[]) =>
+  records.map((applicant) => ({
+    ...mergeApplicantWithRecruitingDecision(applicant),
+    assigned_exec: deriveAssignedExec(applicant),
+  }));
 
 const viewerRoles: RecruitingRole[] = ['partner', 'pm', 'lc', 'consultant'];
 
@@ -248,6 +255,7 @@ const DevopsManage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const recruitingApplicants = useRecruitingStore((state) => state.applicants);
 
   const [adminSecret, setAdminSecret] = useState('');
   const [storedSecret, setStoredSecret] = useState<string | null>(null);
@@ -302,7 +310,7 @@ const DevopsManage = () => {
         return;
       }
 
-      setApplications(mappedApplications.map((applicant) => mergeApplicantWithRecruitingDecision(applicant)));
+      setApplications(syncApplicantsWithRecruitingState(mappedApplications));
       setFeedbackByApplicant(groupFeedbackEntries(mappedEvaluations));
       setUsingMockData(false);
       setSelectedApplicantId((current) => current ?? mappedApplications[0]?.id ?? null);
@@ -372,6 +380,10 @@ const DevopsManage = () => {
     if (!storedSecret || !isDatabaseView) return;
     void fetchDatabasePreview(storedSecret, selectedDatabaseTable);
   }, [storedSecret, isDatabaseView, selectedDatabaseTable]);
+
+  useEffect(() => {
+    setApplications((current) => syncApplicantsWithRecruitingState(current));
+  }, [recruitingApplicants]);
 
   const cycleOptions = useMemo(() => {
     const cycles = Array.from(new Set(applications.map((applicant) => applicant.cycle_name).filter(Boolean)));
@@ -513,7 +525,7 @@ const DevopsManage = () => {
           throw new Error('Could not match this interviewee to a live applicant record. Refresh the dashboard and try again.');
         }
 
-        setApplications(liveApplications.map((applicant) => mergeApplicantWithRecruitingDecision(applicant)));
+        setApplications(syncApplicantsWithRecruitingState(liveApplications));
         setFeedbackByApplicant(groupFeedbackEntries(liveEvaluations));
         setUsingMockData(false);
         setError(null);
@@ -589,28 +601,17 @@ const DevopsManage = () => {
 
     const decisionRecord = applyRecruitingDecision(pendingDecision.applicant, pendingDecision.action);
 
-    setApplications((current) =>
-      current.map((applicant) =>
-        applicant.id === pendingDecision.applicant.id
-          ? mergeApplicantWithRecruitingDecision({
-              ...applicant,
-              status: decisionRecord.status,
-              final_decision: decisionRecord.final_decision,
-              reviewed_at: decisionRecord.reviewed_at,
-            })
-          : applicant
-      )
-    );
+    setApplications((current) => syncApplicantsWithRecruitingState(current));
 
     setPendingDecision(null);
     toast({
-      title: 'Decision saved locally',
-      description: `${pendingDecision.applicant.name} was updated to ${decisionRecord.status.replace(/_/g, ' ')} in local recruiting state.`,
+      title: 'Decision saved',
+      description: `${pendingDecision.applicant.name} was updated to ${decisionRecord.status.replace(/_/g, ' ')} in shared recruiting state.`,
     });
   };
 
   const voteCountsForApplicant = (applicantId: number) => getVoteCounts(getEntriesForRound(applicantId, listRound));
-  const statusForApplicant = (applicant: ApplicantRecord) => getOverallStatus(applicant, getEntriesForRound(applicant.id, listRound));
+  const statusForApplicant = (applicant: ApplicantRecord) => applicant.status.replace(/_/g, ' ');
   const scoreForApplicant = (applicantId: number) => getAverageScore(getEntriesForRound(applicantId, listRound));
   const overallApplicantAverageScore = useMemo(() => {
     const scores = filteredApplicants
@@ -678,6 +679,12 @@ const DevopsManage = () => {
               <Link to="/tech/manage">
                 <LayoutGrid className="h-4 w-4" />
                 Dashboard
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className={adminViewButtonClass(false)}>
+              <Link to="/tech/assignments">
+                <CalendarPlus2 className="h-4 w-4" />
+                Assignments
               </Link>
             </Button>
             <Button asChild variant="outline" className={adminViewButtonClass(isApplicantsView)}>
@@ -787,7 +794,7 @@ const DevopsManage = () => {
 
           {!isApplicantsView && !isFeedbackView && !isDatabaseView ? (
             <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-              <div className="grid gap-6 md:grid-cols-3">
+              <div className="grid gap-6 md:grid-cols-2 2xl:grid-cols-4">
                 <Link
                   to="/tech/manage/applicants"
                   className="group rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.98),rgba(8,13,22,0.99))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.34)] transition-all hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-[linear-gradient(180deg,rgba(19,34,55,0.98),rgba(8,13,22,0.99))]"
@@ -814,6 +821,20 @@ const DevopsManage = () => {
                     Submit interview feedback directly into the backend `evaluations` table using the exact applicant name.
                   </p>
                   <p className="mt-6 text-sm font-medium text-cyan-100">Open feedback form</p>
+                </Link>
+
+                <Link
+                  to="/tech/assignments"
+                  className="group rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.98),rgba(8,13,22,0.99))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.34)] transition-all hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-[linear-gradient(180deg,rgba(19,34,55,0.98),rgba(8,13,22,0.99))]"
+                >
+                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-100">
+                    <CalendarPlus2 className="h-6 w-6" />
+                  </span>
+                  <h2 className="mt-6 text-2xl font-semibold text-white">Assignments</h2>
+                  <p className="mt-3 text-sm leading-6 text-white/55">
+                    Manually assign primary and secondary interviewers for active rounds using the shared recruiting workflow state.
+                  </p>
+                  <p className="mt-6 text-sm font-medium text-cyan-100">Open assignment workspace</p>
                 </Link>
 
                 <Link
@@ -993,7 +1014,7 @@ const DevopsManage = () => {
               <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/70">Confirm decision</p>
               <CardTitle className="text-2xl text-white">Commit recruiting update?</CardTitle>
               <p className="text-sm leading-6 text-white/60">
-                This updates only the local recruiting store for <span className="font-medium text-white">{pendingDecision.applicant.name}</span>.
+                This writes the applicant status into the shared recruiting foundation for <span className="font-medium text-white">{pendingDecision.applicant.name}</span>.
                 Existing evaluations, resume access, and the database preview stay unchanged.
               </p>
             </CardHeader>

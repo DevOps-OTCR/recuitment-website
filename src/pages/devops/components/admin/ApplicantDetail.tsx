@@ -101,6 +101,14 @@ const recruitingDecisionOptions: Array<{
   },
 ];
 
+const allowedDecisionActionsByStatus: Record<string, RecruitingDecisionAction[]> = {
+  applied: ['reject_after_application_review', 'advance_to_round_1'],
+  round_1: ['reject_after_round_1', 'advance_to_round_2'],
+  round_2: ['reject_after_round_2', 'accept_final'],
+  accepted: [],
+  rejected: [],
+};
+
 const ApplicantDetail = ({
   applicant,
   feedbackEntries,
@@ -126,6 +134,9 @@ const ApplicantDetail = ({
       if (roleDifference !== 0) return roleDifference;
       return new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime();
     });
+  const availableDecisionOptions = recruitingDecisionOptions.filter((option) =>
+    (allowedDecisionActionsByStatus[applicant.status] ?? []).includes(option.action)
+  );
 
   return (
   <div className="space-y-5">
@@ -209,8 +220,9 @@ const ApplicantDetail = ({
         </div>
 
         {canManageDecisions ? (
+          availableDecisionOptions.length > 0 ? (
           <div className="grid gap-3 xl:grid-cols-2">
-            {recruitingDecisionOptions.map((option) => (
+            {availableDecisionOptions.map((option) => (
               <button
                 key={option.action}
                 type="button"
@@ -222,6 +234,11 @@ const ApplicantDetail = ({
               </button>
             ))}
           </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-white/55">
+              This applicant is already in a final recruiting state. PM and Partner reviewers can still inspect the record, but there is no next-stage pass or decline action to commit here.
+            </div>
+          )
         ) : (
           <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-white/55">
             Decision controls are visible only to PM and Partner reviewers. LC and Consultant users can still review resumes and submit interview feedback from this dashboard.

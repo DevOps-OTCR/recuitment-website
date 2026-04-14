@@ -76,6 +76,8 @@ export interface Assignment {
   interviewerId: string;
   assignedByUserId: string;
   assignedAt: string;
+  room: string | null;
+  scheduledTime: string | null;
 }
 
 export interface RecruitingUser {

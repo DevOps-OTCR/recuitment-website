@@ -1,7 +1,15 @@
 import { useSyncExternalStore } from 'react';
 
 import { recruitingMockState } from './mock-data';
-import { ApplicationStatus, InterviewRound, type Applicant, type ApplicantPortalSnapshot, type Assignment, type Evaluation, type RecruitingState } from './types';
+import {
+  ApplicationStatus,
+  InterviewRound,
+  type Applicant,
+  type ApplicantPortalSnapshot,
+  type Assignment,
+  type Evaluation,
+  type RecruitingState,
+} from './types';
 import { findApplicantByEmail, getApplicationStatusLabel } from './utils';
 
 type RecruitingListener = () => void;
@@ -89,6 +97,39 @@ class RecruitingStore {
     this.emit();
   };
 
+  setApplicantDecision = (applicantId: string, status: ApplicationStatus, notes: string) => {
+    const updatedAt = new Date().toISOString();
+
+    this.state = {
+      ...this.state,
+      applicants: this.state.applicants.map((applicant) =>
+        applicant.id === applicantId
+          ? {
+              ...applicant,
+              status,
+              currentRound:
+                status === ApplicationStatus.Round1
+                  ? InterviewRound.Round1
+                  : status === ApplicationStatus.Round2
+                    ? InterviewRound.Round2
+                    : null,
+              finalDecision:
+                status === ApplicationStatus.Accepted
+                  ? 'accepted'
+                  : status === ApplicationStatus.Rejected
+                    ? 'rejected'
+                    : 'pending',
+              notes,
+              updatedAt,
+            }
+          : applicant
+      ),
+    };
+
+    this.emit();
+    return updatedAt;
+  };
+
   upsertApplicant = (nextApplicant: Applicant) => {
     const exists = this.state.applicants.some((applicant) => applicant.id === nextApplicant.id);
     this.state = {
@@ -100,18 +141,32 @@ class RecruitingStore {
     this.emit();
   };
 
-  addAssignment = (assignment: Assignment) => {
+  upsertAssignment = (assignment: Assignment) => {
+    const nextAssignments = this.state.assignments.filter(
+      (entry) =>
+        !(
+          entry.applicantId === assignment.applicantId &&
+          entry.round === assignment.round &&
+          entry.role === assignment.role
+        )
+    );
+
+    const applicantAssignments = [...nextAssignments, assignment].filter(
+      (entry) => entry.applicantId === assignment.applicantId && entry.round === assignment.round
+    );
+
+    const primaryAssignment = applicantAssignments.find((entry) => entry.role === 'primary') ?? null;
+    const secondaryAssignment = applicantAssignments.find((entry) => entry.role === 'secondary') ?? null;
+
     this.state = {
       ...this.state,
-      assignments: [...this.state.assignments, { ...assignment }],
+      assignments: [...nextAssignments, { ...assignment }],
       applicants: this.state.applicants.map((applicant) =>
         applicant.id === assignment.applicantId
           ? {
               ...applicant,
-              assignedPrimaryInterviewerId:
-                assignment.role === 'primary' ? assignment.interviewerId : applicant.assignedPrimaryInterviewerId,
-              assignedSecondaryInterviewerId:
-                assignment.role === 'secondary' ? assignment.interviewerId : applicant.assignedSecondaryInterviewerId,
+              assignedPrimaryInterviewerId: primaryAssignment?.interviewerId ?? null,
+              assignedSecondaryInterviewerId: secondaryAssignment?.interviewerId ?? null,
               updatedAt: new Date().toISOString(),
             }
           : applicant
@@ -124,6 +179,31 @@ class RecruitingStore {
     this.state = {
       ...this.state,
       evaluations: [...this.state.evaluations, { ...evaluation, rubric: { ...evaluation.rubric }, strengths: [...evaluation.strengths], concerns: [...evaluation.concerns] }],
+    };
+    this.emit();
+  };
+
+  upsertEvaluation = (evaluation: Evaluation) => {
+    const nextEvaluation = {
+      ...evaluation,
+      rubric: { ...evaluation.rubric },
+      strengths: [...evaluation.strengths],
+      concerns: [...evaluation.concerns],
+    };
+
+    const existingIndex = this.state.evaluations.findIndex(
+      (entry) =>
+        entry.applicantId === evaluation.applicantId &&
+        entry.interviewerId === evaluation.interviewerId &&
+        entry.round === evaluation.round
+    );
+
+    this.state = {
+      ...this.state,
+      evaluations:
+        existingIndex === -1
+          ? [...this.state.evaluations, nextEvaluation]
+          : this.state.evaluations.map((entry, index) => (index === existingIndex ? nextEvaluation : entry)),
     };
     this.emit();
   };

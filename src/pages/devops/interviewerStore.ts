@@ -1,11 +1,9 @@
-import { applicants as seedApplicants, assignments as seedAssignments, evaluations as seedEvaluations, recruitingUsers } from '@/features/recruiting/mock-data';
-import { mergeApplicantWithRecruitingDecision, recruitingStore } from '@/features/recruiting';
+import { applicants as seedApplicants, recruitingUsers } from '@/features/recruiting/mock-data';
+import { recruitingStore } from '@/features/recruiting';
 import { ApplicationStatus, InterviewRound as RecruitingInterviewRound, Role, type Applicant, type Assignment, type Evaluation, type RecruitingUser } from '@/features/recruiting/types';
 import { mockApplicants } from '@/pages/devops/components/admin/mockData';
 import type { ApplicantRecord, FeedbackEntry, InterviewRound, InterviewerRole } from '@/pages/devops/components/admin/types';
 
-const INTERVIEW_ASSIGNMENTS_KEY = 'otcr-tech-interview-assignments';
-const INTERVIEW_EVALUATIONS_KEY = 'otcr-tech-interview-evaluations';
 const INTERVIEWER_USER_KEY = 'otcr-tech-current-interviewer-id';
 
 const normalizeRole = (role: Role): RecruitingUser['role'] => role;
@@ -55,46 +53,6 @@ const persistedResumeLookup = new Map(
     .filter((applicant) => applicant.resume_url)
     .map((applicant) => [applicant.email.trim().toLowerCase(), applicant.resume_url as string])
 );
-
-const safeParse = <T,>(value: string | null, fallback: T): T => {
-  if (!value) return fallback;
-
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
-  }
-};
-
-const getSeedAssignments = () => seedAssignments.slice();
-const getSeedEvaluations = () => seedEvaluations.slice();
-
-export const getStoredAssignments = (): Assignment[] => {
-  if (typeof window === 'undefined') return getSeedAssignments();
-
-  const stored = safeParse<Assignment[] | null>(window.localStorage.getItem(INTERVIEW_ASSIGNMENTS_KEY), null);
-  if (stored && Array.isArray(stored) && stored.length > 0) return stored;
-
-  const seeded = getSeedAssignments();
-  window.localStorage.setItem(INTERVIEW_ASSIGNMENTS_KEY, JSON.stringify(seeded));
-  return seeded;
-};
-
-export const getStoredEvaluations = (): Evaluation[] => {
-  if (typeof window === 'undefined') return getSeedEvaluations();
-
-  const stored = safeParse<Evaluation[] | null>(window.localStorage.getItem(INTERVIEW_EVALUATIONS_KEY), null);
-  if (stored && Array.isArray(stored) && stored.length > 0) return stored;
-
-  const seeded = getSeedEvaluations();
-  window.localStorage.setItem(INTERVIEW_EVALUATIONS_KEY, JSON.stringify(seeded));
-  return seeded;
-};
-
-const persistEvaluations = (evaluations: Evaluation[]) => {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(INTERVIEW_EVALUATIONS_KEY, JSON.stringify(evaluations));
-};
 
 const toApplicantRecord = (applicant: Applicant): ApplicantRecord => ({
   id: applicant.id.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0),
@@ -189,7 +147,7 @@ export const setCurrentInterviewerId = (userId: string) => {
 export const getInterviewerWorkspaceSnapshot = (currentUserId: string) => {
   const users = getInterviewerUsers();
   const currentUser = users.find((user) => user.id === currentUserId) ?? users[0] ?? null;
-  const assignments = getStoredAssignments();
+  const { assignments, evaluations } = recruitingStore.getSnapshot();
   const applicantRecords = getAllApplicantRecords();
   const assignedApplicantIds = new Set(assignments.filter((assignment) => assignment.interviewerId === currentUser?.id).map((assignment) => assignment.applicantId));
   const assignedApplicants = applicantRecords.filter((applicant) => {
@@ -197,7 +155,7 @@ export const getInterviewerWorkspaceSnapshot = (currentUserId: string) => {
     return stringId ? assignedApplicantIds.has(stringId) : false;
   });
 
-  const feedbackByApplicant = groupFeedbackEntries(getStoredEvaluations().map(toFeedbackEntry));
+  const feedbackByApplicant = groupFeedbackEntries(evaluations.map(toFeedbackEntry));
 
   return {
     users,
@@ -217,7 +175,8 @@ export const submitInterviewerFeedback = (
     throw new Error('This applicant is not backed by an interview assignment.');
   }
 
-  const matchingAssignment = getStoredAssignments().find(
+  const { assignments } = recruitingStore.getSnapshot();
+  const matchingAssignment = assignments.find(
     (assignment) =>
       assignment.applicantId === applicantId &&
       assignment.interviewerId === user.id &&
@@ -248,17 +207,7 @@ export const submitInterviewerFeedback = (
     submittedAt: new Date().toISOString(),
   };
 
-  const remainingEvaluations = getStoredEvaluations().filter(
-    (evaluation) =>
-      !(
-        evaluation.applicantId === applicantId &&
-        evaluation.interviewerId === user.id &&
-        evaluation.round === nextEvaluation.round
-      )
-  );
-
-  const nextEvaluations = [nextEvaluation, ...remainingEvaluations];
-  persistEvaluations(nextEvaluations);
+  recruitingStore.upsertEvaluation(nextEvaluation);
 
   return toFeedbackEntry(nextEvaluation);
 };

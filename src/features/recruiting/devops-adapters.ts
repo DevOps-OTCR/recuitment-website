@@ -17,6 +17,17 @@ type DecisionSnapshot = {
   decisionLabel: string;
 };
 
+const upsertDecisionNote = (notes: string | null | undefined, decisionLabel: string) => {
+  const cleaned = (notes ?? '')
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line) => !/^Decision:/i.test(line.trim()))
+    .join('\n')
+    .trim();
+
+  return cleaned ? `${cleaned}\nDecision: ${decisionLabel}` : `Decision: ${decisionLabel}`;
+};
+
 const normalizeDecision = (action: RecruitingDecisionAction): DecisionSnapshot => {
   switch (action) {
     case 'reject_after_application_review':
@@ -63,9 +74,7 @@ export const mergeApplicantWithRecruitingDecision = (applicant: ApplicantRecord)
     status: sharedApplicant.status,
     final_decision: sharedApplicant.finalDecision.toUpperCase(),
     reviewed_at: sharedApplicant.updatedAt,
-    notes: applicant.notes
-      ? `${applicant.notes}\nDecision: ${decisionLabel}`
-      : `Decision: ${decisionLabel}`,
+    notes: upsertDecisionNote(applicant.notes, decisionLabel),
   };
 };
 
@@ -76,17 +85,11 @@ export const applyRecruitingDecision = (applicant: ApplicantRecord, action: Recr
   }
 
   const nextDecision = normalizeDecision(action);
-  const reviewedAt = new Date().toISOString();
-
-  recruitingStore.upsertApplicant({
-    ...sharedApplicant,
-    status: nextDecision.status,
-    finalDecision: nextDecision.finalDecision,
-    notes: sharedApplicant.notes
-      ? `${sharedApplicant.notes}\nDecision: ${nextDecision.decisionLabel}`
-      : `Decision: ${nextDecision.decisionLabel}`,
-    updatedAt: reviewedAt,
-  });
+  const reviewedAt = recruitingStore.setApplicantDecision(
+    sharedApplicant.id,
+    nextDecision.status,
+    upsertDecisionNote(sharedApplicant.notes, nextDecision.decisionLabel)
+  );
 
   return {
     applicantId: applicant.id,
