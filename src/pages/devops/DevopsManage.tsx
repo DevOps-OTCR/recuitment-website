@@ -3,7 +3,6 @@ import {
   CalendarPlus2,
   ClipboardList,
   Database,
-  FilePenLine,
   LayoutGrid,
   Loader2,
   LogOut,
@@ -20,12 +19,10 @@ import { useToast } from '@/hooks/use-toast';
 import ApplicantDetail from '@/pages/devops/components/admin/ApplicantDetail';
 import ConsultantList from '@/pages/devops/components/admin/ConsultantList';
 import DatabaseView from '@/pages/devops/components/admin/DatabaseView';
-import FeedbackForm from '@/pages/devops/components/admin/FeedbackForm';
 import {
   applyRecruitingDecision,
   Role,
   InterviewRound as RecruitingInterviewRound,
-  recruitingStore,
   useRecruitingStore,
   type Applicant as RecruitingApplicant,
   type Evaluation as RecruitingEvaluation,
@@ -48,7 +45,6 @@ import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 const MANAGE_VIEWER_ROLE_STORAGE = 'otcr_manage_viewer_role';
 
 const defaultExecRoster = ['Ava Patel', 'Mihika Rao', 'Isaiah Brooks', 'Laksh Shah'];
-const nameKey = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
 
 const deriveAssignedExec = (applicant: ApplicantRecord) =>
   applicant.assigned_exec ??
@@ -290,15 +286,12 @@ const DevopsManage = () => {
   const [pendingDecision, setPendingDecision] = useState<{ applicant: ApplicantRecord; action: RecruitingDecisionAction } | null>(null);
 
   const isApplicantsView = location.pathname === '/tech/manage/applicants';
-  const isFeedbackView = location.pathname === '/tech/manage/feedback';
   const isDatabaseView = location.pathname === '/tech/manage/database';
   const requestedApplicantIdParam = searchParams.get('applicantId');
-  const requestedRoundParam = searchParams.get('round');
   const requestedApplicantId =
     requestedApplicantIdParam && Number.isFinite(Number(requestedApplicantIdParam))
       ? Number(requestedApplicantIdParam)
       : null;
-  const requestedFeedbackRound: InterviewRound = requestedRoundParam === 'Round 2' ? 'Round 2' : 'Round 1';
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -402,9 +395,6 @@ const DevopsManage = () => {
   }, [applications, requestedApplicantId]);
 
   const selectedApplicant = filteredApplicants.find((applicant) => applicant.id === selectedApplicantId) ?? null;
-  const requestedFeedbackApplicant =
-    requestedApplicantId !== null ? applications.find((applicant) => applicant.id === requestedApplicantId) ?? null : null;
-
   const getAvailableRounds = (_applicantId: number): InterviewRound[] => interviewRounds;
 
   const getSelectedRound = (applicantId: number): InterviewRound => selectedRoundsByApplicant[applicantId] ?? 'Round 1';
@@ -455,68 +445,6 @@ const DevopsManage = () => {
     });
   };
 
-  const handleOpenFeedbackForm = (applicant: ApplicantRecord, round: InterviewRound = 'Round 1') => {
-    navigate(`/tech/manage/feedback?applicantId=${applicant.id}&round=${encodeURIComponent(round)}`);
-  };
-
-  const handleSubmitFeedback = async (entry: Omit<FeedbackEntry, 'id' | 'submittedAt'>) => {
-    setSubmittingFeedback(true);
-
-    try {
-      const matchedApplicant =
-        recruitingState.applicants.find((applicant) => nameKey(applicant.name) === nameKey(entry.intervieweeName)) ??
-        recruitingState.applicants.find((applicant) => numericApplicantId(applicant.id) === entry.applicantId) ??
-        null;
-
-      if (!matchedApplicant) {
-        throw new Error('Could not match this interviewee to the shared recruiting state.');
-      }
-
-      const interviewer =
-        recruitingState.users.find((user) => nameKey(user.name) === nameKey(entry.interviewerName)) ??
-        recruitingState.users.find((user) => user.email.trim().toLowerCase() === entry.interviewerName.trim().toLowerCase()) ??
-        recruitingState.users.find((user) => roleToInterviewerRole(user.role) === entry.interviewerRole) ??
-        null;
-
-      if (!interviewer) {
-        throw new Error('Could not match this interviewer to the shared recruiting state.');
-      }
-
-      recruitingStore.upsertEvaluation({
-        id: `eval-${matchedApplicant.id}-${interviewer.id}-${entry.round === 'Round 2' ? 'round_2' : 'round_1'}`,
-        applicantId: matchedApplicant.id,
-        interviewerId: interviewer.id,
-        interviewerRole: interviewer.role,
-        round: entry.round === 'Round 2' ? RecruitingInterviewRound.Round2 : RecruitingInterviewRound.Round1,
-        recommendation: feedbackToRecommendation(entry.recommendation),
-        rubric: {
-          communication: Math.min(5, entry.behavioralPerformanceScore + 2),
-          structure: Math.min(5, entry.quantitativeStructureScore + 2),
-          problemSolving: Math.min(5, entry.casePerformanceScore + 2),
-          motivation: Math.min(5, entry.interestInOtcrScore + 2),
-          teamwork: Math.min(5, entry.leadershipScore + 2),
-        },
-        summary: entry.overallPerformanceOverview,
-        strengths: [entry.overallPerformanceOverview],
-        concerns: [entry.finalRoundSummary],
-        submittedAt: new Date().toISOString(),
-      });
-
-      toast({
-        title: 'Feedback saved',
-        description: `${entry.intervieweeName} now has a persisted local review in the shared recruiting state.`,
-      });
-    } catch (submitError: unknown) {
-      toast({
-        title: 'Could not save feedback',
-        description: submitError instanceof Error ? submitError.message : 'The shared recruiting state rejected the evaluation payload.',
-        variant: 'destructive',
-      });
-    } finally {
-      setSubmittingFeedback(false);
-    }
-  };
-
   const handleRefresh = () => {
     setApplications(sharedWorkspace.applications);
     setFeedbackByApplicant(groupFeedbackEntries(sharedWorkspace.evaluations));
@@ -553,7 +481,7 @@ const DevopsManage = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_26%),radial-gradient(circle_at_80%_20%,rgba(34,197,94,0.10),transparent_18%),linear-gradient(180deg,rgba(3,8,17,0.92),rgba(3,8,17,1))]" />
         <div className="relative mx-auto max-w-7xl">
           <div className="mb-5 flex flex-wrap items-center gap-3">
-            <Button asChild variant="outline" className={adminViewButtonClass(!isApplicantsView && !isFeedbackView && !isDatabaseView)}>
+            <Button asChild variant="outline" className={adminViewButtonClass(!isApplicantsView && !isDatabaseView)}>
               <Link to="/tech/manage">
                 <LayoutGrid className="h-4 w-4" />
                 Dashboard
@@ -571,12 +499,6 @@ const DevopsManage = () => {
                 Applicants
               </Link>
             </Button>
-            <Button asChild variant="outline" className={adminViewButtonClass(isFeedbackView)}>
-              <Link to="/tech/manage/feedback">
-                <FilePenLine className="h-4 w-4" />
-                Feedback Form
-              </Link>
-            </Button>
             <Button asChild variant="outline" className={adminViewButtonClass(isDatabaseView)}>
               <Link to="/tech/manage/database">
                 <Database className="h-4 w-4" />
@@ -591,23 +513,19 @@ const DevopsManage = () => {
               <div className="mt-3 flex items-center gap-4">
                 <img src={otcrTechLogo} alt="OTCR Technologies" className="h-10 w-auto" />
                 <h1 className="text-3xl font-semibold text-white">
-                  {!isApplicantsView && !isFeedbackView && !isDatabaseView
+                  {!isApplicantsView && !isDatabaseView
                     ? 'Consultant review dashboard'
                     : isApplicantsView
                       ? 'Applicants'
-                      : isFeedbackView
-                        ? 'Feedback form'
-                        : 'Database'}
+                      : 'Database'}
                 </h1>
               </div>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-white/60">
-                {!isApplicantsView && !isFeedbackView && !isDatabaseView
-                  ? 'Choose between applicant review, the standalone interviewer form, and a local shared-state database preview.'
+                {!isApplicantsView && !isDatabaseView
+                  ? 'Choose between applicant review, assignments, and a local shared-state database preview.'
                   : isApplicantsView
                     ? 'This is the applicant review workspace, backed by the same shared local recruiting data used across the tech workflow.'
-                    : isFeedbackView
-                      ? 'Submit the consultant interview rubric and store it directly in the shared local recruiting state.'
-                      : 'Inspect the current shared local recruiting tables, row counts, and recent records without leaving the admin dashboard.'}
+                    : 'Inspect the current shared local recruiting tables, row counts, and recent records without leaving the admin dashboard.'}
               </p>
               <p className="mt-2 text-xs uppercase tracking-[0.24em] text-white/40">
                 Visible under <span className="text-white/70">/tech/manage</span> and legacy redirects under <span className="text-white/70">/devops/manage</span>
@@ -658,9 +576,9 @@ const DevopsManage = () => {
             </div>
           </div>
 
-          {!isApplicantsView && !isFeedbackView && !isDatabaseView ? (
+          {!isApplicantsView && !isDatabaseView ? (
             <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-              <div className="grid gap-6 md:grid-cols-2 2xl:grid-cols-4">
+              <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 <Link
                   to="/tech/manage/applicants"
                   className="group rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.98),rgba(8,13,22,0.99))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.34)] transition-all hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-[linear-gradient(180deg,rgba(19,34,55,0.98),rgba(8,13,22,0.99))]"
@@ -673,20 +591,6 @@ const DevopsManage = () => {
                     Open applicant review, search the pipeline, read resumes, and inspect persisted evaluations tied to each candidate.
                   </p>
                   <p className="mt-6 text-sm font-medium text-cyan-100">Open applicant workspace</p>
-                </Link>
-
-                <Link
-                  to="/tech/manage/feedback"
-                  className="group rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.98),rgba(8,13,22,0.99))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.34)] transition-all hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-[linear-gradient(180deg,rgba(19,34,55,0.98),rgba(8,13,22,0.99))]"
-                >
-                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-100">
-                    <FilePenLine className="h-6 w-6" />
-                  </span>
-                  <h2 className="mt-6 text-2xl font-semibold text-white">Feedback Form</h2>
-                  <p className="mt-3 text-sm leading-6 text-white/55">
-                    Submit interview feedback directly into the shared local recruiting evaluations state using the exact applicant name.
-                  </p>
-                  <p className="mt-6 text-sm font-medium text-cyan-100">Open feedback form</p>
                 </Link>
 
                 <Link
@@ -827,26 +731,6 @@ const DevopsManage = () => {
                     getStatusLabel={statusForApplicant}
                     getAverageScore={scoreForApplicant}
                     overallAverageScore={overallApplicantAverageScore}
-                  />
-                </div>
-              </div>
-            )
-          ) : null}
-
-          {isFeedbackView ? (
-            loading && applications.length === 0 ? (
-              <div className="flex items-center justify-center py-24">
-                <Loader2 className="h-8 w-8 animate-spin text-white/50" />
-              </div>
-            ) : (
-              <div className="mx-auto w-full max-w-[1360px]">
-                <div>
-                  <FeedbackForm
-                    applicants={applications}
-                    initialApplicantId={requestedFeedbackApplicant?.id ?? null}
-                    initialRound={requestedFeedbackRound}
-                    onSubmitFeedback={handleSubmitFeedback}
-                    submitting={submittingFeedback}
                   />
                 </div>
               </div>

@@ -17,6 +17,7 @@ const RECRUITING_STATE_STORAGE_KEY = 'otcr-recruiting-state';
 const RECRUITING_STATE_VERSION_KEY = 'otcr-recruiting-state-version';
 const RECRUITING_STATE_VERSION = '2026-04-15-interviewer-flow-v1';
 
+// Keep store snapshots immutable-at-the-edge so services and pages can treat reads as value snapshots.
 const cloneState = (state: RecruitingState): RecruitingState => ({
   applicants: state.applicants.map((applicant) => ({ ...applicant })),
   evaluations: state.evaluations.map((evaluation) => ({
@@ -60,6 +61,8 @@ const loadPersistedState = (): RecruitingState => {
   }
 };
 
+// Shared frontend-only recruiting source of truth.
+// Pages should subscribe through useRecruitingStore and mutate through services when possible.
 class RecruitingStore {
   private state: RecruitingState = loadPersistedState();
 
@@ -245,6 +248,7 @@ class RecruitingStore {
 
 export const recruitingStore = new RecruitingStore();
 
+// Thin reactive selector hook over the shared recruiting store.
 export const useRecruitingStore = <T,>(selector: (state: RecruitingState) => T) =>
   useSyncExternalStore(recruitingStore.subscribe, () => selector(recruitingStore.getSnapshot()), () =>
     selector(recruitingStore.getSnapshot())

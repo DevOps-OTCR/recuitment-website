@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 import {
   ApplicationStatus,
-  recruitingStore,
+  applicationsService,
   type Applicant,
   type ApplicantCycle,
   type SchoolYear,
@@ -106,13 +106,13 @@ const DevopsApply = () => {
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!validateForm() || !resumeFile) return;
 
     setIsSubmitting(true);
 
-    const existingApplicant = recruitingStore.getApplicantByEmail(formValues.email);
+    const existingApplicant = await applicationsService.getApplicationByEmail(formValues.email);
     const submittedAt = existingApplicant?.submittedAt ?? new Date().toISOString();
     const record: Applicant = {
       id: existingApplicant?.id ?? toApplicantId(formValues.name, formValues.email),
@@ -134,7 +134,7 @@ const DevopsApply = () => {
       notes: existingApplicant?.notes ?? 'Submitted through /tech/apply',
     };
 
-    recruitingStore.upsertApplicant(record);
+    await applicationsService.createOrUpdateApplication(record);
     setSubmittedApplication(record);
     setIsSubmitting(false);
   };

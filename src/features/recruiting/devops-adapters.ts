@@ -54,30 +54,7 @@ const findSharedApplicant = (applicant: Pick<ApplicantRecord, 'id' | 'email'>) =
   );
 };
 
-export const mergeApplicantWithRecruitingDecision = (applicant: ApplicantRecord): ApplicantRecord => {
-  const sharedApplicant = findSharedApplicant(applicant);
-  if (!sharedApplicant) return applicant;
-
-  const decisionLabel =
-    sharedApplicant.status === ApplicationStatus.Rejected
-      ? 'Rejected'
-      : sharedApplicant.status === ApplicationStatus.Accepted
-        ? 'Accepted'
-        : sharedApplicant.status === ApplicationStatus.Round2
-          ? 'Advanced to Round 2'
-          : sharedApplicant.status === ApplicationStatus.Round1
-            ? 'Advanced to Round 1'
-            : 'Applied';
-
-  return {
-    ...applicant,
-    status: sharedApplicant.status,
-    final_decision: sharedApplicant.finalDecision.toUpperCase(),
-    reviewed_at: sharedApplicant.updatedAt,
-    notes: upsertDecisionNote(applicant.notes, decisionLabel),
-  };
-};
-
+// Manage-page adapter: translate admin decision actions into shared recruiting-store updates.
 export const applyRecruitingDecision = (applicant: ApplicantRecord, action: RecruitingDecisionAction) => {
   const sharedApplicant = findSharedApplicant(applicant);
   if (!sharedApplicant) {

@@ -10,11 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import {
+  assignmentsService,
   getApplicationStatusLabel,
   getInterviewRoundLabel,
   isPartnerOrPm,
   isValidAssignmentForRole,
-  recruitingStore,
   Role,
   useRecruitingStore,
   type Applicant,
@@ -156,7 +156,7 @@ const DevopsAssignments = () => {
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!selectedApplicant || !selectedApplicant.currentRound || !currentUser) return;
 
     const primaryUser = users.find((user) => user.id === draft.primaryInterviewerId) ?? null;
@@ -184,7 +184,7 @@ const DevopsAssignments = () => {
     const room = draft.room.trim() || null;
     const assignedAt = new Date().toISOString();
 
-    recruitingStore.upsertAssignment({
+    await assignmentsService.upsertAssignment({
       id: `assignment-${selectedApplicant.id}-${selectedApplicant.currentRound}-primary`,
       applicantId: selectedApplicant.id,
       round: selectedApplicant.currentRound,
@@ -196,7 +196,7 @@ const DevopsAssignments = () => {
       scheduledTime,
     });
 
-    recruitingStore.upsertAssignment({
+    await assignmentsService.upsertAssignment({
       id: `assignment-${selectedApplicant.id}-${selectedApplicant.currentRound}-secondary`,
       applicantId: selectedApplicant.id,
       round: selectedApplicant.currentRound,

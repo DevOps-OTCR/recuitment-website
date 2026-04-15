@@ -10,8 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   ApplicationStatus,
-  findApplicantByEmail,
   getApplicationStatusLabel,
+  statusService,
   useRecruitingStore,
 } from '@/features/recruiting';
 
@@ -76,18 +76,21 @@ const DevopsStatus = () => {
   const [email, setEmail] = useState(searchParams.get('email') ?? '');
   const [submittedEmail, setSubmittedEmail] = useState(searchParams.get('email') ?? '');
   const applicants = useRecruitingStore((state) => state.applicants);
+  const [lookupApplicantId, setLookupApplicantId] = useState<string | null>(null);
 
   const normalizedSubmittedEmail = normalizeEmail(submittedEmail);
   const hasSearched = normalizedSubmittedEmail.length > 0;
 
   const applicant = useMemo(
-    () => findApplicantByEmail(applicants, normalizedSubmittedEmail),
-    [applicants, normalizedSubmittedEmail]
+    () => applicants.find((entry) => entry.id === lookupApplicantId) ?? null,
+    [applicants, lookupApplicantId]
   );
 
-  const handleLookup = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleLookup = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmittedEmail(email);
+    const snapshot = await statusService.lookupApplicantStatusByEmail(email);
+    setLookupApplicantId(snapshot?.applicantId ?? null);
   };
 
   const activeStatus = applicant ? statusConfig[applicant.status] : null;
@@ -146,6 +149,7 @@ const DevopsStatus = () => {
                     onClick={() => {
                       setEmail('');
                       setSubmittedEmail('');
+                      setLookupApplicantId(null);
                     }}
                   >
                     Clear

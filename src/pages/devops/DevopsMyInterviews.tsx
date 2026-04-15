@@ -7,12 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import {
   Role,
+  evaluationsService,
   canReviewApplicants,
   getApplicationStatusLabel,
-  getCurrentInterviewerId,
   getInterviewRoundLabel,
-  recruitingStore,
-  setCurrentInterviewerId,
+  sessionService,
   useRecruitingStore,
   type Applicant,
   type Assignment,
@@ -105,7 +104,7 @@ const DevopsMyInterviews = () => {
     [users]
   );
 
-  const [currentUserId, setCurrentUserIdState] = useState(() => getCurrentInterviewerId());
+  const [currentUserId, setCurrentUserIdState] = useState('');
   const [selectedApplicantId, setSelectedApplicantId] = useState<string | null>(null);
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
@@ -115,8 +114,21 @@ const DevopsMyInterviews = () => {
   );
 
   useEffect(() => {
+    let cancelled = false;
+
+    void sessionService.getCurrentInterviewerId().then((userId) => {
+      if (cancelled) return;
+      setCurrentUserIdState(userId);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (currentUser && currentUser.id !== currentUserId) {
-      setCurrentInterviewerId(currentUser.id);
+      void sessionService.setCurrentInterviewer(currentUser.id);
       setCurrentUserIdState(currentUser.id);
     }
   }, [currentUser, currentUserId]);
@@ -169,7 +181,7 @@ const DevopsMyInterviews = () => {
   );
 
   const handleUserChange = (nextUserId: string) => {
-    setCurrentInterviewerId(nextUserId);
+    void sessionService.setCurrentInterviewer(nextUserId);
     setCurrentUserIdState(nextUserId);
     setSelectedApplicantId(null);
   };
@@ -179,7 +191,7 @@ const DevopsMyInterviews = () => {
 
     setSubmittingFeedback(true);
     try {
-      recruitingStore.upsertEvaluation({
+      await evaluationsService.upsertEvaluation({
         id: `eval-${selectedApplicant.id}-${currentUser.id}-${selectedAssignment.round}`,
         applicantId: selectedApplicant.id,
         interviewerId: currentUser.id,
