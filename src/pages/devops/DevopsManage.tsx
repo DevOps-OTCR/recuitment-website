@@ -6,7 +6,6 @@ import {
   FilePenLine,
   LayoutGrid,
   Loader2,
-  Lock,
   LogOut,
   RefreshCcw,
 } from 'lucide-react';
@@ -14,23 +13,23 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 
 import Footer from '@/components/Footer';
 import Navigation from '@/components/Navigation';
-import { adminApi, type AdminApplicationResponse, type AdminEvaluationResponse, type AdminEvaluationPayload } from '@/lib/admin-api';
-import { getOaApiUrl } from '@/lib/oa-api-url';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import ApplicantDetail from '@/pages/devops/components/admin/ApplicantDetail';
 import ConsultantList from '@/pages/devops/components/admin/ConsultantList';
 import DatabaseView from '@/pages/devops/components/admin/DatabaseView';
 import FeedbackForm from '@/pages/devops/components/admin/FeedbackForm';
-import { mockApplicants, mockFeedback } from '@/pages/devops/components/admin/mockData';
 import {
   applyRecruitingDecision,
-  mergeApplicantWithRecruitingDecision,
+  Role,
+  InterviewRound as RecruitingInterviewRound,
+  recruitingStore,
   useRecruitingStore,
+  type Applicant as RecruitingApplicant,
+  type Evaluation as RecruitingEvaluation,
+  type RecruitingState,
   type RecruitingDecisionAction,
   type RecruitingRole,
 } from '@/features/recruiting';
@@ -46,8 +45,6 @@ import {
 } from '@/pages/devops/components/admin/types';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 
-const API_BASE_URL = getOaApiUrl();
-const ADMIN_KEY_STORAGE = 'otcr_devops_admin_secret';
 const MANAGE_VIEWER_ROLE_STORAGE = 'otcr_manage_viewer_role';
 
 const defaultExecRoster = ['Ava Patel', 'Mihika Rao', 'Isaiah Brooks', 'Laksh Shah'];
@@ -57,90 +54,6 @@ const deriveAssignedExec = (applicant: ApplicantRecord) =>
   applicant.assigned_exec ??
   applicant.notes?.match(/assigned[:\s]+([a-zA-Z\s]+)/i)?.[1]?.trim() ??
   defaultExecRoster[applicant.id % defaultExecRoster.length];
-
-const normalizeErrorMessage = (error: unknown, fallback: string) => {
-  if (!(error instanceof Error)) return fallback;
-  const detail = error.message.replace(/^API Error \d+:\s*/i, '').trim();
-  return detail || fallback;
-};
-
-const mapApplication = (application: AdminApplicationResponse): ApplicantRecord => {
-  const mapped: ApplicantRecord = {
-    id: application.id,
-    name: application.name,
-    email: application.email,
-    interest: application.interest,
-    resume_filename: application.resume_filename,
-    resume_url: application.resume_url ?? null,
-    status: application.status,
-    final_decision: application.final_decision,
-    cycle_name: application.cycle_name,
-    created_at: application.created_at,
-    reviewed_at: application.reviewed_at,
-    notes: application.notes,
-    has_assessment_link: application.has_assessment_link,
-    assessment_completed: application.assessment_completed,
-    assessment_token: application.assessment_token,
-    focus_loss_events: application.focus_loss_events,
-    is_flagged: application.is_flagged,
-    integrity_notes: application.integrity_notes,
-    archived_at: application.archived_at,
-    assigned_exec: null,
-  };
-
-  return {
-    ...mapped,
-    assigned_exec: deriveAssignedExec(mapped),
-  };
-};
-
-const mapEvaluation = (evaluation: AdminEvaluationResponse): FeedbackEntry => ({
-  id: String(evaluation.id),
-  applicantId: evaluation.application_id,
-  applicantName: evaluation.applicant_name,
-  interviewerName: evaluation.interviewer_name,
-  intervieweeName: evaluation.interviewee_name,
-  intervieweeGender: evaluation.interviewee_gender,
-  interviewerRole: evaluation.interviewer_role,
-  round: evaluation.round === 'Round 2' ? 'Round 2' : 'Round 1',
-  leadershipScore: normalizeRatingBand(evaluation.leadership_score),
-  interestInOtcrScore: normalizeRatingBand(evaluation.interest_in_otcr_score),
-  behavioralPerformanceScore: normalizeRatingBand(evaluation.behavioral_performance_score),
-  businessAcumenScore: normalizeRatingBand(evaluation.business_acumen_score),
-  qualitativeCreativityScore: normalizeRatingBand(evaluation.qualitative_creativity_score),
-  quantitativeStructureScore: normalizeRatingBand(evaluation.quantitative_structure_score),
-  casePerformanceScore: normalizeRatingBand(evaluation.case_performance_score),
-  creativityConversationScore: normalizeRatingBand(evaluation.creativity_conversation_score),
-  recommendation: evaluation.recommendation,
-  finalRoundSummary: evaluation.final_round_summary ?? '',
-  overallPerformanceOverview: evaluation.overall_performance_overview ?? evaluation.comments ?? '',
-  submittedAt: evaluation.created_at,
-});
-
-const mapDatabaseOverview = (overview: Awaited<ReturnType<typeof adminApi.getDatabaseOverview>>): DatabaseOverview => ({
-  generatedAt: overview.generated_at,
-  persistence: overview.persistence,
-  tables: overview.tables,
-});
-
-const mapDatabasePreview = (preview: Awaited<ReturnType<typeof adminApi.getDatabaseTable>>): DatabaseTablePreview => ({
-  table: preview.table,
-  count: preview.count,
-  columns: preview.columns,
-  rows: preview.rows,
-});
-
-const fetchWorkspaceSnapshot = async (secret: string) => {
-  const [applicationResponse, evaluationResponse] = await Promise.all([
-    adminApi.listApplications(secret),
-    adminApi.listEvaluations(secret),
-  ]);
-
-  return {
-    applications: applicationResponse.map(mapApplication),
-    evaluations: evaluationResponse.map(mapEvaluation),
-  };
-};
 
 const groupFeedbackEntries = (entries: FeedbackEntry[]) =>
   entries.reduce<Record<number, FeedbackEntry[]>>((acc, entry) => {
@@ -216,18 +129,121 @@ const getOverallStatus = (applicant: ApplicantRecord, entries: FeedbackEntry[]) 
   return 'Pending';
 };
 
-const buildFallbackApplicants = () =>
-  mockApplicants.map((applicant) => ({
-    ...mergeApplicantWithRecruitingDecision(applicant),
-    assigned_exec: deriveAssignedExec(applicant),
-  }));
+const numericApplicantId = (applicantId: string) =>
+  applicantId.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
 
-const initialFallbackApplicants = buildFallbackApplicants();
-const syncApplicantsWithRecruitingState = (records: ApplicantRecord[]) =>
-  records.map((applicant) => ({
-    ...mergeApplicantWithRecruitingDecision(applicant),
-    assigned_exec: deriveAssignedExec(applicant),
-  }));
+const roleToInterviewerRole = (role: Role) =>
+  role === Role.Consultant || role === Role.LC ? 'Secondary' : 'Primary';
+
+const recommendationToFeedback = (recommendation: RecruitingEvaluation['recommendation']): FeedbackEntry['recommendation'] => {
+  switch (recommendation) {
+    case 'strong_yes':
+    case 'yes':
+      return 'YES';
+    case 'lean_yes':
+      return 'LEAN YES';
+    case 'no':
+      return 'NO';
+    case 'lean_no':
+    default:
+      return 'LEAN NO';
+  }
+};
+
+const feedbackToRecommendation = (recommendation: FeedbackEntry['recommendation']): RecruitingEvaluation['recommendation'] => {
+  switch (recommendation) {
+    case 'YES':
+      return 'yes';
+    case 'LEAN YES':
+      return 'lean_yes';
+    case 'NO':
+      return 'no';
+    case 'MAYBE':
+    case 'LEAN NO':
+    default:
+      return 'lean_no';
+  }
+};
+
+const mapRecruitingApplicant = (applicant: RecruitingApplicant): ApplicantRecord => ({
+  id: numericApplicantId(applicant.id),
+  name: applicant.name,
+  email: applicant.email,
+  interest: applicant.whyOtcr,
+  resume_filename: applicant.resume.split('/').pop() ?? applicant.resume,
+  resume_url: null,
+  status: applicant.status,
+  final_decision: applicant.finalDecision.toUpperCase(),
+  cycle_name: `Cycle ${applicant.cycle}`,
+  created_at: applicant.submittedAt,
+  reviewed_at: applicant.updatedAt,
+  notes: applicant.notes,
+  has_assessment_link: false,
+  assessment_completed: false,
+  assessment_token: null,
+  focus_loss_events: 0,
+  is_flagged: false,
+  integrity_notes: null,
+  archived_at: null,
+  assigned_exec: deriveAssignedExec({
+    id: numericApplicantId(applicant.id),
+    name: applicant.name,
+    email: applicant.email,
+    interest: applicant.whyOtcr,
+    resume_filename: applicant.resume.split('/').pop() ?? applicant.resume,
+    status: applicant.status,
+    final_decision: applicant.finalDecision.toUpperCase(),
+    cycle_name: `Cycle ${applicant.cycle}`,
+    created_at: applicant.submittedAt,
+    reviewed_at: applicant.updatedAt,
+    notes: applicant.notes,
+    has_assessment_link: false,
+    assessment_completed: false,
+    assessment_token: null,
+    focus_loss_events: 0,
+    is_flagged: false,
+    integrity_notes: null,
+    archived_at: null,
+    assigned_exec: null,
+    resume_url: null,
+  }),
+});
+
+const mapRecruitingEvaluation = (
+  evaluation: RecruitingEvaluation,
+  state: RecruitingState
+): FeedbackEntry => {
+  const applicant = state.applicants.find((entry) => entry.id === evaluation.applicantId);
+  const interviewer = state.users.find((entry) => entry.id === evaluation.interviewerId);
+
+  return {
+    id: evaluation.id,
+    applicantId: numericApplicantId(evaluation.applicantId),
+    applicantName: applicant?.name ?? evaluation.applicantId,
+    interviewerName: interviewer?.name ?? 'Unknown interviewer',
+    intervieweeName: applicant?.name ?? evaluation.applicantId,
+    intervieweeGender: 'Other',
+    interviewerRole: roleToInterviewerRole(evaluation.interviewerRole),
+    round: evaluation.round === RecruitingInterviewRound.Round2 ? 'Round 2' : 'Round 1',
+    leadershipScore: Math.min(3, Math.max(1, Math.round((evaluation.rubric.teamwork + evaluation.rubric.motivation) / 3))) as FeedbackEntry['leadershipScore'],
+    interestInOtcrScore: Math.min(3, Math.max(1, Math.round(evaluation.rubric.motivation / 2))) as FeedbackEntry['interestInOtcrScore'],
+    behavioralPerformanceScore: Math.min(3, Math.max(1, Math.round(evaluation.rubric.communication / 2))) as FeedbackEntry['behavioralPerformanceScore'],
+    businessAcumenScore: Math.min(3, Math.max(1, Math.round(evaluation.rubric.problemSolving / 2))) as FeedbackEntry['businessAcumenScore'],
+    qualitativeCreativityScore: Math.min(3, Math.max(1, Math.round(evaluation.rubric.problemSolving / 2))) as FeedbackEntry['qualitativeCreativityScore'],
+    quantitativeStructureScore: Math.min(3, Math.max(1, Math.round(evaluation.rubric.structure / 2))) as FeedbackEntry['quantitativeStructureScore'],
+    casePerformanceScore: Math.min(3, Math.max(1, Math.round((evaluation.rubric.problemSolving + evaluation.rubric.structure) / 4))) as FeedbackEntry['casePerformanceScore'],
+    creativityConversationScore: Math.min(3, Math.max(1, Math.round((evaluation.rubric.communication + evaluation.rubric.teamwork) / 4))) as FeedbackEntry['creativityConversationScore'],
+    recommendation: recommendationToFeedback(evaluation.recommendation),
+    finalRoundSummary: evaluation.concerns.join(', '),
+    overallPerformanceOverview: evaluation.summary,
+    submittedAt: evaluation.submittedAt,
+  };
+};
+
+const buildSharedWorkspaceSnapshot = (state: RecruitingState) => ({
+  applications: state.applicants.map(mapRecruitingApplicant),
+  evaluations: state.evaluations.map((evaluation) => mapRecruitingEvaluation(evaluation, state)),
+});
 
 const viewerRoles: RecruitingRole[] = ['partner', 'pm', 'lc', 'consultant'];
 
@@ -255,23 +271,18 @@ const DevopsManage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const recruitingApplicants = useRecruitingStore((state) => state.applicants);
+  const recruitingState = useRecruitingStore((state) => state);
+  const sharedWorkspace = useMemo(() => buildSharedWorkspaceSnapshot(recruitingState), [recruitingState]);
 
-  const [adminSecret, setAdminSecret] = useState('');
-  const [storedSecret, setStoredSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [applications, setApplications] = useState<ApplicantRecord[]>(initialFallbackApplicants);
-  const [selectedApplicantId, setSelectedApplicantId] = useState<number | null>(initialFallbackApplicants[0]?.id ?? null);
+  const [applications, setApplications] = useState<ApplicantRecord[]>(sharedWorkspace.applications);
+  const [selectedApplicantId, setSelectedApplicantId] = useState<number | null>(sharedWorkspace.applications[0]?.id ?? null);
   const [searchValue, setSearchValue] = useState('');
   const [cycleFilter, setCycleFilter] = useState<'all' | string>('all');
-  const [feedbackByApplicant, setFeedbackByApplicant] = useState<Record<number, FeedbackEntry[]>>(mockFeedback);
-  const [usingMockData, setUsingMockData] = useState(true);
+  const [feedbackByApplicant, setFeedbackByApplicant] = useState<Record<number, FeedbackEntry[]>>(groupFeedbackEntries(sharedWorkspace.evaluations));
   const [databaseOverview, setDatabaseOverview] = useState<DatabaseOverview | null>(null);
   const [databasePreview, setDatabasePreview] = useState<DatabaseTablePreview | null>(null);
-  const [databaseLoading, setDatabaseLoading] = useState(false);
-  const [databaseError, setDatabaseError] = useState<string | null>(null);
   const [selectedDatabaseTable, setSelectedDatabaseTable] = useState<DatabaseTableName>('evaluations');
   const [selectedRoundsByApplicant, setSelectedRoundsByApplicant] = useState<Record<number, InterviewRound>>({});
   const [listRound, setListRound] = useState<InterviewRound>('Round 1');
@@ -289,80 +300,6 @@ const DevopsManage = () => {
       : null;
   const requestedFeedbackRound: InterviewRound = requestedRoundParam === 'Round 2' ? 'Round 2' : 'Round 1';
 
-  const headers = () => ({
-    'X-Admin-Secret': storedSecret || '',
-  });
-
-  const fetchAdminWorkspace = async (secret: string) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { applications: mappedApplications, evaluations: mappedEvaluations } = await fetchWorkspaceSnapshot(secret);
-
-      if (mappedApplications.length === 0) {
-        const fallback = buildFallbackApplicants();
-        setApplications(fallback);
-        setFeedbackByApplicant(mockFeedback);
-        setUsingMockData(true);
-        setSelectedApplicantId((current) => current ?? fallback[0]?.id ?? null);
-        setError('Backend is reachable but returned no applicants. Showing mock applicant data for the dashboard.');
-        return;
-      }
-
-      setApplications(syncApplicantsWithRecruitingState(mappedApplications));
-      setFeedbackByApplicant(groupFeedbackEntries(mappedEvaluations));
-      setUsingMockData(false);
-      setSelectedApplicantId((current) => current ?? mappedApplications[0]?.id ?? null);
-    } catch (fetchError: unknown) {
-      const fallback = buildFallbackApplicants();
-      setApplications(fallback);
-      setFeedbackByApplicant(mockFeedback);
-      setUsingMockData(true);
-      setSelectedApplicantId((current) => current ?? fallback[0]?.id ?? null);
-
-      const message = normalizeErrorMessage(fetchError, 'Backend unavailable. Showing mock applicant data.');
-      if (/invalid admin secret/i.test(message) || /invalid admin key/i.test(message)) {
-        sessionStorage.removeItem(ADMIN_KEY_STORAGE);
-        setStoredSecret(null);
-        setApplications(initialFallbackApplicants);
-        setFeedbackByApplicant(mockFeedback);
-        setUsingMockData(true);
-        setError('Invalid admin key. Please enter it again.');
-        navigate('/tech/manage', { replace: true });
-        return;
-      }
-
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchDatabasePreview = async (secret: string, table: DatabaseTableName) => {
-    setDatabaseLoading(true);
-    setDatabaseError(null);
-
-    try {
-      const [overviewResponse, previewResponse] = await Promise.all([
-        adminApi.getDatabaseOverview(secret),
-        adminApi.getDatabaseTable(secret, table),
-      ]);
-
-      setDatabaseOverview(mapDatabaseOverview(overviewResponse));
-      setDatabasePreview(mapDatabasePreview(previewResponse));
-    } catch (previewError: unknown) {
-      setDatabaseError(normalizeErrorMessage(previewError, 'Failed to load database preview.'));
-    } finally {
-      setDatabaseLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const key = sessionStorage.getItem(ADMIN_KEY_STORAGE);
-    if (key) setStoredSecret(key);
-  }, []);
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const storedViewerRole = window.localStorage.getItem(MANAGE_VIEWER_ROLE_STORAGE);
@@ -372,18 +309,67 @@ const DevopsManage = () => {
   }, []);
 
   useEffect(() => {
-    if (!storedSecret) return;
-    void fetchAdminWorkspace(storedSecret);
-  }, [storedSecret]);
+    setApplications(sharedWorkspace.applications);
+    setFeedbackByApplicant(groupFeedbackEntries(sharedWorkspace.evaluations));
+  }, [sharedWorkspace]);
 
   useEffect(() => {
-    if (!storedSecret || !isDatabaseView) return;
-    void fetchDatabasePreview(storedSecret, selectedDatabaseTable);
-  }, [storedSecret, isDatabaseView, selectedDatabaseTable]);
+    if (!isDatabaseView) return;
 
-  useEffect(() => {
-    setApplications((current) => syncApplicantsWithRecruitingState(current));
-  }, [recruitingApplicants]);
+    setDatabaseOverview({
+      generatedAt: new Date().toISOString(),
+      persistence: {
+        database: 'frontend-only shared recruiting state',
+        storage: 'localStorage',
+      },
+      tables: [
+        { table: 'applications', count: recruitingState.applicants.length },
+        { table: 'evaluations', count: recruitingState.evaluations.length },
+        { table: 'assessment_links', count: 0 },
+        { table: 'attempts', count: 0 },
+        { table: 'submissions', count: 0 },
+        { table: 'cycles', count: 2 },
+        { table: 'assessment_progress_snapshots', count: 0 },
+      ],
+    });
+
+    setDatabasePreview({
+      table: selectedDatabaseTable,
+      count:
+        selectedDatabaseTable === 'applications'
+          ? recruitingState.applicants.length
+          : selectedDatabaseTable === 'evaluations'
+            ? recruitingState.evaluations.length
+            : 0,
+      columns:
+        selectedDatabaseTable === 'applications'
+          ? ['id', 'name', 'email', 'status', 'currentRound', 'finalDecision', 'updatedAt']
+          : selectedDatabaseTable === 'evaluations'
+            ? ['id', 'applicantId', 'interviewerId', 'round', 'recommendation', 'submittedAt']
+            : [],
+      rows:
+        selectedDatabaseTable === 'applications'
+          ? recruitingState.applicants.slice(0, 10).map((applicant) => ({
+              id: applicant.id,
+              name: applicant.name,
+              email: applicant.email,
+              status: applicant.status,
+              currentRound: applicant.currentRound,
+              finalDecision: applicant.finalDecision,
+              updatedAt: applicant.updatedAt,
+            }))
+          : selectedDatabaseTable === 'evaluations'
+            ? recruitingState.evaluations.slice(0, 10).map((evaluation) => ({
+                id: evaluation.id,
+                applicantId: evaluation.applicantId,
+                interviewerId: evaluation.interviewerId,
+                round: evaluation.round,
+                recommendation: evaluation.recommendation,
+                submittedAt: evaluation.submittedAt,
+              }))
+            : [],
+    });
+  }, [isDatabaseView, recruitingState, selectedDatabaseTable]);
 
   const cycleOptions = useMemo(() => {
     const cycles = Array.from(new Set(applications.map((applicant) => applicant.cycle_name).filter(Boolean)));
@@ -441,23 +427,12 @@ const DevopsManage = () => {
     [feedbackByApplicant]
   );
 
-  const handleUnlock = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!adminSecret.trim()) return;
-    sessionStorage.setItem(ADMIN_KEY_STORAGE, adminSecret.trim());
-    setStoredSecret(adminSecret.trim());
-    setAdminSecret('');
-  };
-
   const handleLogout = () => {
-    sessionStorage.removeItem(ADMIN_KEY_STORAGE);
-    setStoredSecret(null);
-    setApplications(initialFallbackApplicants);
-    setFeedbackByApplicant(mockFeedback);
-    setUsingMockData(true);
+    setApplications(sharedWorkspace.applications);
+    setFeedbackByApplicant(groupFeedbackEntries(sharedWorkspace.evaluations));
     setDatabaseOverview(null);
     setDatabasePreview(null);
-    setSelectedApplicantId(initialFallbackApplicants[0]?.id ?? null);
+    setSelectedApplicantId(sharedWorkspace.applications[0]?.id ?? null);
     navigate('/tech/manage', { replace: true });
   };
 
@@ -474,27 +449,10 @@ const DevopsManage = () => {
       return;
     }
 
-    if (!storedSecret || usingMockData) {
-      toast({
-        title: 'Resume unavailable',
-        description: 'This applicant is using fallback data, so there is no backend resume stream.',
-      });
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/applications/${applicant.id}/resume`, { headers: headers() });
-      if (!response.ok) throw new Error('Could not open resume');
-      const blob = await response.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      window.open(objectUrl, '_blank', 'noopener,noreferrer');
-    } catch {
-      toast({
-        title: 'Resume unavailable',
-        description: 'The backend did not return a resume for this applicant.',
-        variant: 'destructive',
-      });
-    }
+    toast({
+      title: 'Resume unavailable',
+      description: 'This shared local recruiting dataset does not include live resume files.',
+    });
   };
 
   const handleOpenFeedbackForm = (applicant: ApplicantRecord, round: InterviewRound = 'Round 1') => {
@@ -502,84 +460,56 @@ const DevopsManage = () => {
   };
 
   const handleSubmitFeedback = async (entry: Omit<FeedbackEntry, 'id' | 'submittedAt'>) => {
-    if (!storedSecret) return;
-
     setSubmittingFeedback(true);
 
     try {
-      let targetApplicantId = entry.applicantId;
+      const matchedApplicant =
+        recruitingState.applicants.find((applicant) => nameKey(applicant.name) === nameKey(entry.intervieweeName)) ??
+        recruitingState.applicants.find((applicant) => numericApplicantId(applicant.id) === entry.applicantId) ??
+        null;
 
-      if (usingMockData) {
-        const { applications: liveApplications, evaluations: liveEvaluations } = await fetchWorkspaceSnapshot(storedSecret);
-
-        if (liveApplications.length === 0) {
-          throw new Error('Backend is reachable but returned no applicants, so feedback could not be attached.');
-        }
-
-        const liveApplicant =
-          liveApplications.find((applicant) => nameKey(applicant.name) === nameKey(entry.intervieweeName)) ??
-          liveApplications.find((applicant) => applicant.id === entry.applicantId) ??
-          null;
-
-        if (!liveApplicant) {
-          throw new Error('Could not match this interviewee to a live applicant record. Refresh the dashboard and try again.');
-        }
-
-        setApplications(syncApplicantsWithRecruitingState(liveApplications));
-        setFeedbackByApplicant(groupFeedbackEntries(liveEvaluations));
-        setUsingMockData(false);
-        setError(null);
-        setSelectedApplicantId(liveApplicant.id);
-        targetApplicantId = liveApplicant.id;
-
-        if (requestedApplicantId !== liveApplicant.id) {
-          navigate(`/tech/manage/feedback?applicantId=${liveApplicant.id}`, { replace: true });
-        }
+      if (!matchedApplicant) {
+        throw new Error('Could not match this interviewee to the shared recruiting state.');
       }
 
-      const payload: AdminEvaluationPayload = {
-        interviewer_name: entry.interviewerName,
-        interviewee_name: entry.intervieweeName,
-        interviewee_gender: entry.intervieweeGender,
-        interviewer_role: entry.interviewerRole,
-        round: entry.round,
-        leadership_score: entry.leadershipScore,
-        interest_in_otcr_score: entry.interestInOtcrScore,
-        behavioral_performance_score: entry.behavioralPerformanceScore,
-        business_acumen_score: entry.businessAcumenScore,
-        qualitative_creativity_score: entry.qualitativeCreativityScore,
-        quantitative_structure_score: entry.quantitativeStructureScore,
-        case_performance_score: entry.casePerformanceScore,
-        creativity_conversation_score: entry.creativityConversationScore,
-        recommendation: entry.recommendation,
-        final_round_summary: entry.finalRoundSummary,
-        overall_performance_overview: entry.overallPerformanceOverview,
-      };
+      const interviewer =
+        recruitingState.users.find((user) => nameKey(user.name) === nameKey(entry.interviewerName)) ??
+        recruitingState.users.find((user) => user.email.trim().toLowerCase() === entry.interviewerName.trim().toLowerCase()) ??
+        recruitingState.users.find((user) => roleToInterviewerRole(user.role) === entry.interviewerRole) ??
+        null;
 
-      const createdEvaluation = await adminApi.createEvaluation(storedSecret, targetApplicantId, payload);
-      const mappedEntry = mapEvaluation(createdEvaluation);
-
-      setFeedbackByApplicant((current) => ({
-        ...current,
-        [mappedEntry.applicantId]: [mappedEntry, ...(current[mappedEntry.applicantId] ?? [])],
-      }));
-      setSelectedRoundsByApplicant((current) => ({
-        ...current,
-        [mappedEntry.applicantId]: mappedEntry.round,
-      }));
-
-      if (isDatabaseView) {
-        void fetchDatabasePreview(storedSecret, selectedDatabaseTable);
+      if (!interviewer) {
+        throw new Error('Could not match this interviewer to the shared recruiting state.');
       }
+
+      recruitingStore.upsertEvaluation({
+        id: `eval-${matchedApplicant.id}-${interviewer.id}-${entry.round === 'Round 2' ? 'round_2' : 'round_1'}`,
+        applicantId: matchedApplicant.id,
+        interviewerId: interviewer.id,
+        interviewerRole: interviewer.role,
+        round: entry.round === 'Round 2' ? RecruitingInterviewRound.Round2 : RecruitingInterviewRound.Round1,
+        recommendation: feedbackToRecommendation(entry.recommendation),
+        rubric: {
+          communication: Math.min(5, entry.behavioralPerformanceScore + 2),
+          structure: Math.min(5, entry.quantitativeStructureScore + 2),
+          problemSolving: Math.min(5, entry.casePerformanceScore + 2),
+          motivation: Math.min(5, entry.interestInOtcrScore + 2),
+          teamwork: Math.min(5, entry.leadershipScore + 2),
+        },
+        summary: entry.overallPerformanceOverview,
+        strengths: [entry.overallPerformanceOverview],
+        concerns: [entry.finalRoundSummary],
+        submittedAt: new Date().toISOString(),
+      });
 
       toast({
         title: 'Feedback saved',
-        description: `${entry.intervieweeName} now has a persisted review in the backend database.`,
+        description: `${entry.intervieweeName} now has a persisted local review in the shared recruiting state.`,
       });
     } catch (submitError: unknown) {
       toast({
         title: 'Could not save feedback',
-        description: normalizeErrorMessage(submitError, 'The backend rejected the evaluation payload.'),
+        description: submitError instanceof Error ? submitError.message : 'The shared recruiting state rejected the evaluation payload.',
         variant: 'destructive',
       });
     } finally {
@@ -588,20 +518,14 @@ const DevopsManage = () => {
   };
 
   const handleRefresh = () => {
-    if (!storedSecret) return;
-    if (isDatabaseView) {
-      void fetchDatabasePreview(storedSecret, selectedDatabaseTable);
-      return;
-    }
-    void fetchAdminWorkspace(storedSecret);
+    setApplications(sharedWorkspace.applications);
+    setFeedbackByApplicant(groupFeedbackEntries(sharedWorkspace.evaluations));
   };
 
   const handleConfirmDecision = () => {
     if (!pendingDecision) return;
 
     const decisionRecord = applyRecruitingDecision(pendingDecision.applicant, pendingDecision.action);
-
-    setApplications((current) => syncApplicantsWithRecruitingState(current));
 
     setPendingDecision(null);
     toast({
@@ -621,52 +545,6 @@ const DevopsManage = () => {
     if (scores.length === 0) return null;
     return scores.reduce((sum, score) => sum + score, 0) / scores.length;
   }, [filteredApplicants, feedbackByApplicant, listRound]);
-
-  if (!storedSecret) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navigation />
-        <section className="px-4 pb-24 pt-32">
-          <div className="mx-auto max-w-md">
-            <div className="mb-8 flex justify-center">
-              <img src={otcrTechLogo} alt="OTCR Technologies" className="h-16 w-auto" />
-            </div>
-            <Card className="border-white/10 bg-card/80">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-white">
-                  <Lock className="h-5 w-5" />
-                  Admin access
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Enter the admin key to open the consultant review dashboard.
-                </p>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleUnlock} className="space-y-4">
-                  <div>
-                    <Label htmlFor="admin-key" className="text-muted-foreground">Admin key</Label>
-                    <Input
-                      id="admin-key"
-                      type="password"
-                      value={adminSecret}
-                      onChange={(event) => setAdminSecret(event.target.value)}
-                      placeholder="Admin secret"
-                      className="mt-2 bg-background/50"
-                      autoComplete="current-password"
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={!adminSecret.trim()}>
-                    Unlock dashboard
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-        <Footer />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -724,12 +602,12 @@ const DevopsManage = () => {
               </div>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-white/60">
                 {!isApplicantsView && !isFeedbackView && !isDatabaseView
-                  ? 'Choose between applicant review, the standalone interviewer form, and a live database preview powered by the backend.'
+                  ? 'Choose between applicant review, the standalone interviewer form, and a local shared-state database preview.'
                   : isApplicantsView
-                    ? 'This is the applicant review workspace, now backed by persisted interviewer evaluations from the API.'
+                    ? 'This is the applicant review workspace, backed by the same shared local recruiting data used across the tech workflow.'
                     : isFeedbackView
-                      ? 'Submit the consultant interview rubric and store it directly in the backend database.'
-                      : 'Inspect the live backend tables, row counts, and recent records without leaving the admin dashboard.'}
+                      ? 'Submit the consultant interview rubric and store it directly in the shared local recruiting state.'
+                      : 'Inspect the current shared local recruiting tables, row counts, and recent records without leaving the admin dashboard.'}
               </p>
               <p className="mt-2 text-xs uppercase tracking-[0.24em] text-white/40">
                 Visible under <span className="text-white/70">/tech/manage</span> and legacy redirects under <span className="text-white/70">/devops/manage</span>
@@ -768,29 +646,17 @@ const DevopsManage = () => {
                 variant="outline"
                 className="h-11 border-white/10 bg-white/5 text-white hover:bg-white/10"
                 onClick={handleRefresh}
-                disabled={loading || databaseLoading || submittingFeedback}
+                disabled={loading || submittingFeedback}
               >
-                {loading || databaseLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
                 Refresh
               </Button>
               <Button variant="ghost" size="sm" onClick={handleLogout} className="text-white/65 hover:text-white">
                 <LogOut className="mr-2 h-4 w-4" />
-                Lock
+                Reset local view
               </Button>
             </div>
           </div>
-
-          {error ? (
-            <div className="mb-5 rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-              {error}
-            </div>
-          ) : null}
-
-          {usingMockData ? (
-            <div className="mb-5 rounded-2xl border border-sky-400/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
-              Backend data was unavailable, so the dashboard is showing mock applicant records and seeded feedback state.
-            </div>
-          ) : null}
 
           {!isApplicantsView && !isFeedbackView && !isDatabaseView ? (
             <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
@@ -818,7 +684,7 @@ const DevopsManage = () => {
                   </span>
                   <h2 className="mt-6 text-2xl font-semibold text-white">Feedback Form</h2>
                   <p className="mt-3 text-sm leading-6 text-white/55">
-                    Submit interview feedback directly into the backend `evaluations` table using the exact applicant name.
+                    Submit interview feedback directly into the shared local recruiting evaluations state using the exact applicant name.
                   </p>
                   <p className="mt-6 text-sm font-medium text-cyan-100">Open feedback form</p>
                 </Link>
@@ -869,9 +735,7 @@ const DevopsManage = () => {
                     </div>
                     <div className="rounded-2xl border border-white/8 bg-white/5 p-4">
                       <p className="text-xs uppercase tracking-[0.2em] text-white/45">Persistence</p>
-                      <p className="mt-3 text-lg font-semibold text-white">
-                        {usingMockData ? 'Mock data' : 'Backend connected'}
-                      </p>
+                      <p className="mt-3 text-lg font-semibold text-white">Shared local state</p>
                     </div>
                   </div>
 
@@ -994,15 +858,12 @@ const DevopsManage = () => {
               overview={databaseOverview}
               preview={databasePreview}
               selectedTable={selectedDatabaseTable}
-              loading={databaseLoading}
-              error={databaseError}
+              loading={false}
+              error={null}
               applicants={applications}
               feedbackByApplicant={feedbackByApplicant}
               onSelectTable={setSelectedDatabaseTable}
-              onRefresh={() => {
-                if (!storedSecret) return;
-                void fetchDatabasePreview(storedSecret, selectedDatabaseTable);
-              }}
+              onRefresh={handleRefresh}
             />
           ) : null}
         </div>
@@ -1015,7 +876,7 @@ const DevopsManage = () => {
               <CardTitle className="text-2xl text-white">Commit recruiting update?</CardTitle>
               <p className="text-sm leading-6 text-white/60">
                 This writes the applicant status into the shared recruiting foundation for <span className="font-medium text-white">{pendingDecision.applicant.name}</span>.
-                Existing evaluations, resume access, and the database preview stay unchanged.
+                Existing evaluations and the shared local database preview stay aligned automatically.
               </p>
             </CardHeader>
             <CardContent className="space-y-5">

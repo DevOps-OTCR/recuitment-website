@@ -51,9 +51,9 @@ const StatusSummary = ({
 
   return (
     <Card className="overflow-hidden border-white/10 bg-[linear-gradient(180deg,rgba(18,29,47,0.96),rgba(10,16,28,0.98))] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
-      <CardContent className="p-4">
-        <div className="flex w-full items-center gap-2 overflow-hidden">
-          <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.03]">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex w-full flex-wrap items-center gap-3 overflow-hidden">
+          <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] sm:h-16 sm:w-16">
             <div
               className="absolute inset-0 rounded-full"
               style={{
@@ -62,21 +62,21 @@ const StatusSummary = ({
                 WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 5px), white 0)',
               }}
             />
-            <span className="text-xs font-semibold text-white">
+            <span className="text-[11px] font-semibold text-white sm:text-xs">
               {totalScore === null ? `--/${maxTotalScore}` : `${totalScore.toFixed(1)}/${maxTotalScore}`}
             </span>
           </div>
 
-          <div className="min-w-[112px] shrink-0">
+          <div className="min-w-[96px] shrink-0">
             <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Composite</p>
-            <p className="mt-1 text-2xl font-semibold text-cyan-300">
+            <p className="mt-1 text-xl font-semibold text-cyan-300 sm:text-2xl">
               {averageScore === null ? '--' : averageScore.toFixed(1)}
-              <span className="ml-1 text-lg font-medium text-white/35">/3.0</span>
+              <span className="ml-1 text-base font-medium text-white/35 sm:text-lg">/3.0</span>
             </p>
           </div>
 
           {stats.map(({ label, value, icon: Icon, tone }) => (
-            <div key={label} className="min-w-0 shrink rounded-2xl border border-white/8 bg-white/5 px-3 py-2.5">
+            <div key={label} className="min-w-[88px] shrink rounded-2xl border border-white/8 bg-white/5 px-3 py-2">
               <div>
                 <p className="text-[10px] uppercase tracking-[0.16em] text-white/45">{label}</p>
                 <div className="mt-1 flex items-center gap-2">
@@ -87,14 +87,14 @@ const StatusSummary = ({
             </div>
           ))}
 
-          <div className="min-w-[92px] text-right">
+          <div className="min-w-[80px] text-right sm:ml-auto">
             <p className="text-[10px] uppercase tracking-[0.16em] text-white/40">vs avg</p>
             <p className={cn('mt-1 text-lg font-semibold', deltaTone)}>
               {scoreDelta === null ? '--' : `${scoreDelta >= 0 ? '+' : ''}${scoreDelta.toFixed(1)}`}
             </p>
           </div>
 
-          <div className={cn('ml-auto shrink-0 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]', statusTone)}>
+          <div className={cn('shrink-0 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] sm:ml-0', statusTone)}>
             {statusLabel}
           </div>
         </div>

@@ -23,6 +23,11 @@ interface FeedbackFormProps {
   applicants: ApplicantRecord[];
   initialApplicantId?: number | null;
   initialRound?: InterviewRound;
+  initialEntry?: FeedbackEntry | null;
+  lockedInterviewerName?: string | null;
+  lockedIntervieweeName?: string | null;
+  lockedInterviewerRole?: InterviewerRole | null;
+  lockedRound?: InterviewRound | null;
   onSubmitFeedback: (entry: Omit<FeedbackEntry, 'id' | 'submittedAt'>) => Promise<void> | void;
   submitting?: boolean;
 }
@@ -66,6 +71,25 @@ const initialState = (intervieweeName = '', round: InterviewRound = 'Round 1'): 
   recommendation: 'MAYBE',
   finalRoundSummary: '',
   overallPerformanceOverview: '',
+});
+
+const stateFromEntry = (entry: FeedbackEntry): FeedbackFormState => ({
+  interviewerName: entry.interviewerName,
+  intervieweeName: entry.intervieweeName,
+  intervieweeGender: entry.intervieweeGender,
+  interviewerRole: entry.interviewerRole,
+  round: entry.round,
+  leadershipScore: String(entry.leadershipScore),
+  interestInOtcrScore: String(entry.interestInOtcrScore),
+  behavioralPerformanceScore: String(entry.behavioralPerformanceScore),
+  businessAcumenScore: String(entry.businessAcumenScore),
+  qualitativeCreativityScore: String(entry.qualitativeCreativityScore),
+  quantitativeStructureScore: String(entry.quantitativeStructureScore),
+  casePerformanceScore: String(entry.casePerformanceScore),
+  creativityConversationScore: String(entry.creativityConversationScore),
+  recommendation: entry.recommendation,
+  finalRoundSummary: entry.finalRoundSummary,
+  overallPerformanceOverview: entry.overallPerformanceOverview,
 });
 
 const recommendationOptions: { value: DecisionValue; label: string; helper: string }[] = [
@@ -131,7 +155,7 @@ const ChoicePillGroup = <T extends string>({
           key={option.value}
           htmlFor={id}
           className={cn(
-            'flex min-h-[72px] cursor-pointer flex-col justify-between rounded-2xl border px-4 py-3 transition-all',
+            'flex min-h-[60px] cursor-pointer flex-col justify-between rounded-2xl border px-3 py-3 transition-all sm:min-h-[68px]',
             isActive
               ? 'border-cyan-300/50 bg-cyan-400/10 text-white shadow-[0_12px_30px_rgba(56,189,248,0.16)]'
               : 'border-white/10 bg-white/[0.03] text-white/70 hover:border-white/20 hover:bg-white/[0.05]'
@@ -139,21 +163,83 @@ const ChoicePillGroup = <T extends string>({
         >
           <RadioGroupItem id={id} value={option.value} className="sr-only" />
           <span className="text-sm font-medium">{option.label}</span>
-          {option.helper ? <span className="mt-2 text-xs leading-5 text-white/45">{option.helper}</span> : null}
+          {option.helper ? <span className="mt-1 text-[11px] leading-4 text-white/45 sm:text-xs sm:leading-5">{option.helper}</span> : null}
         </Label>
       );
     })}
   </RadioGroup>
 );
 
-const FeedbackForm = ({ applicants, initialApplicantId, initialRound = 'Round 1', onSubmitFeedback, submitting = false }: FeedbackFormProps) => {
+const FeedbackForm = ({
+  applicants,
+  initialApplicantId,
+  initialRound = 'Round 1',
+  initialEntry = null,
+  lockedInterviewerName = null,
+  lockedIntervieweeName = null,
+  lockedInterviewerRole = null,
+  lockedRound = null,
+  onSubmitFeedback,
+  submitting = false,
+}: FeedbackFormProps) => {
   const initialApplicant = useMemo(
     () => applicants.find((candidate) => candidate.id === initialApplicantId) ?? null,
     [applicants, initialApplicantId]
   );
-  const [form, setForm] = useState<FeedbackFormState>(() => restoreFeedbackDraft(initialApplicant?.name ?? '', initialRound));
+  const [form, setForm] = useState<FeedbackFormState>(() => {
+    const restored = initialEntry
+      ? stateFromEntry(initialEntry)
+      : restoreFeedbackDraft(lockedIntervieweeName ?? initialApplicant?.name ?? '', lockedRound ?? initialRound);
+    return {
+      ...restored,
+      interviewerName: lockedInterviewerName ?? restored.interviewerName,
+      intervieweeName: lockedIntervieweeName ?? restored.intervieweeName,
+      interviewerRole: lockedInterviewerRole ?? restored.interviewerRole,
+      round: lockedRound ?? restored.round,
+    };
+  });
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const previousInitialApplicantNameRef = useRef(initialApplicant?.name ?? '');
+  const previousEntryIdRef = useRef(initialEntry?.id ?? null);
+
+  useEffect(() => {
+    const currentEntryId = initialEntry?.id ?? null;
+    const previousEntryId = previousEntryIdRef.current;
+    previousEntryIdRef.current = currentEntryId;
+
+    if (currentEntryId === previousEntryId) return;
+
+    if (initialEntry) {
+      const nextState = stateFromEntry(initialEntry);
+      setForm({
+        ...nextState,
+        interviewerName: lockedInterviewerName ?? nextState.interviewerName,
+        intervieweeName: lockedIntervieweeName ?? nextState.intervieweeName,
+        interviewerRole: lockedInterviewerRole ?? nextState.interviewerRole,
+        round: lockedRound ?? nextState.round,
+      });
+      setValidationMessage(null);
+      return;
+    }
+
+    const fallback = initialState(lockedIntervieweeName ?? initialApplicant?.name ?? '', lockedRound ?? initialRound);
+    setForm({
+      ...fallback,
+      interviewerName: lockedInterviewerName ?? fallback.interviewerName,
+      intervieweeName: lockedIntervieweeName ?? fallback.intervieweeName,
+      interviewerRole: lockedInterviewerRole ?? fallback.interviewerRole,
+      round: lockedRound ?? fallback.round,
+    });
+    setValidationMessage(null);
+  }, [
+    initialApplicant?.name,
+    initialEntry,
+    initialRound,
+    lockedIntervieweeName,
+    lockedInterviewerName,
+    lockedInterviewerRole,
+    lockedRound,
+  ]);
 
   useEffect(() => {
     const nextInitialApplicantName = initialApplicant?.name ?? '';
@@ -177,17 +263,42 @@ const FeedbackForm = ({ applicants, initialApplicantId, initialRound = 'Round 1'
   }, [initialApplicant?.name]);
 
   useEffect(() => {
+    if (!lockedInterviewerName) return;
     setForm((current) => {
-      if (current.round === initialRound) return current;
-      return { ...current, round: initialRound };
+      if (current.interviewerName === lockedInterviewerName) return current;
+      return { ...current, interviewerName: lockedInterviewerName };
     });
-  }, [initialRound]);
+  }, [lockedInterviewerName]);
+
+  useEffect(() => {
+    if (!lockedIntervieweeName) return;
+    setForm((current) => {
+      if (current.intervieweeName === lockedIntervieweeName) return current;
+      return { ...current, intervieweeName: lockedIntervieweeName };
+    });
+  }, [lockedIntervieweeName]);
+
+  useEffect(() => {
+    if (!lockedInterviewerRole) return;
+    setForm((current) => {
+      if (current.interviewerRole === lockedInterviewerRole) return current;
+      return { ...current, interviewerRole: lockedInterviewerRole };
+    });
+  }, [lockedInterviewerRole]);
+
+  useEffect(() => {
+    const nextRound = lockedRound ?? initialRound;
+    setForm((current) => {
+      if (current.round === nextRound) return current;
+      return { ...current, round: nextRound };
+    });
+  }, [initialRound, lockedRound]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     try {
-      if (isPristineFeedbackDraft(form, initialApplicant?.name ?? '', initialRound)) {
+      if (isPristineFeedbackDraft(form, lockedIntervieweeName ?? initialApplicant?.name ?? '', lockedRound ?? initialRound)) {
         sessionStorage.removeItem(FEEDBACK_DRAFT_STORAGE);
         return;
       }
@@ -196,7 +307,7 @@ const FeedbackForm = ({ applicants, initialApplicantId, initialRound = 'Round 1'
     } catch (error) {
       console.warn('Failed to save feedback draft', error);
     }
-  }, [form, initialApplicant?.name, initialRound]);
+  }, [form, initialApplicant?.name, initialRound, lockedIntervieweeName, lockedRound]);
 
   const matchedApplicant = useMemo(() => {
     const lookup = nameKey(form.intervieweeName);
@@ -241,7 +352,6 @@ const FeedbackForm = ({ applicants, initialApplicantId, initialRound = 'Round 1'
       overallPerformanceOverview: form.overallPerformanceOverview.trim(),
     });
 
-    setForm(initialState(initialApplicant?.name ?? '', initialRound));
     setValidationMessage(null);
   };
 
@@ -249,9 +359,9 @@ const FeedbackForm = ({ applicants, initialApplicantId, initialRound = 'Round 1'
 
   return (
     <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.97),rgba(8,13,22,0.99))] shadow-[0_24px_70px_rgba(0,0,0,0.34)]">
-      <CardHeader>
+      <CardHeader className="space-y-2 px-4 pb-4 pt-4 sm:px-5">
         <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/70">Interviewer feedback</p>
-        <CardTitle className="text-2xl text-white">Consultant review form</CardTitle>
+        <CardTitle className="text-xl text-white sm:text-2xl">Consultant review form</CardTitle>
         <p className="text-sm leading-6 text-white/55">
           Use the interviewee&apos;s exact applicant name so the submission attaches to the correct profile in the Applicants view.
         </p>
@@ -259,8 +369,8 @@ const FeedbackForm = ({ applicants, initialApplicantId, initialRound = 'Round 1'
           Unsaved responses stay on this browser if you switch pages and come back before submitting.
         </p>
       </CardHeader>
-      <CardContent>
-        <form className="space-y-8" onSubmit={handleSubmit}>
+      <CardContent className="px-4 pb-4 pt-0 sm:px-5 sm:pb-5">
+        <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="interviewerName" className="text-white/70">Your Name</Label>
@@ -268,8 +378,9 @@ const FeedbackForm = ({ applicants, initialApplicantId, initialRound = 'Round 1'
                 id="interviewerName"
                 value={form.interviewerName}
                 onChange={(event) => setForm((current) => ({ ...current, interviewerName: event.target.value }))}
-                className="border-white/10 bg-white/5 text-white"
+                className="h-11 border-white/10 bg-white/5 text-white"
                 placeholder="Interviewer name"
+                readOnly={Boolean(lockedInterviewerName)}
               />
             </div>
 
@@ -280,8 +391,9 @@ const FeedbackForm = ({ applicants, initialApplicantId, initialRound = 'Round 1'
                 list="applicant-name-options"
                 value={form.intervieweeName}
                 onChange={(event) => setForm((current) => ({ ...current, intervieweeName: event.target.value }))}
-                className="border-white/10 bg-white/5 text-white"
+                className="h-11 border-white/10 bg-white/5 text-white"
                 placeholder="Select or type the applicant name"
+                readOnly={Boolean(lockedIntervieweeName)}
               />
               <datalist id="applicant-name-options">
                 {applicantNameOptions.map((name) => (
@@ -302,7 +414,7 @@ const FeedbackForm = ({ applicants, initialApplicantId, initialRound = 'Round 1'
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-5 lg:grid-cols-2">
             <div className="space-y-3">
               <Label className="text-white/70">Interviewee&apos;s Gender</Label>
               <ChoicePillGroup
@@ -318,52 +430,64 @@ const FeedbackForm = ({ applicants, initialApplicantId, initialRound = 'Round 1'
 
             <div className="space-y-3">
               <Label className="text-white/70">Are you the primary or secondary interviewer?</Label>
-              <ChoicePillGroup
-                value={form.interviewerRole}
-                onChange={(value) => setForm((current) => ({ ...current, interviewerRole: value }))}
-                options={[
-                  { value: 'Primary', label: 'Primary' },
-                  { value: 'Secondary', label: 'Secondary' },
-                ]}
-                columnsClassName="sm:grid-cols-2"
-              />
+              {lockedInterviewerRole ? (
+                <div className="rounded-2xl border border-cyan-300/30 bg-cyan-400/10 px-4 py-3 text-sm font-medium text-white">
+                  {lockedInterviewerRole} interviewer
+                </div>
+              ) : (
+                <ChoicePillGroup
+                  value={form.interviewerRole}
+                  onChange={(value) => setForm((current) => ({ ...current, interviewerRole: value }))}
+                  options={[
+                    { value: 'Primary', label: 'Primary' },
+                    { value: 'Secondary', label: 'Secondary' },
+                  ]}
+                  columnsClassName="sm:grid-cols-2"
+                />
+              )}
             </div>
           </div>
 
           <div className="space-y-3">
             <Label className="text-white/70">Interview round</Label>
-            <ChoicePillGroup
-              value={form.round}
-              onChange={(value) => setForm((current) => ({ ...current, round: value }))}
-              options={[
-                { value: 'Round 1', label: 'Round 1' },
-                { value: 'Round 2', label: 'Round 2' },
-              ]}
-              columnsClassName="sm:grid-cols-2"
-            />
+            {lockedRound ? (
+              <div className="rounded-2xl border border-cyan-300/30 bg-cyan-400/10 px-4 py-3 text-sm font-medium text-white">
+                {lockedRound}
+              </div>
+            ) : (
+              <ChoicePillGroup
+                value={form.round}
+                onChange={(value) => setForm((current) => ({ ...current, round: value }))}
+                options={[
+                  { value: 'Round 1', label: 'Round 1' },
+                  { value: 'Round 2', label: 'Round 2' },
+                ]}
+                columnsClassName="sm:grid-cols-2"
+              />
+            )}
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
               <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/65">Ratings</p>
-              <p className="mt-2 text-sm text-white/55">
+              <p className="mt-1 text-sm text-white/55">
                 Each rubric area uses static end labels with only the numeric options selectable.
               </p>
             </div>
 
-            <div className="grid gap-5 xl:grid-cols-2">
+            <div className="grid gap-4 xl:grid-cols-2">
               {feedbackMetricFields.map((field) => (
-                <div key={field.key} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5">
+                <div key={field.key} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
                   <p className="text-sm font-medium text-white">{field.label}</p>
                   <p className="mt-2 text-sm leading-6 text-white/45">{field.description}</p>
-                  <div className="mt-4 flex items-center justify-between gap-4 text-xs uppercase tracking-[0.18em] text-white/35">
+                  <div className="mt-3 flex items-center justify-between gap-4 text-[11px] uppercase tracking-[0.18em] text-white/35">
                     <span>Below Expectations</span>
                     <span>Above Expectations</span>
                   </div>
                   <RadioGroup
                     value={form[field.key]}
                     onValueChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))}
-                    className="mt-3 grid gap-2 md:grid-cols-3"
+                    className="mt-3 grid grid-cols-3 gap-2"
                   >
                     {selectableRatingOptions.map((option) => {
                       const optionId = `${field.key}-${option.value}`;
@@ -374,14 +498,14 @@ const FeedbackForm = ({ applicants, initialApplicantId, initialRound = 'Round 1'
                           key={optionId}
                           htmlFor={optionId}
                           className={cn(
-                            'flex min-h-[76px] cursor-pointer flex-col justify-between rounded-2xl border px-4 py-3 transition-all',
+                            'flex min-h-[68px] cursor-pointer items-start justify-start rounded-2xl border px-4 py-3 transition-all sm:min-h-[76px]',
                             isActive
                               ? 'border-cyan-300/50 bg-cyan-400/10 text-white shadow-[0_10px_24px_rgba(56,189,248,0.16)]'
                               : 'border-white/10 bg-black/20 text-white/65 hover:border-white/20 hover:bg-white/[0.05]'
                           )}
                         >
                           <RadioGroupItem id={optionId} value={String(option.value)} className="sr-only" />
-                          <span className="text-sm font-medium">{option.label}</span>
+                          <span className="text-xl font-semibold">{option.label}</span>
                         </Label>
                       );
                     })}
@@ -412,7 +536,7 @@ const FeedbackForm = ({ applicants, initialApplicantId, initialRound = 'Round 1'
               id="finalRoundSummary"
               value={form.finalRoundSummary}
               onChange={(event) => setForm((current) => ({ ...current, finalRoundSummary: event.target.value }))}
-              className="min-h-[120px] border-white/10 bg-white/5 text-white"
+              className="min-h-[110px] border-white/10 bg-white/5 text-white"
               placeholder="What should the final-round interviewer probe further?"
             />
           </div>
@@ -428,7 +552,7 @@ const FeedbackForm = ({ applicants, initialApplicantId, initialRound = 'Round 1'
               id="overallPerformanceOverview"
               value={form.overallPerformanceOverview}
               onChange={(event) => setForm((current) => ({ ...current, overallPerformanceOverview: event.target.value }))}
-              className="min-h-[140px] border-white/10 bg-white/5 text-white"
+              className="min-h-[120px] border-white/10 bg-white/5 text-white"
               placeholder="Example: LEAN YES. Strong behavioral signal and composure, but I would still test quantitative structuring harder in the final round."
             />
           </div>
@@ -447,10 +571,10 @@ const FeedbackForm = ({ applicants, initialApplicantId, initialRound = 'Round 1'
             {submitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Saving feedback...
+                {initialEntry ? 'Updating response...' : 'Saving feedback...'}
               </>
             ) : (
-              'Save feedback'
+              initialEntry ? 'Edit response' : 'Save feedback'
             )}
           </Button>
         </form>

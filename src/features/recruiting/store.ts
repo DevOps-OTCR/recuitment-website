@@ -14,6 +14,8 @@ import { findApplicantByEmail, getApplicationStatusLabel } from './utils';
 
 type RecruitingListener = () => void;
 const RECRUITING_STATE_STORAGE_KEY = 'otcr-recruiting-state';
+const RECRUITING_STATE_VERSION_KEY = 'otcr-recruiting-state-version';
+const RECRUITING_STATE_VERSION = '2026-04-15-interviewer-flow-v1';
 
 const cloneState = (state: RecruitingState): RecruitingState => ({
   applicants: state.applicants.map((applicant) => ({ ...applicant })),
@@ -31,6 +33,13 @@ const loadPersistedState = (): RecruitingState => {
   if (typeof window === 'undefined') return cloneState(recruitingMockState);
 
   try {
+    const storedVersion = window.localStorage.getItem(RECRUITING_STATE_VERSION_KEY);
+    if (storedVersion !== RECRUITING_STATE_VERSION) {
+      window.localStorage.setItem(RECRUITING_STATE_VERSION_KEY, RECRUITING_STATE_VERSION);
+      window.localStorage.setItem(RECRUITING_STATE_STORAGE_KEY, JSON.stringify(recruitingMockState));
+      return cloneState(recruitingMockState);
+    }
+
     const raw = window.localStorage.getItem(RECRUITING_STATE_STORAGE_KEY);
     if (!raw) return cloneState(recruitingMockState);
 
@@ -227,6 +236,7 @@ class RecruitingStore {
 
   private emit() {
     if (typeof window !== 'undefined') {
+      window.localStorage.setItem(RECRUITING_STATE_VERSION_KEY, RECRUITING_STATE_VERSION);
       window.localStorage.setItem(RECRUITING_STATE_STORAGE_KEY, JSON.stringify(this.state));
     }
     this.listeners.forEach((listener) => listener());
