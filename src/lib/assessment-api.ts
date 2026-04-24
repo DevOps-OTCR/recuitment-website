@@ -2,9 +2,7 @@
  * API client for the DevOps OA backend
  */
 
-import { getOaApiUrl } from './oa-api-url';
-
-const API_BASE_URL = getOaApiUrl();
+import { apiFetch } from './api-client';
 
 export interface QuestionOption {
   id: string;
@@ -81,32 +79,11 @@ export interface SubmitResponse {
 }
 
 class AssessmentApiClient {
-  private baseUrl: string;
-
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl;
-  }
-
   private async fetch<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
-    
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API Error ${response.status}: ${errorText}`);
-    }
-
-    return response.json();
+    return apiFetch<T>(endpoint, options);
   }
 
   /**
@@ -203,4 +180,4 @@ class AssessmentApiClient {
 }
 
 // Export singleton instance
-export const assessmentApi = new AssessmentApiClient(API_BASE_URL);
+export const assessmentApi = new AssessmentApiClient();

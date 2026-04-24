@@ -10,5 +10,5 @@ export function getOaApiUrl(): string {
   if (typeof window !== 'undefined' && window.location.origin === PRODUCTION_ORIGIN) {
     return PRODUCTION_API_URL;
   }
-  return import.meta.env.VITE_OA_API_URL || 'http://localhost:8000';
+  return import.meta.env.NEXT_PUBLIC_OA_API_URL || import.meta.env.VITE_OA_API_URL || 'http://localhost:8000';
 }

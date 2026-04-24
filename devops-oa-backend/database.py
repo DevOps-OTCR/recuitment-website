@@ -130,6 +130,6 @@ def ensure_runtime_schema():
 
 def init_db():
     """Initialize database tables."""
-    from models import AssessmentLink, Attempt, Submission, Application  # noqa: F401
+    from models import AssessmentLink, Attempt, Submission, Application, User  # noqa: F401
     Base.metadata.create_all(bind=engine)
     ensure_runtime_schema()

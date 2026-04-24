@@ -1,6 +1,4 @@
-import { getOaApiUrl } from './oa-api-url';
-
-const API_BASE_URL = getOaApiUrl();
+import { apiFetch } from './api-client';
 
 export interface AdminEvaluationPayload {
   interviewer_name: string;
@@ -83,7 +81,8 @@ export interface AdminDatabaseOverviewResponse {
       | 'attempts'
       | 'submissions'
       | 'cycles'
-      | 'assessment_progress_snapshots';
+      | 'assessment_progress_snapshots'
+      | 'users';
     count: number;
   }>;
 }
@@ -96,69 +95,44 @@ export interface AdminDatabaseTablePreviewResponse {
     | 'attempts'
     | 'submissions'
     | 'cycles'
-    | 'assessment_progress_snapshots';
+    | 'assessment_progress_snapshots'
+    | 'users';
   count: number;
   columns: string[];
   rows: Array<Record<string, unknown>>;
 }
 
 class AdminApiClient {
-  private baseUrl = API_BASE_URL;
   private timeoutMs = 2500;
 
-  private async fetch<T>(endpoint: string, adminSecret: string, options: RequestInit = {}): Promise<T> {
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), this.timeoutMs);
-    let response: Response;
-
-    try {
-      response = await fetch(`${this.baseUrl}${endpoint}`, {
-        ...options,
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Secret': adminSecret,
-          ...options.headers,
-        },
-      });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new Error(`Admin API request timed out after ${this.timeoutMs}ms`);
-      }
-      throw error;
-    } finally {
-      window.clearTimeout(timeoutId);
-    }
-
-    if (!response.ok) {
-      const message = await response.text();
-      throw new Error(`API Error ${response.status}: ${message}`);
-    }
-
-    return response.json();
+  private async fetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    return apiFetch<T>(endpoint, {
+      ...options,
+      timeoutMs: this.timeoutMs,
+    });
   }
 
-  listApplications(adminSecret: string) {
-    return this.fetch<AdminApplicationResponse[]>('/api/admin/applications', adminSecret);
+  listApplications() {
+    return this.fetch<AdminApplicationResponse[]>('/api/admin/applications');
   }
 
-  listEvaluations(adminSecret: string) {
-    return this.fetch<AdminEvaluationResponse[]>('/api/admin/evaluations', adminSecret);
+  listEvaluations() {
+    return this.fetch<AdminEvaluationResponse[]>('/api/admin/evaluations');
   }
 
-  createEvaluation(adminSecret: string, applicationId: number, payload: AdminEvaluationPayload) {
-    return this.fetch<AdminEvaluationResponse>(`/api/admin/applications/${applicationId}/evaluations`, adminSecret, {
+  createEvaluation(applicationId: number, payload: AdminEvaluationPayload) {
+    return this.fetch<AdminEvaluationResponse>(`/api/admin/applications/${applicationId}/evaluations`, {
       method: 'POST',
       body: JSON.stringify(payload),
     });
   }
 
-  getDatabaseOverview(adminSecret: string) {
-    return this.fetch<AdminDatabaseOverviewResponse>('/api/admin/database/overview', adminSecret);
+  getDatabaseOverview() {
+    return this.fetch<AdminDatabaseOverviewResponse>('/api/admin/database/overview');
   }
 
-  getDatabaseTable(adminSecret: string, tableName: AdminDatabaseTablePreviewResponse['table'], limit: number = 25) {
-    return this.fetch<AdminDatabaseTablePreviewResponse>(`/api/admin/database/tables/${tableName}?limit=${limit}`, adminSecret);
+  getDatabaseTable(tableName: AdminDatabaseTablePreviewResponse['table'], limit: number = 25) {
+    return this.fetch<AdminDatabaseTablePreviewResponse>(`/api/admin/database/tables/${tableName}?limit=${limit}`);
   }
 }
 

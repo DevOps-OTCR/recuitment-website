@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     
     # Database: Supabase Postgres in production (use pooler URL on Render)
     database_url: str = "sqlite:///./devops_oa.db"
+
+    # Microsoft Entra ID token verification
+    microsoft_graph_me_url: str = "https://graph.microsoft.com/v1.0/me"
+    microsoft_graph_timeout_seconds: float = 10.0
     
     # Supabase: required in production when using Supabase Postgres (resume storage)
     supabase_url: str = ""

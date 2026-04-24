@@ -9,6 +9,11 @@ from database import Base
 
 # --- ENUMS ---
 
+
+def _enum_values(enum_cls):
+    return [member.value for member in enum_cls]
+
+
 class DecisionStatus(enum.Enum):
     YES = "YES"
     NO = "NO"
@@ -20,7 +25,42 @@ class ApplicationStatus(str, enum.Enum):
     APPROVED = "approved"
     REJECTED = "rejected"
 
+
+class Role(str, enum.Enum):
+    APPLICANT = "applicant"
+    CONSULTANT = "consultant"
+    LC = "lc"
+    PM = "pm"
+    PARTNER = "partner"
+
 # --- MODELS ---
+
+
+class User(Base):
+    """Admin or recruiting user."""
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    name = Column(String(255), nullable=True)
+    password_hash = Column(Text, nullable=False)
+    role = Column(
+        Enum(
+            Role,
+            values_callable=_enum_values,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            length=20,
+            name="ck_users_role",
+        ),
+        default=Role.APPLICANT,
+        server_default=Role.APPLICANT.value,
+        nullable=False,
+    )
+    active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_login_at = Column(DateTime, nullable=True)
 
 class Cycle(Base):
     __tablename__ = "cycles"

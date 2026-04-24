@@ -5,12 +5,13 @@ import os
 import enum
 from datetime import datetime
 from typing import Any, Optional, List, Literal
-from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse, Response, RedirectResponse
-from sqlalchemy import inspect, text
+from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel, Field
 
+from auth import get_current_user, permissions_for_user, requires_permissions, requires_roles, role_for_user
 from config import get_settings
 from database import get_db
 from models import (
@@ -22,6 +23,8 @@ from models import (
     Evaluation,
     ProgressSnapshot,
     DecisionStatus,
+    Role,
+    User,
 )
 from storage import upload_resume, download_resume, is_supabase_path, get_supabase_storage
 
@@ -280,6 +283,7 @@ DATABASE_PREVIEW_TABLES = {
     "submissions": "submitted_at",
     "cycles": "id",
     "assessment_progress_snapshots": "snapshot_at",
+    "users": "created_at",
 }
 
 
@@ -370,6 +374,49 @@ class ResultResponse(BaseModel):
     submitted_at: Optional[datetime] = None
     sections_completed: List[str]
     completed: bool
+
+
+class AuthenticatedUserResponse(BaseModel):
+    id: int
+    email: str
+    name: Optional[str]
+    role: str
+    active: bool
+    permissions: List[str]
+
+
+class MyApplicationResponse(BaseModel):
+    id: int
+    name: str
+    email: str
+    status: str
+    final_decision: str
+    created_at: datetime
+    reviewed_at: Optional[datetime]
+    assessment_token: Optional[str] = None
+    assessment_url: Optional[str] = None
+    assessment_completed: bool = False
+    sections_completed: List[str] = Field(default_factory=list)
+    evaluation_count: int = 0
+    latest_interview_round: Optional[str] = None
+
+
+def _user_to_response(user: User) -> AuthenticatedUserResponse:
+    return AuthenticatedUserResponse(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        role=role_for_user(user),
+        active=user.active,
+        permissions=permissions_for_user(user),
+    )
+
+
+def _evaluation_identity_candidates(user: User) -> list[str]:
+    identities = {user.email.strip().lower()}
+    if user.name:
+        identities.add(user.name.strip().lower())
+    return sorted(value for value in identities if value)
 
 
 # ============================================================================
@@ -466,27 +513,98 @@ async def check_application_status(email: str, db: Session = Depends(get_db)):
 
 
 # ============================================================================
-# Admin Endpoints
+# Authenticated User Endpoints
 # ============================================================================
 
-def _get_admin_secret() -> str:
-    """Admin password from settings (loaded from /etc/secrets/.env or .env)."""
-    password = settings.admin_password
-    if not password or password == "change-me-in-production":
-        raise HTTPException(
-            status_code=500,
-            detail="ADMIN_PASSWORD not properly configured. Upload .env secret file to Render."
+@router.get("/auth/me", response_model=AuthenticatedUserResponse)
+async def get_authenticated_user(
+    current_user: User = Depends(get_current_user),
+):
+    """Return the authenticated Microsoft Entra user plus resolved backend role/permissions."""
+    return _user_to_response(current_user)
+
+
+@router.get("/auth/me/application", response_model=MyApplicationResponse)
+async def get_my_application(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(requires_roles(Role.APPLICANT)),
+):
+    """Return the signed-in applicant's own application and interview progress."""
+    application = (
+        db.query(Application)
+        .options(
+            joinedload(Application.assessment_link).joinedload(AssessmentLink.attempts),
+            joinedload(Application.evaluations),
         )
-    return password
+        .filter(Application.email == current_user.email)
+        .first()
+    )
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found for the signed-in user.")
+
+    attempt = None
+    assessment_token = None
+    assessment_url = None
+    if application.assessment_link:
+        assessment_token = application.assessment_link.token
+        assessment_url = f"{settings.frontend_base_url}/{assessment_token}"
+        if application.assessment_link.attempts:
+            attempt = max(
+                application.assessment_link.attempts,
+                key=lambda entry: entry.started_at or datetime.min,
+            )
+
+    latest_evaluation = None
+    if application.evaluations:
+        latest_evaluation = max(
+            application.evaluations,
+            key=lambda entry: entry.created_at or datetime.min,
+        )
+
+    return MyApplicationResponse(
+        id=application.id,
+        name=application.name,
+        email=application.email,
+        status=application.status,
+        final_decision=application.final_decision.value,
+        created_at=application.created_at,
+        reviewed_at=application.reviewed_at,
+        assessment_token=assessment_token,
+        assessment_url=assessment_url,
+        assessment_completed=bool(attempt and attempt.completed_at),
+        sections_completed=list(attempt.sections_completed or []) if attempt else [],
+        evaluation_count=len(application.evaluations or []),
+        latest_interview_round=latest_evaluation.round if latest_evaluation else None,
+    )
 
 
-def verify_admin_secret(x_admin_secret: str = Header(..., alias="X-Admin-Secret")):
-    """Verify admin secret header."""
-    expected = _get_admin_secret()
-    
-    if x_admin_secret != expected:
-        raise HTTPException(status_code=403, detail="Invalid admin secret")
-    return True
+@router.get("/auth/me/interviews", response_model=List[EvaluationResponse])
+async def list_my_interviews(
+    application_id: Optional[int] = None,
+    limit: int = 250,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(requires_permissions("view_assigned_interviews")),
+):
+    """Return evaluations authored by the signed-in interviewer."""
+    identities = _evaluation_identity_candidates(current_user)
+    query = db.query(Evaluation).options(joinedload(Evaluation.application))
+
+    if identities:
+        query = query.filter(func.lower(Evaluation.interviewer_name).in_(identities))
+    if application_id is not None:
+        query = query.filter(Evaluation.application_id == application_id)
+
+    evaluations = (
+        query.order_by(Evaluation.created_at.desc(), Evaluation.id.desc())
+        .limit(max(1, min(limit, 500)))
+        .all()
+    )
+    return [_evaluation_to_response(evaluation) for evaluation in evaluations]
+
+
+# ============================================================================
+# Admin Endpoints
+# ============================================================================
 
 
 @router.get("/admin/applications", response_model=List[ApplicationListItem])
@@ -494,7 +612,7 @@ async def list_applications(
     status: Optional[str] = None,
     archived: Optional[str] = None,
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_admin_secret),
+    _current_user: User = Depends(requires_permissions("view_all_applicants")),
 ):
     """List applications (admin only). archived=0 or omit = exclude archived; archived=1 = include; archived=only = only archived."""
     query = db.query(Application).options(
@@ -549,7 +667,7 @@ async def list_applications(
 async def get_application(
     application_id: int,
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_admin_secret),
+    _current_user: User = Depends(requires_permissions("view_all_applicants")),
 ):
     """Get application details (admin only)."""
     application = db.query(Application).filter(Application.id == application_id).first()
@@ -578,7 +696,7 @@ async def get_application(
 async def get_application_resume(
     application_id: int,
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_admin_secret),
+    _current_user: User = Depends(requires_permissions("view_all_applicants")),
 ):
     """Stream resume file for admin (opens in new tab). From Supabase Storage or local disk."""
     application = db.query(Application).filter(Application.id == application_id).first()
@@ -620,7 +738,7 @@ async def list_evaluations(
     application_id: Optional[int] = None,
     limit: int = 250,
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_admin_secret),
+    _current_user: User = Depends(requires_permissions("see_relative_score")),
 ):
     """List saved interviewer evaluations (admin only)."""
     query = db.query(Evaluation).options(joinedload(Evaluation.application))
@@ -641,7 +759,7 @@ async def create_evaluation(
     application_id: int,
     payload: EvaluationPayload,
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_admin_secret),
+    current_user: User = Depends(requires_permissions("submit_feedback")),
 ):
     """Create an interviewer evaluation for an application (admin only)."""
     application = db.query(Application).filter(Application.id == application_id).first()
@@ -651,7 +769,7 @@ async def create_evaluation(
     recommendation_bucket = _recommendation_bucket(payload.recommendation)
     evaluation = Evaluation(
         application_id=application.id,
-        interviewer_name=payload.interviewer_name.strip(),
+        interviewer_name=(current_user.name or current_user.email).strip(),
         round=payload.round,
         interviewee_name=payload.interviewee_name.strip(),
         interviewee_gender=payload.interviewee_gender,
@@ -692,7 +810,7 @@ async def create_evaluation(
 @router.get("/admin/database/overview", response_model=DatabaseOverviewResponse)
 async def get_database_overview(
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_admin_secret),
+    _current_user: User = Depends(requires_permissions("see_database")),
 ):
     """Return row counts for the main backend tables (admin only)."""
     inspector = inspect(db.bind)
@@ -716,7 +834,7 @@ async def get_database_table_preview(
     table_name: str,
     limit: int = 25,
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_admin_secret),
+    _current_user: User = Depends(requires_permissions("see_database")),
 ):
     """Return a preview of rows from a whitelisted table (admin only)."""
     if table_name not in DATABASE_PREVIEW_TABLES:
@@ -751,7 +869,7 @@ async def get_database_table_preview(
 async def get_submission(
     token: str,
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_admin_secret),
+    _current_user: User = Depends(requires_permissions("see_database")),
 ):
     """Get all submissions for an assessment token (admin only)."""
     link = db.query(AssessmentLink).filter(AssessmentLink.token == token).first()
@@ -903,7 +1021,7 @@ async def approve_application(
     application_id: int,
     request: ApproveApplicationRequest,
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_admin_secret),
+    _current_user: User = Depends(requires_roles(Role.PARTNER)),
 ):
     """Approve an application and generate assessment link (admin only)."""
     application = db.query(Application).filter(Application.id == application_id).first()
@@ -947,7 +1065,7 @@ async def reject_application(
     application_id: int,
     request: ApproveApplicationRequest,
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_admin_secret),
+    _current_user: User = Depends(requires_roles(Role.PARTNER)),
 ):
     """Reject an application (admin only)."""
     application = db.query(Application).filter(Application.id == application_id).first()
@@ -971,7 +1089,7 @@ async def reject_application(
 async def archive_application(
     application_id: int,
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_admin_secret),
+    _current_user: User = Depends(requires_roles(Role.PARTNER)),
 ):
     """Archive an application (hide from default list). Admin only."""
     application = db.query(Application).filter(Application.id == application_id).first()
@@ -986,7 +1104,7 @@ async def archive_application(
 async def unarchive_application(
     application_id: int,
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_admin_secret),
+    _current_user: User = Depends(requires_roles(Role.PARTNER)),
 ):
     """Restore an archived application. Admin only."""
     application = db.query(Application).filter(Application.id == application_id).first()
@@ -1001,7 +1119,7 @@ async def unarchive_application(
 async def delete_application(
     application_id: int,
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_admin_secret),
+    _current_user: User = Depends(requires_roles(Role.PARTNER)),
 ):
     """Permanently delete an application and its assessment link/attempts. Admin only."""
     application = db.query(Application).filter(Application.id == application_id).first()
@@ -1040,7 +1158,7 @@ async def delete_application(
 async def create_link(
     request: CreateLinkRequest,
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_admin_secret),
+    _current_user: User = Depends(requires_roles(Role.PARTNER)),
 ):
     """Create a new assessment link (admin only)."""
     token = secrets.token_urlsafe(16)
@@ -1069,7 +1187,7 @@ async def create_link(
 @router.post("/admin/test-link")
 async def get_admin_test_link(
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_admin_secret),
+    _current_user: User = Depends(requires_roles(Role.PARTNER)),
 ):
     """Get or create a reusable admin test link (admin only).
     

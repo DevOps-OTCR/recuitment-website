@@ -5,6 +5,7 @@ import { componentTagger } from "lovable-tagger";
 
 export default defineConfig(({ mode }) => ({
   base: mode === 'production' ? '/' : '/',
+  envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
   server: {
     host: true, // optional: was "::"
     port: 8080,
