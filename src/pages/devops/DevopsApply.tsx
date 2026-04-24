@@ -1,151 +1,215 @@
-import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import Navigation from '@/components/Navigation';
+import { useMemo, useState } from 'react';
+import { ArrowLeft, CheckCircle2, FileText, ShieldCheck, Sparkles, UploadCloud } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
 import Footer from '@/components/Footer';
+import Navigation from '@/components/Navigation';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Upload, Loader2, ArrowLeft, FileText, AlertCircle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
+import {
+  ApplicationStatus,
+  applicationsService,
+  type Applicant,
+  type ApplicantCycle,
+  type SchoolYear,
+  type TeamApplyingFor,
+} from '@/features/recruiting';
 
-import { getOaApiUrl } from '../../lib/oa-api-url';
-const API_BASE_URL = getOaApiUrl();
-
-interface ApplicationResult {
-  id: number;
+type FormValues = {
   name: string;
   email: string;
-  status: string;
-  message: string;
-}
+  schoolYear: string;
+  whyOtcr: string;
+  caseAnswer: string;
+  teamApplyingFor: string;
+  cycle: `${ApplicantCycle}` | '';
+};
+
+type FormErrors = Partial<Record<keyof FormValues | 'resume', string>>;
+
+const initialFormValues: FormValues = {
+  name: '',
+  email: '',
+  schoolYear: '',
+  whyOtcr: '',
+  caseAnswer: '',
+  teamApplyingFor: '',
+  cycle: '',
+};
+
+const schoolYearOptions: SchoolYear[] = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'Graduate'];
+const teamOptions: TeamApplyingFor[] = ['Consulting', 'Operations', 'Technology', 'Design', 'Internal'];
+
+const validateEmail = (email: string) => /\S+@\S+\.\S+/.test(email);
+
+const formatSubmittedAt = (timestamp: string) =>
+  new Date(timestamp).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
+const toApplicantId = (name: string, email: string) => {
+  const base = `${name}-${email}`
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+
+  return `app-${base || Date.now()}`;
+};
 
 const DevopsApply = () => {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const isEmbed = searchParams.get('embed') === 'true';
-  
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [interest, setInterest] = useState('');
-  const [resume, setResume] = useState<File | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<ApplicationResult | null>(null);
+  const [formValues, setFormValues] = useState<FormValues>(initialFormValues);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedApplication, setSubmittedApplication] = useState<Applicant | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Validate file type
-      const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-      if (!allowedTypes.includes(file.type)) {
-        setError('Please upload a PDF or Word document.');
-        return;
-      }
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setError('File size must be less than 5MB.');
-        return;
-      }
-      setResume(file);
-      setError(null);
-    }
+  const completionCount = useMemo(() => {
+    const values = Object.values(formValues).filter((value) => value.trim?.() || value);
+    return values.length + (resumeFile ? 1 : 0);
+  }, [formValues, resumeFile]);
+
+  const updateField = <K extends keyof FormValues>(field: K, value: FormValues[K]) => {
+    setFormValues((current) => ({ ...current, [field]: value }));
+    setErrors((current) => ({ ...current, [field]: undefined }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!name.trim() || !email.trim() || !interest.trim() || !resume) {
-      setError('Please fill in all fields and upload your resume.');
-      return;
-    }
-
-    setSubmitting(true);
-    setError(null);
-
-    try {
-      const formData = new FormData();
-      formData.append('name', name.trim());
-      formData.append('email', email.trim().toLowerCase());
-      formData.append('interest', interest.trim());
-      formData.append('resume', resume);
-
-      const response = await fetch(`${API_BASE_URL}/api/applications`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Failed to submit application');
-      }
-
-      setResult(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit application. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
+  const handleResumeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setResumeFile(file);
+    setErrors((current) => ({ ...current, resume: undefined }));
   };
 
-  // Success state
-  if (result) {
-    const successContent = (
-      <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-        <CardHeader className="text-center">
-          <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-8 h-8 text-green-500" />
-          </div>
-          <CardTitle className="text-2xl text-white">Application Submitted!</CardTitle>
-          <CardDescription>{result.message}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="bg-background/50 rounded-lg p-4 space-y-2">
-            <p className="text-sm text-muted-foreground">
-              <span className="text-white font-medium">Name:</span> {result.name}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              <span className="text-white font-medium">Email:</span> {result.email}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              <span className="text-white font-medium">Status:</span>{' '}
-              <span className="capitalize">{result.status}</span>
-            </p>
-          </div>
-          <p className="text-xs text-muted-foreground text-center">
-            You can check your application status anytime on the Tech page.
-          </p>
-          {!isEmbed && (
-            <Button
-              variant="outline"
-              onClick={() => navigate('/tech')}
-              className="w-full"
-            >
-              Back to Tech
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-    );
+  const validateForm = () => {
+    const nextErrors: FormErrors = {};
 
-    // Embed mode - minimal wrapper
-    if (isEmbed) {
-      return (
-        <div className="min-h-screen bg-background p-4">
-          <div className="max-w-md mx-auto pt-8">
-            {successContent}
-          </div>
-        </div>
-      );
-    }
+    if (!formValues.name.trim()) nextErrors.name = 'Name is required.';
+    if (!formValues.email.trim()) nextErrors.email = 'Email is required.';
+    else if (!validateEmail(formValues.email.trim())) nextErrors.email = 'Enter a valid email address.';
+    if (!resumeFile) nextErrors.resume = 'Resume is required.';
+    if (!formValues.schoolYear.trim()) nextErrors.schoolYear = 'School year is required.';
+    if (!formValues.whyOtcr.trim()) nextErrors.whyOtcr = 'Tell us why OTCR is a fit.';
+    if (!formValues.caseAnswer.trim()) nextErrors.caseAnswer = 'Case answer is required.';
+    if (!formValues.teamApplyingFor.trim()) nextErrors.teamApplyingFor = 'Choose a team.';
+    if (!formValues.cycle) nextErrors.cycle = 'Select a cycle.';
 
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!validateForm() || !resumeFile) return;
+
+    setIsSubmitting(true);
+
+    const existingApplicant = await applicationsService.getApplicationByEmail(formValues.email);
+    const submittedAt = existingApplicant?.submittedAt ?? new Date().toISOString();
+    const record: Applicant = {
+      id: existingApplicant?.id ?? toApplicantId(formValues.name, formValues.email),
+      name: formValues.name.trim(),
+      email: formValues.email.trim().toLowerCase(),
+      resume: resumeFile.name,
+      schoolYear: formValues.schoolYear as SchoolYear,
+      whyOtcr: formValues.whyOtcr.trim(),
+      caseAnswer: formValues.caseAnswer.trim(),
+      teamApplyingFor: formValues.teamApplyingFor as TeamApplyingFor,
+      cycle: Number(formValues.cycle) as ApplicantCycle,
+      status: ApplicationStatus.Applied,
+      currentRound: null,
+      finalDecision: 'pending',
+      assignedPrimaryInterviewerId: existingApplicant?.assignedPrimaryInterviewerId ?? null,
+      assignedSecondaryInterviewerId: existingApplicant?.assignedSecondaryInterviewerId ?? null,
+      submittedAt,
+      updatedAt: new Date().toISOString(),
+      notes: existingApplicant?.notes ?? 'Submitted through /tech/apply',
+    };
+
+    await applicationsService.createOrUpdateApplication(record);
+    setSubmittedApplication(record);
+    setIsSubmitting(false);
+  };
+
+  if (submittedApplication) {
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
-        <section className="pt-32 pb-16 px-4">
-          <div className="max-w-md mx-auto">
-            {successContent}
+        <section className="relative overflow-hidden px-4 pb-20 pt-32">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(20,184,166,0.16),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_30%)]" />
+          <div className="relative mx-auto max-w-3xl">
+            <Card className="border-white/10 bg-slate-950/80 shadow-2xl shadow-teal-950/20 backdrop-blur">
+              <CardHeader className="space-y-6 text-center">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-500/10">
+                  <CheckCircle2 className="h-8 w-8 text-emerald-300" />
+                </div>
+                <div className="space-y-2">
+                  <CardTitle className="text-3xl text-white">Application submitted</CardTitle>
+                  <CardDescription className="mx-auto max-w-xl text-base text-slate-300">
+                    Your OTCR recruiting profile has been created locally with status <span className="font-semibold text-white">applied</span>.
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-5 text-sm text-slate-300 md:grid-cols-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Applicant</p>
+                    <p className="mt-1 font-medium text-white">{submittedApplication.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Email</p>
+                    <p className="mt-1 font-medium text-white">{submittedApplication.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Team</p>
+                    <p className="mt-1 font-medium text-white">{submittedApplication.teamApplyingFor}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Cycle</p>
+                    <p className="mt-1 font-medium text-white">Cycle {submittedApplication.cycle}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Resume</p>
+                    <p className="mt-1 font-medium text-white">{submittedApplication.resume}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Submitted</p>
+                    <p className="mt-1 font-medium text-white">{formatSubmittedAt(submittedApplication.submittedAt)}</p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-teal-400/20 bg-teal-400/10 p-4 text-sm text-teal-50">
+                  This uses local state only. No backend, database, or real file upload was triggered.
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button asChild className="flex-1 bg-teal-500 text-slate-950 hover:bg-teal-400">
+                    <Link to="/tech">Back to Tech</Link>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                    onClick={() => {
+                      setSubmittedApplication(null);
+                      setFormValues(initialFormValues);
+                      setResumeFile(null);
+                      setErrors({});
+                    }}
+                  >
+                    Submit another application
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </section>
         <Footer />
@@ -153,218 +217,205 @@ const DevopsApply = () => {
     );
   }
 
-  // Form card component (reused in both modes)
-  const formCard = (
-    <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-      <CardHeader>
-        {isEmbed && (
-          <img 
-            src={otcrTechLogo} 
-            alt="OTCR Technologies" 
-            className="h-12 w-auto mx-auto mb-4"
-          />
-        )}
-        <CardTitle className="text-xl text-white">{isEmbed ? 'Apply to OTCR Technologies' : 'Your Information'}</CardTitle>
-        <CardDescription>
-          Fill out the form below to apply.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Name */}
-          <div className="space-y-2">
-            <Label htmlFor="name" className="text-white">Full Name</Label>
-            <Input
-              id="name"
-              type="text"
-              placeholder="John Doe"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="bg-background/50 border-border text-white placeholder:text-muted-foreground"
-              required
-            />
-          </div>
-
-          {/* Email */}
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-white">Email Address</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="john@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="bg-background/50 border-border text-white placeholder:text-muted-foreground"
-              required
-            />
-            <p className="text-xs text-muted-foreground">
-              Use the email you want us to contact you at.
-            </p>
-          </div>
-
-          {/* Interest */}
-          <div className="space-y-2">
-            <Label htmlFor="interest" className="text-white">Why are you interested in OTCR Technologies?</Label>
-            <Input
-              id="interest"
-              type="text"
-              placeholder="One sentence about your interest"
-              value={interest}
-              onChange={(e) => setInterest(e.target.value)}
-              className="bg-background/50 border-border text-white placeholder:text-muted-foreground"
-              maxLength={200}
-              required
-            />
-            <p className="text-xs text-muted-foreground">
-              Keep it brief — one sentence is perfect.
-            </p>
-          </div>
-
-          {/* Resume Upload */}
-          <div className="space-y-2">
-            <Label htmlFor="resume" className="text-white">Resume</Label>
-            <div className="relative">
-              <input
-                id="resume"
-                type="file"
-                accept=".pdf,.doc,.docx"
-                onChange={handleFileChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                required
-              />
-              <div className={`
-                flex items-center gap-3 p-4 rounded-lg border-2 border-dashed
-                transition-colors cursor-pointer
-                ${resume 
-                  ? 'border-green-500/50 bg-green-500/5' 
-                  : 'border-border hover:border-primary/50 bg-background/50'
-                }
-              `}>
-                {resume ? (
-                  <>
-                    <FileText className="w-5 h-5 text-green-500" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white truncate">{resume.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {(resume.size / 1024).toFixed(1)} KB
-                      </p>
-                    </div>
-                    <CheckCircle className="w-5 h-5 text-green-500" />
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-5 h-5 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm text-white">Click to upload resume</p>
-                      <p className="text-xs text-muted-foreground">PDF or Word, max 5MB</p>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-              <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
-              <p className="text-sm text-destructive">{error}</p>
-            </div>
-          )}
-
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            disabled={submitting || !name.trim() || !email.trim() || !resume}
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              'Submit Application'
-            )}
-          </Button>
-
-          {/* Back Link - hidden in embed mode */}
-          {!isEmbed && (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => navigate('/tech')}
-              className="w-full text-muted-foreground hover:text-white"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Tech
-            </Button>
-          )}
-        </form>
-      </CardContent>
-    </Card>
-  );
-
-  // Embed mode - minimal wrapper with just the form
-  if (isEmbed) {
-    return (
-      <div className="min-h-screen bg-background p-4">
-        <div className="max-w-md mx-auto pt-4">
-          {formCard}
-        </div>
-      </div>
-    );
-  }
-
-  // Full page mode
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      
-      {/* Main Content - Side by side on desktop */}
-      <section className="pt-28 lg:pt-32 pb-24 px-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-start">
-            {/* Left side - Info */}
-            <div className="text-center lg:text-left lg:sticky lg:top-32">
-              <img 
-                src={otcrTechLogo} 
-                alt="OTCR Technologies" 
-                className="h-20 lg:h-28 w-auto mx-auto lg:mx-0 mb-6"
-              />
-              <h1 className="text-4xl lg:text-5xl font-extrabold text-white mb-4">
-                Apply to Technologies Division
-              </h1>
-              <p className="text-lg text-muted-foreground mb-8">
-                Submit your application to join the Technologies Division.
-                We'll review your application and reach out about next steps.
-              </p>
-              
-              {/* Quick info */}
-              <div className="hidden lg:block space-y-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-teal-primary/20 flex items-center justify-center">
-                    <FileText className="w-4 h-4 text-teal-primary" />
-                  </div>
-                  <span>Application takes ~2 minutes</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-teal-primary/20 flex items-center justify-center">
-                    <CheckCircle className="w-4 h-4 text-teal-primary" />
-                  </div>
-                  <span>We review applications within a week</span>
-                </div>
+      <section className="relative overflow-hidden pb-20 pt-28">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.18),transparent_34%),radial-gradient(circle_at_80%_20%,rgba(96,165,250,0.12),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.96),rgba(2,6,23,1))]" />
+        <div className="relative mx-auto grid max-w-6xl gap-8 px-4 lg:grid-cols-[0.88fr_1.12fr]">
+          <div className="space-y-6">
+            <Link to="/tech" className="inline-flex items-center gap-2 text-sm text-slate-300 transition hover:text-white">
+              <ArrowLeft className="h-4 w-4" />
+              Back to OTCR Tech
+            </Link>
+
+            <div className="space-y-5">
+              <img src={otcrTechLogo} alt="OTCR Technologies" className="h-14 w-auto" />
+              <div className="inline-flex items-center gap-2 rounded-full border border-teal-400/20 bg-teal-400/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-teal-100">
+                <Sparkles className="h-3.5 w-3.5" />
+                OTCR Recruiting Pipeline
+              </div>
+              <div className="space-y-4">
+                <h1 className="max-w-xl text-4xl font-semibold tracking-tight text-white md:text-5xl">
+                  Apply for the team without touching the evaluator dashboard.
+                </h1>
+                <p className="max-w-xl text-base leading-7 text-slate-300">
+                  Submit your applicant profile, attach a resume placeholder, and enter your written responses. This page stores an upstream application record locally with recruiting status set to <span className="font-semibold text-white">applied</span>.
+                </p>
               </div>
             </div>
 
-            {/* Right side - Form */}
-            <div className="w-full max-w-md mx-auto lg:mx-0">
-              {formCard}
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Required</p>
+                <p className="mt-2 text-2xl font-semibold text-white">8/8</p>
+                <p className="mt-1 text-sm text-slate-400">Core intake fields covered</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Storage</p>
+                <p className="mt-2 text-2xl font-semibold text-white">Local</p>
+                <p className="mt-1 text-sm text-slate-400">No backend or DB hookup</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Progress</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{completionCount}/8</p>
+                <p className="mt-1 text-sm text-slate-400">Fields completed so far</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-5 text-sm text-emerald-50">
+              <div className="flex items-center gap-2 font-medium text-white">
+                <ShieldCheck className="h-4 w-4 text-emerald-300" />
+                Submission behavior for this build
+              </div>
+              <p>Resume upload is UI-only and stores the selected filename in local state.</p>
+              <p>The created record is ready to feed the future applicant portal and recruiting workflow.</p>
             </div>
           </div>
+
+          <Card className="border-white/10 bg-slate-950/80 shadow-2xl shadow-slate-950/40 backdrop-blur">
+            <CardHeader className="space-y-3">
+              <CardTitle className="text-2xl text-white">Applicant submission</CardTitle>
+              <CardDescription className="text-slate-300">
+                Complete all required fields to create a local OTCR application record.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className="space-y-6" onSubmit={handleSubmit}>
+                <div className="grid gap-5 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-white">Name</Label>
+                    <Input
+                      id="name"
+                      value={formValues.name}
+                      onChange={(event) => updateField('name', event.target.value)}
+                      placeholder="Full name"
+                      className="border-white/10 bg-white/5 text-white placeholder:text-slate-500"
+                    />
+                    {errors.name ? <p className="text-xs text-rose-300">{errors.name}</p> : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-white">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formValues.email}
+                      onChange={(event) => updateField('email', event.target.value)}
+                      placeholder="name@illinois.edu"
+                      className="border-white/10 bg-white/5 text-white placeholder:text-slate-500"
+                    />
+                    {errors.email ? <p className="text-xs text-rose-300">{errors.email}</p> : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-white">School year</Label>
+                    <Select value={formValues.schoolYear} onValueChange={(value) => updateField('schoolYear', value)}>
+                      <SelectTrigger className="border-white/10 bg-white/5 text-white">
+                        <SelectValue placeholder="Select school year" />
+                      </SelectTrigger>
+                      <SelectContent className="border-white/10 bg-slate-950 text-white">
+                        {schoolYearOptions.map((option) => (
+                          <SelectItem key={option} value={option} className="focus:bg-white/10 focus:text-white">
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.schoolYear ? <p className="text-xs text-rose-300">{errors.schoolYear}</p> : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-white">Team applying for</Label>
+                    <Select value={formValues.teamApplyingFor} onValueChange={(value) => updateField('teamApplyingFor', value)}>
+                      <SelectTrigger className="border-white/10 bg-white/5 text-white">
+                        <SelectValue placeholder="Choose a team" />
+                      </SelectTrigger>
+                      <SelectContent className="border-white/10 bg-slate-950 text-white">
+                        {teamOptions.map((option) => (
+                          <SelectItem key={option} value={option} className="focus:bg-white/10 focus:text-white">
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.teamApplyingFor ? <p className="text-xs text-rose-300">{errors.teamApplyingFor}</p> : null}
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label className="text-white">Cycle</Label>
+                    <Select value={formValues.cycle} onValueChange={(value: `${ApplicantCycle}`) => updateField('cycle', value)}>
+                      <SelectTrigger className="border-white/10 bg-white/5 text-white md:max-w-[220px]">
+                        <SelectValue placeholder="Select cycle" />
+                      </SelectTrigger>
+                      <SelectContent className="border-white/10 bg-slate-950 text-white">
+                        <SelectItem value="1" className="focus:bg-white/10 focus:text-white">Cycle 1</SelectItem>
+                        <SelectItem value="2" className="focus:bg-white/10 focus:text-white">Cycle 2</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {errors.cycle ? <p className="text-xs text-rose-300">{errors.cycle}</p> : null}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="resume" className="text-white">Resume upload</Label>
+                  <label
+                    htmlFor="resume"
+                    className="group flex cursor-pointer items-center gap-4 rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-4 transition hover:border-teal-300/40 hover:bg-white/[0.05]"
+                  >
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-400/10 text-teal-200">
+                      {resumeFile ? <FileText className="h-5 w-5" /> : <UploadCloud className="h-5 w-5" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-white">
+                        {resumeFile ? resumeFile.name : 'Choose a resume file'}
+                      </p>
+                      <p className="text-sm text-slate-400">
+                        UI placeholder only. No upload occurs in this build.
+                      </p>
+                    </div>
+                  </label>
+                  <Input id="resume" type="file" className="hidden" onChange={handleResumeChange} />
+                  {errors.resume ? <p className="text-xs text-rose-300">{errors.resume}</p> : null}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="whyOtcr" className="text-white">Why OTCR</Label>
+                  <Textarea
+                    id="whyOtcr"
+                    value={formValues.whyOtcr}
+                    onChange={(event) => updateField('whyOtcr', event.target.value)}
+                    placeholder="Why do you want to join OTCR, and what kind of work are you hoping to do?"
+                    className="min-h-[120px] border-white/10 bg-white/5 text-white placeholder:text-slate-500"
+                  />
+                  {errors.whyOtcr ? <p className="text-xs text-rose-300">{errors.whyOtcr}</p> : null}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="caseAnswer" className="text-white">Case answer</Label>
+                  <Textarea
+                    id="caseAnswer"
+                    value={formValues.caseAnswer}
+                    onChange={(event) => updateField('caseAnswer', event.target.value)}
+                    placeholder="Walk through how you would structure and solve a short consulting-style prompt."
+                    className="min-h-[160px] border-white/10 bg-white/5 text-white placeholder:text-slate-500"
+                  />
+                  {errors.caseAnswer ? <p className="text-xs text-rose-300">{errors.caseAnswer}</p> : null}
+                </div>
+
+                <div className="flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-slate-400">
+                    Required fields are validated before creating the local application record.
+                  </p>
+                  <Button type="submit" disabled={isSubmitting} className="bg-teal-500 text-slate-950 hover:bg-teal-400">
+                    {isSubmitting ? 'Submitting...' : 'Submit application'}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       </section>
-
       <Footer />
     </div>
   );

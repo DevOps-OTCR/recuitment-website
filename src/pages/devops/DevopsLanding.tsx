@@ -6,32 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
-  ArrowRight, ArrowDown, Clock, Code, Brain, Lightbulb, FileText, Search, 
-  CheckCircle, XCircle, Loader2, ExternalLink, Server, Cloud, 
+  ArrowRight, ArrowDown, Code, Brain, Lightbulb, FileText, Search,
+  Server, Cloud,
   GitBranch, Activity, Shield, Zap, Users, Rocket, Briefcase, Sparkles, Award
 } from 'lucide-react';
 import FadeContent from '@/reactbits/animations/FadeContent/FadeContent';
 import SplitText from '@/reactbits/textanimations/SplitText/SplitText';
 import chicagoSkyline from '@/assets/chicago_skyline.png';
 
-import { getOaApiUrl } from '../../lib/oa-api-url';
-const API_BASE_URL = getOaApiUrl();
-
-interface StatusCheckResult {
-  found: boolean;
-  status?: string;
-  name?: string;
-  created_at?: string;
-  assessment_token?: string;
-  assessment_url?: string;
-  message?: string;
-}
-
 const DevopsLanding = () => {
   const [token, setToken] = useState('');
   const [checkEmail, setCheckEmail] = useState('');
-  const [checkingStatus, setCheckingStatus] = useState(false);
-  const [statusResult, setStatusResult] = useState<StatusCheckResult | null>(null);
   const navigate = useNavigate();
 
   const handleStartAssessment = () => {
@@ -46,21 +31,9 @@ const DevopsLanding = () => {
     }
   };
 
-  const handleCheckStatus = async () => {
+  const handleCheckStatus = () => {
     if (!checkEmail.trim()) return;
-    
-    setCheckingStatus(true);
-    setStatusResult(null);
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/applications/check/${encodeURIComponent(checkEmail.trim().toLowerCase())}`);
-      const data = await response.json();
-      setStatusResult(data);
-    } catch (err) {
-      setStatusResult({ found: false, message: 'Failed to check status. Please try again.' });
-    } finally {
-      setCheckingStatus(false);
-    }
+    navigate(`/tech/status?email=${encodeURIComponent(checkEmail.trim().toLowerCase())}`);
   };
 
   // Internal platform work
@@ -434,69 +407,18 @@ const DevopsLanding = () => {
                 />
                 <Button 
                   onClick={handleCheckStatus}
-                  disabled={!checkEmail.trim() || checkingStatus}
+                  disabled={!checkEmail.trim()}
                   variant="outline"
                   className="w-full"
                 >
-                  {checkingStatus ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Checking...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="w-4 h-4 mr-2" />
-                      Check Status
-                    </>
-                  )}
+                  <>
+                    <Search className="w-4 h-4 mr-2" />
+                    Open Status Portal
+                  </>
                 </Button>
-                
-                {/* Status Result */}
-                {statusResult && (
-                  <div className={`p-3 rounded-lg ${
-                    statusResult.found 
-                      ? statusResult.status === 'approved' 
-                        ? 'bg-green-500/10 border border-green-500/20'
-                        : statusResult.status === 'rejected'
-                          ? 'bg-red-500/10 border border-red-500/20'
-                          : 'bg-yellow-500/10 border border-yellow-500/20'
-                      : 'bg-muted/50'
-                  }`}>
-                    {statusResult.found ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          {statusResult.status === 'approved' ? (
-                            <CheckCircle className="w-4 h-4 text-green-500" />
-                          ) : statusResult.status === 'rejected' ? (
-                            <XCircle className="w-4 h-4 text-red-500" />
-                          ) : (
-                            <Clock className="w-4 h-4 text-yellow-500" />
-                          )}
-                          <span className="text-sm font-medium text-white capitalize">
-                            {statusResult.status}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Application for {statusResult.name}
-                        </p>
-                        {statusResult.assessment_token && (
-                          <Button
-                            size="sm"
-                            onClick={() => navigate(`/tech/assessment/${statusResult.assessment_token}`)}
-                            className="w-full mt-2 bg-green-600 hover:bg-green-700"
-                          >
-                            Start Assessment
-                            <ExternalLink className="w-3 h-3 ml-2" />
-                          </Button>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        {statusResult.message || 'No application found with this email.'}
-                      </p>
-                    )}
-                  </div>
-                )}
+                <p className="text-xs text-muted-foreground">
+                  We&apos;ll take you to the applicant portal and prefill this email for lookup.
+                </p>
               </CardContent>
             </Card>
 
