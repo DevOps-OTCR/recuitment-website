@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Clock3, FileSearch, Mail, Search, XCircle } from 'lucide-react';
 
@@ -8,12 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  ApplicationStatus,
-  getApplicationStatusLabel,
-  statusService,
-  useRecruitingStore,
-} from '@/features/recruiting';
+import { ApplicationStatus, getApplicationStatusLabel } from '@/features/recruiting';
+import { ApiError } from '@/lib/api-client';
+import { publicApplicationsApi, type PublicApplicationStatusResponse } from '@/lib/public-applications-api';
 
 const statusConfig: Record<
   ApplicationStatus,
@@ -71,29 +68,79 @@ const formatUpdatedAt = (value: string) =>
     year: 'numeric',
   });
 
+const mapBackendStatus = (status: PublicApplicationStatusResponse['status']): ApplicationStatus | null => {
+  switch (status) {
+    case 'pending':
+      return ApplicationStatus.Applied;
+    case 'approved':
+      return ApplicationStatus.Accepted;
+    case 'rejected':
+      return ApplicationStatus.Rejected;
+    default:
+      return null;
+  }
+};
+
+type StatusLookupResult = {
+  applicantName: string;
+  applicantEmail: string;
+  status: ApplicationStatus;
+  createdAt: string;
+  assessmentUrl?: string;
+};
+
 const DevopsStatus = () => {
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState(searchParams.get('email') ?? '');
   const [submittedEmail, setSubmittedEmail] = useState(searchParams.get('email') ?? '');
-  const applicants = useRecruitingStore((state) => state.applicants);
-  const [lookupApplicantId, setLookupApplicantId] = useState<string | null>(null);
+  const [lookupResult, setLookupResult] = useState<StatusLookupResult | null>(null);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const normalizedSubmittedEmail = normalizeEmail(submittedEmail);
   const hasSearched = normalizedSubmittedEmail.length > 0;
 
-  const applicant = useMemo(
-    () => applicants.find((entry) => entry.id === lookupApplicantId) ?? null,
-    [applicants, lookupApplicantId]
-  );
-
   const handleLookup = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmittedEmail(email);
-    const snapshot = await statusService.lookupApplicantStatusByEmail(email);
-    setLookupApplicantId(snapshot?.applicantId ?? null);
+    setLookupError(null);
+    setIsLoading(true);
+
+    try {
+      const response = await publicApplicationsApi.checkApplicationStatus(email);
+
+      if (!response.found) {
+        setLookupResult(null);
+        return;
+      }
+
+      const mappedStatus = mapBackendStatus(response.status);
+      if (!mappedStatus || !response.name || !response.created_at) {
+        throw new Error('Backend returned an unexpected application status payload.');
+      }
+
+      setLookupResult({
+        applicantName: response.name,
+        applicantEmail: normalizeEmail(email),
+        status: mappedStatus,
+        createdAt: response.created_at,
+        assessmentUrl: response.assessment_url,
+      });
+    } catch (error) {
+      setLookupResult(null);
+      if (error instanceof ApiError) {
+        setLookupError(error.body || 'Status lookup failed.');
+      } else if (error instanceof Error) {
+        setLookupError(error.message);
+      } else {
+        setLookupError('Status lookup failed.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const activeStatus = applicant ? statusConfig[applicant.status] : null;
+  const activeStatus = lookupResult ? statusConfig[lookupResult.status] : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -136,11 +183,11 @@ const DevopsStatus = () => {
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Button
                     type="submit"
-                    disabled={!normalizeEmail(email)}
+                    disabled={!normalizeEmail(email) || isLoading}
                     className="bg-cyan-500 text-slate-950 hover:bg-cyan-400"
                   >
                     <Search className="mr-2 h-4 w-4" />
-                    Check Status
+                    {isLoading ? 'Checking...' : 'Check Status'}
                   </Button>
                   <Button
                     type="button"
@@ -149,7 +196,8 @@ const DevopsStatus = () => {
                     onClick={() => {
                       setEmail('');
                       setSubmittedEmail('');
-                      setLookupApplicantId(null);
+                      setLookupResult(null);
+                      setLookupError(null);
                     }}
                   >
                     Clear
@@ -169,40 +217,48 @@ const DevopsStatus = () => {
                 </p>
               </CardContent>
             </Card>
-          ) : applicant && activeStatus ? (
+          ) : lookupResult && activeStatus ? (
             <Card className={`mt-6 border ${activeStatus.panelClassName}`}>
               <CardContent className="space-y-6 px-6 py-6">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
                     <div className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium ${activeStatus.badgeClassName}`}>
-                      {getApplicationStatusLabel(applicant.status)}
+                      {getApplicationStatusLabel(lookupResult.status)}
                     </div>
                     <h2 className="mt-4 text-2xl font-semibold text-white">{activeStatus.headline}</h2>
                     <p className="mt-2 max-w-2xl text-sm text-white/75">{activeStatus.description}</p>
-                  </div>
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/8">
-                    <activeStatus.Icon className="h-7 w-7 text-white" />
                   </div>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
                     <p className="text-xs uppercase tracking-[0.18em] text-white/45">Applicant</p>
-                    <p className="mt-2 text-base font-medium text-white">{applicant.name}</p>
-                    <p className="mt-1 text-sm text-white/60">{applicant.email}</p>
+                    <p className="mt-2 text-base font-medium text-white">{lookupResult.applicantName}</p>
+                    <p className="mt-1 text-sm text-white/60">{lookupResult.applicantEmail}</p>
                   </div>
                   <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
                     <p className="text-xs uppercase tracking-[0.18em] text-white/45">Application</p>
-                    <p className="mt-2 text-base font-medium text-white">
-                      {applicant.teamApplyingFor} team, Cycle {applicant.cycle}
-                    </p>
-                    <p className="mt-1 text-sm text-white/60">Last updated {formatUpdatedAt(applicant.updatedAt)}</p>
+                    <p className="mt-2 text-base font-medium text-white">Backend application record located</p>
+                    <p className="mt-1 text-sm text-white/60">Submitted {formatUpdatedAt(lookupResult.createdAt)}</p>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white/70">
                   Need help? Email the recruiting team if you think you used a different address or have not seen an update in a while.
                 </div>
+                {lookupResult.assessmentUrl ? (
+                  <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4 text-sm text-emerald-50">
+                    Assessment unlocked: <a href={lookupResult.assessmentUrl} className="underline underline-offset-4">{lookupResult.assessmentUrl}</a>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : lookupError ? (
+            <Card className="mt-6 border-white/10 bg-rose-500/5">
+              <CardContent className="px-6 py-10 text-center">
+                <XCircle className="mx-auto mb-4 h-10 w-10 text-rose-300" />
+                <h2 className="text-xl font-semibold text-white">Lookup failed</h2>
+                <p className="mx-auto mt-2 max-w-xl text-sm text-white/65">{lookupError}</p>
               </CardContent>
             </Card>
           ) : (
