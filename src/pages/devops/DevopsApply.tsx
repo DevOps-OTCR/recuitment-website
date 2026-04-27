@@ -11,14 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
-import {
-  ApplicationStatus,
-  applicationsService,
-  type Applicant,
-  type ApplicantCycle,
-  type SchoolYear,
-  type TeamApplyingFor,
-} from '@/features/recruiting';
+import { type ApplicantCycle, type SchoolYear, type TeamApplyingFor } from '@/features/recruiting';
+import { ApiError } from '@/lib/api-client';
+import { publicApplicationsApi, type PublicApplicationResponse } from '@/lib/public-applications-api';
 
 type FormValues = {
   name: string;
@@ -56,14 +51,9 @@ const formatSubmittedAt = (timestamp: string) =>
     minute: '2-digit',
   });
 
-const toApplicantId = (name: string, email: string) => {
-  const base = `${name}-${email}`
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-
-  return `app-${base || Date.now()}`;
+type SubmittedApplication = PublicApplicationResponse & {
+  interestSummary: string;
+  resumeFilename: string;
 };
 
 const DevopsApply = () => {
@@ -71,7 +61,8 @@ const DevopsApply = () => {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittedApplication, setSubmittedApplication] = useState<Applicant | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submittedApplication, setSubmittedApplication] = useState<SubmittedApplication | null>(null);
 
   const completionCount = useMemo(() => {
     const values = Object.values(formValues).filter((value) => value.trim?.() || value);
@@ -81,12 +72,14 @@ const DevopsApply = () => {
   const updateField = <K extends keyof FormValues>(field: K, value: FormValues[K]) => {
     setFormValues((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
+    setSubmitError(null);
   };
 
   const handleResumeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
     setResumeFile(file);
     setErrors((current) => ({ ...current, resume: undefined }));
+    setSubmitError(null);
   };
 
   const validateForm = () => {
@@ -111,32 +104,40 @@ const DevopsApply = () => {
     if (!validateForm() || !resumeFile) return;
 
     setIsSubmitting(true);
+    setSubmitError(null);
 
-    const existingApplicant = await applicationsService.getApplicationByEmail(formValues.email);
-    const submittedAt = existingApplicant?.submittedAt ?? new Date().toISOString();
-    const record: Applicant = {
-      id: existingApplicant?.id ?? toApplicantId(formValues.name, formValues.email),
-      name: formValues.name.trim(),
-      email: formValues.email.trim().toLowerCase(),
-      resume: resumeFile.name,
-      schoolYear: formValues.schoolYear as SchoolYear,
-      whyOtcr: formValues.whyOtcr.trim(),
-      caseAnswer: formValues.caseAnswer.trim(),
-      teamApplyingFor: formValues.teamApplyingFor as TeamApplyingFor,
-      cycle: Number(formValues.cycle) as ApplicantCycle,
-      status: ApplicationStatus.Applied,
-      currentRound: null,
-      finalDecision: 'pending',
-      assignedPrimaryInterviewerId: existingApplicant?.assignedPrimaryInterviewerId ?? null,
-      assignedSecondaryInterviewerId: existingApplicant?.assignedSecondaryInterviewerId ?? null,
-      submittedAt,
-      updatedAt: new Date().toISOString(),
-      notes: existingApplicant?.notes ?? 'Submitted through /tech/apply',
-    };
+    try {
+      const interestSummary = [
+        `School year: ${formValues.schoolYear}`,
+        `Team: ${formValues.teamApplyingFor}`,
+        `Cycle: ${formValues.cycle}`,
+        `Why OTCR: ${formValues.whyOtcr.trim()}`,
+        `Case answer: ${formValues.caseAnswer.trim()}`,
+      ].join('\n\n');
 
-    await applicationsService.createOrUpdateApplication(record);
-    setSubmittedApplication(record);
-    setIsSubmitting(false);
+      const response = await publicApplicationsApi.submitApplication({
+        name: formValues.name.trim(),
+        email: formValues.email.trim().toLowerCase(),
+        interest: interestSummary,
+        resume: resumeFile,
+      });
+
+      setSubmittedApplication({
+        ...response,
+        interestSummary,
+        resumeFilename: resumeFile.name,
+      });
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setSubmitError(error.body || 'Application submission failed.');
+      } else if (error instanceof Error) {
+        setSubmitError(error.message);
+      } else {
+        setSubmitError('Application submission failed.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (submittedApplication) {
@@ -154,7 +155,7 @@ const DevopsApply = () => {
                 <div className="space-y-2">
                   <CardTitle className="text-3xl text-white">Application submitted</CardTitle>
                   <CardDescription className="mx-auto max-w-xl text-base text-slate-300">
-                    Your OTCR recruiting profile has been created locally with status <span className="font-semibold text-white">applied</span>.
+                    Your application was submitted to the backend with status <span className="font-semibold text-white">{submittedApplication.status}</span>.
                   </CardDescription>
                 </div>
               </CardHeader>
@@ -169,25 +170,25 @@ const DevopsApply = () => {
                     <p className="mt-1 font-medium text-white">{submittedApplication.email}</p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Team</p>
-                    <p className="mt-1 font-medium text-white">{submittedApplication.teamApplyingFor}</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Status</p>
+                    <p className="mt-1 font-medium text-white">{submittedApplication.status}</p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Cycle</p>
-                    <p className="mt-1 font-medium text-white">Cycle {submittedApplication.cycle}</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Application ID</p>
+                    <p className="mt-1 font-medium text-white">#{submittedApplication.id}</p>
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Resume</p>
-                    <p className="mt-1 font-medium text-white">{submittedApplication.resume}</p>
+                    <p className="mt-1 font-medium text-white">{submittedApplication.resumeFilename}</p>
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Submitted</p>
-                    <p className="mt-1 font-medium text-white">{formatSubmittedAt(submittedApplication.submittedAt)}</p>
+                    <p className="mt-1 font-medium text-white">{formatSubmittedAt(submittedApplication.created_at)}</p>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-teal-400/20 bg-teal-400/10 p-4 text-sm text-teal-50">
-                  This uses local state only. No backend, database, or real file upload was triggered.
+                  Backend write completed. The application row and resume upload were sent to the API.
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row">
@@ -203,6 +204,7 @@ const DevopsApply = () => {
                       setFormValues(initialFormValues);
                       setResumeFile(null);
                       setErrors({});
+                      setSubmitError(null);
                     }}
                   >
                     Submit another application
@@ -240,7 +242,7 @@ const DevopsApply = () => {
                   Apply for the team without touching the evaluator dashboard.
                 </h1>
                 <p className="max-w-xl text-base leading-7 text-slate-300">
-                  Submit your applicant profile, attach a resume placeholder, and enter your written responses. This page stores an upstream application record locally with recruiting status set to <span className="font-semibold text-white">applied</span>.
+                  Submit your applicant profile, upload a resume, and enter your written responses. This page sends a real application request to the backend API.
                 </p>
               </div>
             </div>
@@ -253,8 +255,8 @@ const DevopsApply = () => {
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Storage</p>
-                <p className="mt-2 text-2xl font-semibold text-white">Local</p>
-                <p className="mt-1 text-sm text-slate-400">No backend or DB hookup</p>
+                <p className="mt-2 text-2xl font-semibold text-white">Backend</p>
+                <p className="mt-1 text-sm text-slate-400">API submission with real resume upload</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Progress</p>
@@ -268,8 +270,8 @@ const DevopsApply = () => {
                 <ShieldCheck className="h-4 w-4 text-emerald-300" />
                 Submission behavior for this build
               </div>
-              <p>Resume upload is UI-only and stores the selected filename in local state.</p>
-              <p>The created record is ready to feed the future applicant portal and recruiting workflow.</p>
+              <p>Resume upload is sent to the backend as multipart form data.</p>
+              <p>The created record is stored in the backend and can be verified through the public status-check endpoint.</p>
             </div>
           </div>
 
@@ -277,7 +279,7 @@ const DevopsApply = () => {
             <CardHeader className="space-y-3">
               <CardTitle className="text-2xl text-white">Applicant submission</CardTitle>
               <CardDescription className="text-slate-300">
-                Complete all required fields to create a local OTCR application record.
+                Complete all required fields to submit a real OTCR application record to the backend.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -371,7 +373,7 @@ const DevopsApply = () => {
                         {resumeFile ? resumeFile.name : 'Choose a resume file'}
                       </p>
                       <p className="text-sm text-slate-400">
-                        UI placeholder only. No upload occurs in this build.
+                        Sent to the backend as part of the application submission.
                       </p>
                     </div>
                   </label>
@@ -405,12 +407,13 @@ const DevopsApply = () => {
 
                 <div className="flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-slate-400">
-                    Required fields are validated before creating the local application record.
+                    Required fields are validated before sending the backend application request.
                   </p>
                   <Button type="submit" disabled={isSubmitting} className="bg-teal-500 text-slate-950 hover:bg-teal-400">
                     {isSubmitting ? 'Submitting...' : 'Submit application'}
                   </Button>
                 </div>
+                {submitError ? <p className="text-sm text-rose-300">{submitError}</p> : null}
               </form>
             </CardContent>
           </Card>
