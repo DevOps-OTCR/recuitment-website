@@ -1,4 +1,14 @@
-export type AdminUserRole = 'partner' | 'pm' | 'lc' | 'consultant' | 'applicant' | 'admin';
+export const roleRouteMap = {
+  APPLICANT: '/applicant',
+  CONSULTANT: '/consultant',
+  LC: '/lc',
+  PM: '/pm',
+  PARTNER: '/partner',
+  EXECUTIVE: '/partner',
+  ADMIN: '/pm',
+} as const;
+
+export type AdminUserRole = keyof typeof roleRouteMap;
 
 export type AdminPermission =
   | 'view_all_applicants'
@@ -27,21 +37,7 @@ export const hasAdminPermission = (
 ) => Boolean(user?.permissions.includes(permission));
 
 export const pathForRole = (role: AdminUserRole | null | undefined) => {
-  switch (role) {
-    case 'applicant':
-      return '/applicant';
-    case 'consultant':
-      return '/consultant';
-    case 'lc':
-      return '/lc';
-    case 'pm':
-      return '/pm';
-    case 'partner':
-    case 'admin':
-      return '/partner';
-    default:
-      return '/sign-in';
-  }
+  return role ? roleRouteMap[role] ?? '/sign-in' : '/sign-in';
 };
 
 export const defaultAppPathForUser = (user: Pick<AdminAuthenticatedUser, 'role'> | null | undefined) =>

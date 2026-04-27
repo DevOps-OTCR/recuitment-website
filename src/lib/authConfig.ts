@@ -67,9 +67,7 @@ export async function initializeMsal(): Promise<PublicClientApplication> {
   if (!initializationPromise) {
     initializationPromise = (async () => {
       await msalInstance.initialize();
-
-      const response = await msalInstance.handleRedirectPromise();
-      const account = response?.account ?? getActiveMsalAccount();
+      const account = getActiveMsalAccount();
       if (account) {
         msalInstance.setActiveAccount(account);
       }

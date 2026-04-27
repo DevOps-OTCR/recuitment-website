@@ -1,8 +1,4 @@
-import {
-  EventType,
-  type AccountInfo,
-  type AuthenticationResult,
-} from '@azure/msal-browser';
+import { type AccountInfo } from '@azure/msal-browser';
 import { MsalProvider } from '@azure/msal-react';
 import {
   createContext,
@@ -15,7 +11,7 @@ import {
 } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 
-import { defaultAppPathForUser, type AdminAuthenticatedUser } from '@/lib/admin-auth';
+import { defaultAppPathForUser, roleRouteMap, type AdminAuthenticatedUser } from '@/lib/admin-auth';
 import { apiFetch, setAccessTokenProvider } from '@/lib/api-client';
 import {
   acquireAccessToken,
@@ -55,7 +51,14 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const isConfigured = isMsalConfigured();
 
-  const refreshUser = useCallback(async (): Promise<AdminAuthenticatedUser | null> => {
+  const clearSessionState = useCallback(() => {
+    setAccount(null);
+    setAccessToken(null);
+    setUser(null);
+    setError(null);
+  }, []);
+
+  const refreshUser = useCallback(async (options?: { token?: string | null }): Promise<AdminAuthenticatedUser | null> => {
     setIsLoading(true);
 
     try {
@@ -64,13 +67,11 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
       setAccount(activeAccount);
 
       if (!activeAccount) {
-        setAccessToken(null);
-        setUser(null);
-        setError(null);
+        clearSessionState();
         return null;
       }
 
-      const token = await acquireAccessToken();
+      const token = options?.token ?? await acquireAccessToken();
       setAccessToken(token);
 
       if (!token) {
@@ -80,6 +81,10 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
       }
 
       const backendUser = await apiFetch<AdminAuthenticatedUser>('/api/auth/me', {
+        auth: false,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         timeoutMs: 5000,
       });
       setUser(backendUser);
@@ -94,45 +99,64 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [clearSessionState]);
 
   useEffect(() => {
     setAccessTokenProvider(() => acquireAccessToken());
-    void refreshUser();
+
+    let isCancelled = false;
+
+    const initializeAuth = async () => {
+      const currentHash = typeof window !== 'undefined' ? window.location.hash : '';
+      const hasRedirectHash =
+        currentHash.includes('#code=') ||
+        currentHash.includes('#id_token=') ||
+        currentHash.includes('&code=') ||
+        currentHash.includes('&id_token=');
+
+      try {
+        await initializeMsal();
+        const response = await msalInstance.handleRedirectPromise();
+        const handledAccount = response?.account ?? getActiveMsalAccount();
+        const redirectToken = response?.accessToken ?? null;
+        const shouldRedirectToRoleRoute = Boolean(response || hasRedirectHash);
+
+        if (handledAccount) {
+          msalInstance.setActiveAccount(handledAccount);
+        }
+
+        const backendUser = isCancelled ? null : await refreshUser({ token: redirectToken });
+
+        if (!isCancelled && shouldRedirectToRoleRoute) {
+          const destination = backendUser?.role ? roleRouteMap[backendUser.role] ?? '/sign-in' : '/sign-in';
+          window.history.replaceState(
+            null,
+            document.title,
+            `${window.location.pathname}${window.location.search}#${destination}`
+          );
+          navigate(destination, { replace: true });
+        }
+
+      } catch (authError) {
+        if (isCancelled) {
+          return;
+        }
+
+        const message =
+          authError instanceof Error ? authError.message : 'Unable to initialize authentication.';
+        setError(message);
+        clearSessionState();
+        setIsLoading(false);
+      }
+    };
+
+    void initializeAuth();
 
     return () => {
+      isCancelled = true;
       setAccessTokenProvider(null);
     };
-  }, [refreshUser]);
-
-  useEffect(() => {
-    const callbackId = msalInstance.addEventCallback((event) => {
-      if (
-        event.eventType === EventType.LOGIN_SUCCESS ||
-        event.eventType === EventType.ACQUIRE_TOKEN_SUCCESS
-      ) {
-        const payload = event.payload as AuthenticationResult | null;
-        if (payload?.account) {
-          msalInstance.setActiveAccount(payload.account);
-        }
-      }
-
-      if (
-        event.eventType === EventType.LOGIN_SUCCESS ||
-        event.eventType === EventType.HANDLE_REDIRECT_END ||
-        event.eventType === EventType.ACQUIRE_TOKEN_SUCCESS ||
-        event.eventType === EventType.LOGOUT_SUCCESS
-      ) {
-        void refreshUser();
-      }
-    });
-
-    return () => {
-      if (callbackId) {
-        msalInstance.removeEventCallback(callbackId);
-      }
-    };
-  }, [refreshUser]);
+  }, [clearSessionState, navigate, refreshUser]);
 
   useEffect(() => {
     const isSignInRoute =
@@ -159,8 +183,9 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
+    clearSessionState();
     await logoutWithRedirect();
-  }, []);
+  }, [clearSessionState]);
 
   const contextValue = useMemo<AuthContextValue>(
     () => ({

@@ -70,6 +70,21 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "see_relative_score",
         "see_database",
     ],
+    Role.EXECUTIVE.value: [
+        "view_assigned_interviews",
+        "view_all_applicants",
+        "submit_feedback",
+        "assign_interviewers",
+        "decide_round_1",
+        "decide_round_2",
+        "see_relative_score",
+        "see_database",
+    ],
+    Role.ADMIN.value: [
+        "view_assigned_interviews",
+        "view_all_applicants",
+        "submit_feedback",
+    ],
 }
 
 
@@ -77,7 +92,7 @@ def normalize_role(role: str | Role) -> str:
     if isinstance(role, Role):
         normalized = role.value
     else:
-        normalized = (role or "").strip().lower()
+        normalized = (role or "").strip().upper()
     if normalized not in ROLE_PERMISSIONS:
         raise ValueError(f"Unsupported role: {role}")
     return normalized
@@ -175,7 +190,7 @@ async def get_current_user(
             email=verified_user.email,
             name=verified_user.display_name,
             password_hash=EXTERNAL_AUTH_PASSWORD_HASH,
-            role=Role.APPLICANT,
+            role=Role.APPLICANT.value,
             active=True,
         )
         db.add(user)

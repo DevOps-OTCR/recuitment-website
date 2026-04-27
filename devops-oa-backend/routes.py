@@ -1021,7 +1021,7 @@ async def approve_application(
     application_id: int,
     request: ApproveApplicationRequest,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(requires_roles(Role.PARTNER)),
+    _current_user: User = Depends(requires_roles(Role.PARTNER, Role.EXECUTIVE)),
 ):
     """Approve an application and generate assessment link (admin only)."""
     application = db.query(Application).filter(Application.id == application_id).first()
@@ -1065,7 +1065,7 @@ async def reject_application(
     application_id: int,
     request: ApproveApplicationRequest,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(requires_roles(Role.PARTNER)),
+    _current_user: User = Depends(requires_roles(Role.PARTNER, Role.EXECUTIVE)),
 ):
     """Reject an application (admin only)."""
     application = db.query(Application).filter(Application.id == application_id).first()
@@ -1089,7 +1089,7 @@ async def reject_application(
 async def archive_application(
     application_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(requires_roles(Role.PARTNER)),
+    _current_user: User = Depends(requires_roles(Role.PARTNER, Role.EXECUTIVE)),
 ):
     """Archive an application (hide from default list). Admin only."""
     application = db.query(Application).filter(Application.id == application_id).first()
@@ -1104,7 +1104,7 @@ async def archive_application(
 async def unarchive_application(
     application_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(requires_roles(Role.PARTNER)),
+    _current_user: User = Depends(requires_roles(Role.PARTNER, Role.EXECUTIVE)),
 ):
     """Restore an archived application. Admin only."""
     application = db.query(Application).filter(Application.id == application_id).first()
@@ -1119,7 +1119,7 @@ async def unarchive_application(
 async def delete_application(
     application_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(requires_roles(Role.PARTNER)),
+    _current_user: User = Depends(requires_roles(Role.PARTNER, Role.EXECUTIVE)),
 ):
     """Permanently delete an application and its assessment link/attempts. Admin only."""
     application = db.query(Application).filter(Application.id == application_id).first()
@@ -1158,7 +1158,7 @@ async def delete_application(
 async def create_link(
     request: CreateLinkRequest,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(requires_roles(Role.PARTNER)),
+    _current_user: User = Depends(requires_roles(Role.PARTNER, Role.EXECUTIVE)),
 ):
     """Create a new assessment link (admin only)."""
     token = secrets.token_urlsafe(16)
@@ -1187,7 +1187,7 @@ async def create_link(
 @router.post("/admin/test-link")
 async def get_admin_test_link(
     db: Session = Depends(get_db),
-    _current_user: User = Depends(requires_roles(Role.PARTNER)),
+    _current_user: User = Depends(requires_roles(Role.PARTNER, Role.EXECUTIVE)),
 ):
     """Get or create a reusable admin test link (admin only).
     

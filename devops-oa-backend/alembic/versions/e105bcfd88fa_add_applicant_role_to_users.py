@@ -28,7 +28,7 @@ def upgrade() -> None:
     with op.batch_alter_table('users', schema=None) as batch_op:
         batch_op.alter_column('role',
                existing_type=sa.VARCHAR(length=20),
-               server_default='applicant',
+               server_default='APPLICANT',
                existing_nullable=False)
 
     # ### end Alembic commands ###

@@ -27,11 +27,13 @@ class ApplicationStatus(str, enum.Enum):
 
 
 class Role(str, enum.Enum):
-    APPLICANT = "applicant"
-    CONSULTANT = "consultant"
-    LC = "lc"
-    PM = "pm"
-    PARTNER = "partner"
+    APPLICANT = "APPLICANT"
+    CONSULTANT = "CONSULTANT"
+    LC = "LC"
+    PM = "PM"
+    PARTNER = "PARTNER"
+    EXECUTIVE = "EXECUTIVE"
+    ADMIN = "ADMIN"
 
 # --- MODELS ---
 
