@@ -11,7 +11,14 @@ from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel, Field
 
-from auth import get_current_user, permissions_for_user, requires_permissions, requires_roles, role_for_user
+from auth import (
+    get_current_user,
+    has_permission,
+    permissions_for_user,
+    requires_permissions,
+    requires_roles,
+    role_for_user,
+)
 from config import get_settings
 from database import get_db
 from models import (
@@ -21,6 +28,7 @@ from models import (
     Application,
     ApplicationStatus,
     Evaluation,
+    InterviewAssignment,
     ProgressSnapshot,
     DecisionStatus,
     Role,
@@ -119,6 +127,8 @@ class ApplicationListItem(BaseModel):
     is_flagged: bool = False
     integrity_notes: Optional[str] = None
     archived_at: Optional[datetime] = None
+    recruiting_status: str
+    current_round: Optional[str] = None
 
 
 class EvaluationRecommendation(str, enum.Enum):
@@ -174,6 +184,59 @@ class EvaluationResponse(BaseModel):
     created_at: datetime
 
 
+class AssignableUserResponse(BaseModel):
+    id: int
+    email: str
+    name: Optional[str]
+    role: str
+    active: bool
+
+
+class InterviewAssignmentResponse(BaseModel):
+    id: int
+    application_id: int
+    applicant_name: str
+    applicant_email: str
+    interest: Optional[str] = None
+    notes: Optional[str] = None
+    cycle_name: Optional[str] = None
+    status: str
+    recruiting_status: str
+    current_round: Optional[str] = None
+    final_decision: str
+    role: Literal["primary", "secondary"]
+    round: Literal["Round 1", "Round 2"]
+    interviewer_id: int
+    interviewer_name: Optional[str]
+    interviewer_email: str
+    interviewer_role: str
+    assigned_by_user_id: Optional[int] = None
+    assigned_by_user_name: Optional[str] = None
+    assigned_at: datetime
+    room: Optional[str] = None
+    scheduled_time: Optional[datetime] = None
+
+
+class UpsertInterviewAssignmentsRequest(BaseModel):
+    round: Literal["Round 1", "Round 2"]
+    primary_interviewer_id: int
+    secondary_interviewer_id: int
+    room: Optional[str] = None
+    scheduled_time: Optional[datetime] = None
+
+
+class ApplicationDecisionRequest(BaseModel):
+    action: Literal[
+        "reject_after_application_review",
+        "advance_to_round_1",
+        "reject_after_round_1",
+        "advance_to_round_2",
+        "reject_after_round_2",
+        "accept_final",
+    ]
+    notes: Optional[str] = None
+
+
 class DatabaseTableSummary(BaseModel):
     table: str
     count: int
@@ -212,6 +275,66 @@ def _extract_resume_url(application: Application) -> Optional[str]:
             if value.startswith("http://") or value.startswith("https://"):
                 return value
     return None
+
+
+def _clean_decision_notes(notes: Optional[str]) -> str:
+    return "\n".join(
+        line.rstrip()
+        for line in (notes or "").splitlines()
+        if not line.strip().lower().startswith("decision:")
+    ).strip()
+
+
+def _append_decision_note(notes: Optional[str], decision_label: str, extra_notes: Optional[str] = None) -> str:
+    pieces: list[str] = []
+    cleaned_notes = _clean_decision_notes(notes)
+    if cleaned_notes:
+        pieces.append(cleaned_notes)
+    if extra_notes:
+        cleaned_extra_notes = extra_notes.strip()
+        if cleaned_extra_notes:
+            pieces.append(cleaned_extra_notes)
+    pieces.append(f"Decision: {decision_label}")
+    return "\n".join(piece for piece in pieces if piece.strip())
+
+
+def _collect_application_rounds(application: Application) -> set[str]:
+    rounds = {
+        (assignment.round or "").strip().lower()
+        for assignment in (application.interview_assignments or [])
+        if assignment.round
+    }
+    rounds.update(
+        (evaluation.round or "").strip().lower()
+        for evaluation in (application.evaluations or [])
+        if evaluation.round
+    )
+    return {round_name for round_name in rounds if round_name}
+
+
+def _derive_recruiting_status(application: Application) -> tuple[str, Optional[str]]:
+    rounds = _collect_application_rounds(application)
+    notes = (application.notes or "").lower()
+
+    if application.final_decision == DecisionStatus.YES:
+        return "accepted", None
+    if application.status == ApplicationStatus.REJECTED.value or application.final_decision == DecisionStatus.NO:
+        return "rejected", None
+    if "advanced to round 2" in notes or "round 2" in rounds:
+        return "round_2", "Round 2"
+    if "advanced to round 1" in notes or "round 1" in rounds:
+        return "round_1", "Round 1"
+    return "applied", None
+
+
+def _user_to_assignable_response(user: User) -> AssignableUserResponse:
+    return AssignableUserResponse(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        role=role_for_user(user),
+        active=user.active,
+    )
 
 
 def _recommendation_bucket(recommendation: EvaluationRecommendation | str) -> DecisionStatus:
@@ -275,9 +398,81 @@ def _evaluation_to_response(evaluation: Evaluation) -> EvaluationResponse:
     )
 
 
+def _assignment_to_response(assignment: InterviewAssignment) -> InterviewAssignmentResponse:
+    application = assignment.application
+    if application is None:
+        raise HTTPException(status_code=500, detail="Assignment missing application relationship.")
+
+    recruiting_status, current_round = _derive_recruiting_status(application)
+    interviewer = assignment.interviewer
+    assigned_by_user = assignment.assigned_by_user
+
+    return InterviewAssignmentResponse(
+        id=assignment.id,
+        application_id=application.id,
+        applicant_name=application.name,
+        applicant_email=application.email,
+        interest=application.interest,
+        notes=application.notes,
+        cycle_name=application.cycle.name if application.cycle else None,
+        status=application.status,
+        recruiting_status=recruiting_status,
+        current_round=current_round,
+        final_decision=application.final_decision.value,
+        role=assignment.role,
+        round=assignment.round,
+        interviewer_id=assignment.interviewer_id,
+        interviewer_name=interviewer.name if interviewer else None,
+        interviewer_email=interviewer.email if interviewer else "",
+        interviewer_role=role_for_user(interviewer) if interviewer else "",
+        assigned_by_user_id=assignment.assigned_by_user_id,
+        assigned_by_user_name=assigned_by_user.name if assigned_by_user else None,
+        assigned_at=assignment.assigned_at,
+        room=assignment.room,
+        scheduled_time=assignment.scheduled_time,
+    )
+
+
+def _application_to_list_item(application: Application) -> ApplicationListItem:
+    attempt = None
+    assessment_token = None
+    if application.assessment_link:
+        link = application.assessment_link
+        assessment_token = link.token
+        if link.attempts:
+            attempt = link.attempts[0]
+
+    recruiting_status, current_round = _derive_recruiting_status(application)
+
+    return ApplicationListItem(
+        id=application.id,
+        name=application.name,
+        email=application.email,
+        interest=application.interest,
+        resume_filename=application.resume_filename,
+        resume_url=_extract_resume_url(application),
+        status=application.status,
+        final_decision=application.final_decision.value,
+        cycle_name=application.cycle.name if application.cycle else None,
+        created_at=application.created_at,
+        reviewed_at=application.reviewed_at,
+        notes=application.notes,
+        has_assessment_link=application.assessment_link_id is not None,
+        assessment_completed=attempt.completed_at is not None if attempt else False,
+        assessment_token=assessment_token,
+        focus_loss_events=attempt.focus_loss_events if attempt else 0,
+        is_flagged=attempt.is_flagged if attempt else False,
+        integrity_notes=attempt.integrity_notes if attempt else None,
+        archived_at=application.archived_at,
+        recruiting_status=recruiting_status,
+        current_round=current_round,
+    )
+
+
 DATABASE_PREVIEW_TABLES = {
     "applications": "created_at",
     "evaluations": "created_at",
+    "interview_assignments": "assigned_at",
     "assessment_links": "created_at",
     "attempts": "started_at",
     "submissions": "submitted_at",
@@ -602,9 +797,251 @@ async def list_my_interviews(
     return [_evaluation_to_response(evaluation) for evaluation in evaluations]
 
 
+@router.get("/auth/me/assigned-interviews", response_model=List[InterviewAssignmentResponse])
+async def list_my_assigned_interviews(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(requires_permissions("view_assigned_interviews")),
+):
+    """Return interview assignments scoped to the signed-in interviewer."""
+    assignments = (
+        db.query(InterviewAssignment)
+        .options(
+            joinedload(InterviewAssignment.application).joinedload(Application.cycle),
+            joinedload(InterviewAssignment.application).joinedload(Application.evaluations),
+            joinedload(InterviewAssignment.application).joinedload(Application.interview_assignments),
+            joinedload(InterviewAssignment.interviewer),
+            joinedload(InterviewAssignment.assigned_by_user),
+        )
+        .filter(InterviewAssignment.interviewer_id == current_user.id)
+        .order_by(
+            InterviewAssignment.scheduled_time.is_(None),
+            InterviewAssignment.scheduled_time.desc(),
+            InterviewAssignment.assigned_at.desc(),
+            InterviewAssignment.id.desc(),
+        )
+        .all()
+    )
+    return [_assignment_to_response(assignment) for assignment in assignments]
+
+
 # ============================================================================
 # Admin Endpoints
 # ============================================================================
+
+
+@router.get("/admin/interviewers", response_model=List[AssignableUserResponse])
+async def list_interviewers(
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(requires_permissions("assign_interviewers")),
+):
+    """List active interviewer users who can participate in staffing."""
+    allowed_roles = {
+        Role.CONSULTANT.value,
+        Role.LC.value,
+        Role.PM.value,
+        Role.PARTNER.value,
+        Role.EXECUTIVE.value,
+        Role.ADMIN.value,
+    }
+    users = (
+        db.query(User)
+        .filter(User.active.is_(True))
+        .order_by(User.name.is_(None), User.name.asc(), User.email.asc())
+        .all()
+    )
+    return [
+        _user_to_assignable_response(user)
+        for user in users
+        if role_for_user(user) in allowed_roles
+    ]
+
+
+@router.get("/admin/assignments", response_model=List[InterviewAssignmentResponse])
+async def list_assignments(
+    application_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(requires_permissions("view_all_applicants")),
+):
+    """List interview staffing assignments."""
+    query = db.query(InterviewAssignment).options(
+        joinedload(InterviewAssignment.application).joinedload(Application.cycle),
+        joinedload(InterviewAssignment.application).joinedload(Application.evaluations),
+        joinedload(InterviewAssignment.application).joinedload(Application.interview_assignments),
+        joinedload(InterviewAssignment.interviewer),
+        joinedload(InterviewAssignment.assigned_by_user),
+    )
+    if application_id is not None:
+        query = query.filter(InterviewAssignment.application_id == application_id)
+
+    assignments = query.order_by(
+        InterviewAssignment.scheduled_time.desc(),
+        InterviewAssignment.assigned_at.desc(),
+        InterviewAssignment.id.desc(),
+    ).all()
+    return [_assignment_to_response(assignment) for assignment in assignments]
+
+
+@router.put("/admin/applications/{application_id}/assignments", response_model=List[InterviewAssignmentResponse])
+async def upsert_assignments(
+    application_id: int,
+    payload: UpsertInterviewAssignmentsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(requires_permissions("assign_interviewers")),
+):
+    """Create or update the primary/secondary interviewer assignments for an application round."""
+    application = (
+        db.query(Application)
+        .options(
+            joinedload(Application.cycle),
+            joinedload(Application.evaluations),
+            joinedload(Application.interview_assignments),
+        )
+        .filter(Application.id == application_id)
+        .first()
+    )
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    primary_user = db.query(User).filter(User.id == payload.primary_interviewer_id, User.active.is_(True)).first()
+    secondary_user = db.query(User).filter(User.id == payload.secondary_interviewer_id, User.active.is_(True)).first()
+    if not primary_user or not secondary_user:
+        raise HTTPException(status_code=400, detail="Both primary and secondary interviewers are required.")
+
+    primary_role = role_for_user(primary_user)
+    secondary_role = role_for_user(secondary_user)
+    if primary_role not in {Role.PM.value, Role.PARTNER.value, Role.EXECUTIVE.value, Role.ADMIN.value}:
+        raise HTTPException(status_code=400, detail="Primary interviewer must be PM, Partner, Executive, or Admin.")
+    if secondary_role not in {Role.CONSULTANT.value, Role.LC.value}:
+        raise HTTPException(status_code=400, detail="Secondary interviewer must be Consultant or LC.")
+
+    existing_assignments = (
+        db.query(InterviewAssignment)
+        .filter(
+            InterviewAssignment.application_id == application.id,
+            InterviewAssignment.round == payload.round,
+        )
+        .all()
+    )
+    assignment_by_role = {assignment.role: assignment for assignment in existing_assignments}
+    assigned_at = datetime.utcnow()
+    shared_room = payload.room.strip() if payload.room else None
+
+    next_assignments = [
+        ("primary", primary_user.id),
+        ("secondary", secondary_user.id),
+    ]
+
+    persisted_assignments: list[InterviewAssignment] = []
+    for role_name, interviewer_id in next_assignments:
+        assignment = assignment_by_role.get(role_name)
+        if assignment is None:
+            assignment = InterviewAssignment(
+                application_id=application.id,
+                round=payload.round,
+                role=role_name,
+                interviewer_id=interviewer_id,
+            )
+            db.add(assignment)
+
+        assignment.interviewer_id = interviewer_id
+        assignment.assigned_by_user_id = current_user.id
+        assignment.assigned_at = assigned_at
+        assignment.room = shared_room
+        assignment.scheduled_time = payload.scheduled_time
+        persisted_assignments.append(assignment)
+
+    for role_name, assignment in assignment_by_role.items():
+        if role_name not in {"primary", "secondary"}:
+            db.delete(assignment)
+
+    application.reviewed_at = datetime.utcnow()
+    db.commit()
+
+    assignments = (
+        db.query(InterviewAssignment)
+        .options(
+            joinedload(InterviewAssignment.application).joinedload(Application.cycle),
+            joinedload(InterviewAssignment.application).joinedload(Application.evaluations),
+            joinedload(InterviewAssignment.application).joinedload(Application.interview_assignments),
+            joinedload(InterviewAssignment.interviewer),
+            joinedload(InterviewAssignment.assigned_by_user),
+        )
+        .filter(
+            InterviewAssignment.application_id == application.id,
+            InterviewAssignment.round == payload.round,
+        )
+        .order_by(InterviewAssignment.role.asc())
+        .all()
+    )
+    return [_assignment_to_response(assignment) for assignment in assignments]
+
+
+@router.post("/admin/applications/{application_id}/decision", response_model=ApplicationListItem)
+async def update_application_decision(
+    application_id: int,
+    payload: ApplicationDecisionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Persist a recruiting pipeline decision for an applicant."""
+    if payload.action in {
+        "reject_after_application_review",
+        "advance_to_round_1",
+        "reject_after_round_1",
+    }:
+        required_permission = "decide_round_1"
+    else:
+        required_permission = "decide_round_2"
+
+    if not has_permission(current_user.role, required_permission):
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have the required permissions for this resource.",
+        )
+
+    application = (
+        db.query(Application)
+        .options(
+            joinedload(Application.assessment_link).joinedload(AssessmentLink.attempts),
+            joinedload(Application.evaluations),
+            joinedload(Application.interview_assignments),
+            joinedload(Application.cycle),
+        )
+        .filter(Application.id == application_id)
+        .first()
+    )
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    decision_map = {
+        "reject_after_application_review": ("Rejected after application review", ApplicationStatus.REJECTED.value, DecisionStatus.NO),
+        "advance_to_round_1": ("Advanced to Round 1", application.status, DecisionStatus.MAYBE),
+        "reject_after_round_1": ("Rejected after Round 1", ApplicationStatus.REJECTED.value, DecisionStatus.NO),
+        "advance_to_round_2": ("Advanced to Round 2", application.status, DecisionStatus.MAYBE),
+        "reject_after_round_2": ("Rejected after Round 2", ApplicationStatus.REJECTED.value, DecisionStatus.NO),
+        "accept_final": ("Accepted final", application.status, DecisionStatus.YES),
+    }
+
+    decision_label, next_status, next_final_decision = decision_map[payload.action]
+    application.status = next_status
+    application.final_decision = next_final_decision
+    application.reviewed_at = datetime.utcnow()
+    application.notes = _append_decision_note(application.notes, decision_label, payload.notes)
+
+    db.commit()
+    db.refresh(application)
+    application = (
+        db.query(Application)
+        .options(
+            joinedload(Application.assessment_link).joinedload(AssessmentLink.attempts),
+            joinedload(Application.evaluations),
+            joinedload(Application.interview_assignments),
+            joinedload(Application.cycle),
+        )
+        .filter(Application.id == application.id)
+        .first()
+    )
+    return _application_to_list_item(application)
 
 
 @router.get("/admin/applications", response_model=List[ApplicationListItem])
@@ -616,7 +1053,10 @@ async def list_applications(
 ):
     """List applications (admin only). archived=0 or omit = exclude archived; archived=1 = include; archived=only = only archived."""
     query = db.query(Application).options(
-        joinedload(Application.assessment_link).joinedload(AssessmentLink.attempts)
+        joinedload(Application.assessment_link).joinedload(AssessmentLink.attempts),
+        joinedload(Application.evaluations),
+        joinedload(Application.interview_assignments),
+        joinedload(Application.cycle),
     )
     if status:
         query = query.filter(Application.status == status)
@@ -628,39 +1068,7 @@ async def list_applications(
 
     applications = query.order_by(Application.created_at.desc()).all()
 
-    result = []
-    for app in applications:
-        attempt = None
-        assessment_token = None
-        if app.assessment_link:
-            link = app.assessment_link
-            assessment_token = link.token
-            if link.attempts:
-                attempt = link.attempts[0]
-
-        result.append(ApplicationListItem(
-            id=app.id,
-            name=app.name,
-            email=app.email,
-            interest=app.interest,
-            resume_filename=app.resume_filename,
-            resume_url=_extract_resume_url(app),
-            status=app.status,
-            final_decision=app.final_decision.value,
-            cycle_name=app.cycle.name if app.cycle else None,
-            created_at=app.created_at,
-            reviewed_at=app.reviewed_at,
-            notes=app.notes,
-            has_assessment_link=app.assessment_link_id is not None,
-            assessment_completed=attempt.completed_at is not None if attempt else False,
-            assessment_token=assessment_token,
-            focus_loss_events=attempt.focus_loss_events if attempt else 0,
-            is_flagged=attempt.is_flagged if attempt else False,
-            integrity_notes=attempt.integrity_notes if attempt else None,
-            archived_at=app.archived_at,
-        ))
-    
-    return result
+    return [_application_to_list_item(app) for app in applications]
 
 
 @router.get("/admin/applications/{application_id}")

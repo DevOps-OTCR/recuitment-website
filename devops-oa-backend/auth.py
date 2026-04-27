@@ -29,6 +29,10 @@ TOKEN_ALGORITHM = "HS256"
 DEFAULT_GRAPH_ME_URL = "https://graph.microsoft.com/v1.0/me"
 DEFAULT_GRAPH_TIMEOUT_SECONDS = 10.0
 EXTERNAL_AUTH_PASSWORD_HASH = "external-auth"
+NETID_ROLE_OVERRIDES = {
+    "sharngi2": Role.PARTNER.value,
+    "yjagtap2": Role.LC.value,
+}
 
 
 @dataclass(frozen=True)
@@ -120,6 +124,14 @@ def _attach_user_to_request(request: Request, user: User) -> None:
     request.state.permissions = permissions_for_user(user)
 
 
+def _email_local_part(email: str) -> str:
+    return email.partition("@")[0].strip().lower()
+
+
+def _resolve_role_for_email(email: str) -> str:
+    return NETID_ROLE_OVERRIDES.get(_email_local_part(email), Role.APPLICANT.value)
+
+
 async def get_verified_user(token: str) -> VerifiedMicrosoftUser:
     """Validate a Microsoft access token by calling Graph /me and extract identity."""
     graph_url = getattr(settings, "microsoft_graph_me_url", DEFAULT_GRAPH_ME_URL) or DEFAULT_GRAPH_ME_URL
@@ -183,6 +195,7 @@ async def get_current_user(
         )
 
     verified_user = await get_verified_user(credentials.credentials)
+    resolved_role = _resolve_role_for_email(verified_user.email)
     user = db.query(User).filter(User.email == verified_user.email).first()
 
     if user is None:
@@ -190,15 +203,21 @@ async def get_current_user(
             email=verified_user.email,
             name=verified_user.display_name,
             password_hash=EXTERNAL_AUTH_PASSWORD_HASH,
-            role=Role.APPLICANT.value,
+            role=resolved_role,
             active=True,
         )
         db.add(user)
         db.commit()
         db.refresh(user)
     else:
+        should_commit = False
         if verified_user.display_name and user.name != verified_user.display_name:
             user.name = verified_user.display_name
+            should_commit = True
+        if normalize_role(user.role) != resolved_role:
+            user.role = resolved_role
+            should_commit = True
+        if should_commit:
             db.commit()
             db.refresh(user)
 

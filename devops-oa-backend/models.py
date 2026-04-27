@@ -63,6 +63,16 @@ class User(Base):
     active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     last_login_at = Column(DateTime, nullable=True)
+    interview_assignments = relationship(
+        "InterviewAssignment",
+        back_populates="interviewer",
+        foreign_keys="InterviewAssignment.interviewer_id",
+    )
+    created_assignments = relationship(
+        "InterviewAssignment",
+        back_populates="assigned_by_user",
+        foreign_keys="InterviewAssignment.assigned_by_user_id",
+    )
 
 class Cycle(Base):
     __tablename__ = "cycles"
@@ -129,6 +139,11 @@ class Application(Base):
     cycle = relationship("Cycle", back_populates="applications")
     evaluations = relationship("Evaluation", back_populates="application")
     assessment_link = relationship("AssessmentLink", back_populates="application", uselist=False)
+    interview_assignments = relationship(
+        "InterviewAssignment",
+        back_populates="application",
+        cascade="all, delete-orphan",
+    )
 
 
 class Evaluation(Base):
@@ -163,6 +178,25 @@ class Evaluation(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     application = relationship("Application", back_populates="evaluations")
+
+
+class InterviewAssignment(Base):
+    """Interview staffing assignment for an applicant and round."""
+    __tablename__ = "interview_assignments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    application_id = Column(Integer, ForeignKey("applications.id"), nullable=False, index=True)
+    round = Column(String(50), nullable=False)
+    role = Column(String(20), nullable=False)
+    interviewer_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    assigned_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    assigned_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    room = Column(String(120), nullable=True)
+    scheduled_time = Column(DateTime, nullable=True)
+
+    application = relationship("Application", back_populates="interview_assignments")
+    interviewer = relationship("User", back_populates="interview_assignments", foreign_keys=[interviewer_id])
+    assigned_by_user = relationship("User", back_populates="created_assignments", foreign_keys=[assigned_by_user_id])
 
 
 class Attempt(Base):

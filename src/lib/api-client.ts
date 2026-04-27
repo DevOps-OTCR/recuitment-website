@@ -24,7 +24,7 @@ export function setAccessTokenProvider(provider: AccessTokenProvider | null): vo
   accessTokenProvider = provider;
 }
 
-export async function apiFetch<T>(endpoint: string, options: ApiFetchOptions = {}): Promise<T> {
+async function createApiRequest(endpoint: string, options: ApiFetchOptions = {}) {
   const { auth = true, timeoutMs, headers: providedHeaders, ...fetchOptions } = options;
   const controller = timeoutMs ? new AbortController() : null;
   const timeoutId = controller ? window.setTimeout(() => controller.abort(), timeoutMs) : null;
@@ -46,31 +46,32 @@ export async function apiFetch<T>(endpoint: string, options: ApiFetchOptions = {
     }
   }
 
-  try {
-    const response = await fetch(`${getOaApiUrl()}${endpoint}`, {
+  return {
+    url: `${getOaApiUrl()}${endpoint}`,
+    timeoutId,
+    requestInit: {
       ...fetchOptions,
       headers,
       signal: controller?.signal ?? fetchOptions.signal,
-    });
+    } satisfies RequestInit,
+  };
+}
+
+export async function apiFetchResponse(endpoint: string, options: ApiFetchOptions = {}): Promise<Response> {
+  const { timeoutId, requestInit, url } = await createApiRequest(endpoint, options);
+
+  try {
+    const response = await fetch(url, requestInit);
 
     if (!response.ok) {
       const message = await response.text();
       throw new ApiError(response.status, message);
     }
 
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    const contentType = response.headers.get('content-type') ?? '';
-    if (contentType.includes('application/json')) {
-      return response.json() as Promise<T>;
-    }
-
-    return (await response.text()) as T;
+    return response;
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error(`API request timed out after ${timeoutMs}ms`);
+      throw new Error(`API request timed out after ${options.timeoutMs}ms`);
     }
     throw error;
   } finally {
@@ -78,4 +79,19 @@ export async function apiFetch<T>(endpoint: string, options: ApiFetchOptions = {
       window.clearTimeout(timeoutId);
     }
   }
+}
+
+export async function apiFetch<T>(endpoint: string, options: ApiFetchOptions = {}): Promise<T> {
+  const response = await apiFetchResponse(endpoint, options);
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    return response.json() as Promise<T>;
+  }
+
+  return (await response.text()) as T;
 }

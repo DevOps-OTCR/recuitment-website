@@ -6,11 +6,13 @@ export type InterviewRound = 'Round 1' | 'Round 2';
 export type DatabaseTableName =
   | 'applications'
   | 'evaluations'
+  | 'interview_assignments'
   | 'assessment_links'
   | 'attempts'
   | 'submissions'
   | 'cycles'
-  | 'assessment_progress_snapshots';
+  | 'assessment_progress_snapshots'
+  | 'users';
 
 export interface ApplicantRecord {
   id: number;
@@ -142,9 +144,11 @@ export interface DatabaseTablePreview {
 export const databaseTableLabels: Record<DatabaseTableName, string> = {
   applications: 'Applications',
   evaluations: 'Evaluations',
+  interview_assignments: 'Interview Assignments',
   assessment_links: 'Assessment Links',
   attempts: 'Attempts',
   submissions: 'Submissions',
   cycles: 'Cycles',
   assessment_progress_snapshots: 'Progress Snapshots',
+  users: 'Users',
 };

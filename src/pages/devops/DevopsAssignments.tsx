@@ -1,29 +1,27 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeftRight, CalendarClock, ClipboardCheck, DoorOpen, ShieldCheck, UserCheck, Users } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ArrowLeftRight, CalendarClock, ClipboardCheck, DoorOpen, Loader2, ShieldCheck, UserCheck, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import Footer from '@/components/Footer';
 import Navigation from '@/components/Navigation';
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import {
-  assignmentsService,
-  getApplicationStatusLabel,
-  getInterviewRoundLabel,
-  isPartnerOrPm,
-  isValidAssignmentForRole,
-  Role,
-  useRecruitingStore,
-  type Applicant,
-  type Assignment,
-  type InterviewRound,
-  type RecruitingUser,
-} from '@/features/recruiting';
-
-const MOCK_ASSIGNER_ID = 'user-partner-maya';
+  adminApi,
+  type AdminApplicationResponse,
+  type InterviewAssignmentResponse,
+} from '@/lib/admin-api';
+import {
+  formatAdminRoleLabel,
+  getAssignmentCandidateRoleLabel,
+  hasBackendPermission,
+  mapAssignableUser,
+  type AssignmentCandidate,
+} from '@/pages/devops/recruiting-backend';
 
 const assignmentNavButtonClass = (active: boolean) =>
   [
@@ -68,55 +66,79 @@ const emptyDraft: AssignmentDraft = {
   scheduledTime: '',
 };
 
-const getDisplayRole = (role: RecruitingUser['role']) => {
-  switch (role) {
-    case Role.Partner:
-      return 'Partner';
-    case Role.PM:
-      return 'PM';
-    case Role.Consultant:
-      return 'Consultant';
-    case Role.LC:
-      return 'LC';
-    default:
-      return 'Applicant';
-  }
-};
+const getCurrentRoundAssignments = (
+  assignments: InterviewAssignmentResponse[],
+  applicationId: number,
+  round: 'Round 1' | 'Round 2'
+) => assignments.filter((assignment) => assignment.application_id === applicationId && assignment.round === round);
 
-const getCurrentRoundAssignments = (assignments: Assignment[], applicantId: string, round: InterviewRound) =>
-  assignments.filter((assignment) => assignment.applicantId === applicantId && assignment.round === round);
+const canBePrimary = (user: AssignmentCandidate) => ['pm', 'partner'].includes(user.routeRole);
+const canBeSecondary = (user: AssignmentCandidate) => ['consultant', 'lc'].includes(user.routeRole);
 
 const DevopsAssignments = () => {
   const { toast } = useToast();
+  const { user, isLoading: authLoading } = useAuth();
   const [draft, setDraft] = useState<AssignmentDraft>(emptyDraft);
+  const [applications, setApplications] = useState<AdminApplicationResponse[]>([]);
+  const [assignments, setAssignments] = useState<InterviewAssignmentResponse[]>([]);
+  const [interviewers, setInterviewers] = useState<AssignmentCandidate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const { applicants, assignments, users } = useRecruitingStore((state) => state);
+  const canAssignInterviewers = hasBackendPermission(user, 'assign_interviewers');
 
-  const currentUser =
-    users.find((user) => user.id === MOCK_ASSIGNER_ID) ??
-    users.find((user) => isPartnerOrPm(user)) ??
-    null;
+  const loadData = useCallback(async () => {
+    if (!user || !canAssignInterviewers) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const [applicationsResponse, assignmentsResponse, interviewersResponse] = await Promise.all([
+        adminApi.listApplications(),
+        adminApi.listAssignments(),
+        adminApi.listInterviewers(),
+      ]);
+
+      setApplications(applicationsResponse);
+      setAssignments(assignmentsResponse);
+      setInterviewers(interviewersResponse.map(mapAssignableUser));
+    } catch (error) {
+      toast({
+        title: 'Could not load assignments workspace',
+        description: error instanceof Error ? error.message : 'The backend did not return assignment data.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [canAssignInterviewers, toast, user]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    void loadData();
+  }, [authLoading, loadData]);
 
   const eligibleApplicants = useMemo(
     () =>
-      applicants
-        .filter((applicant) => applicant.finalDecision === 'pending' && applicant.currentRound !== null)
-        .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()),
-    [applicants]
+      applications
+        .filter((applicant) => applicant.current_round !== null && ['round_1', 'round_2'].includes(applicant.recruiting_status))
+        .sort((left, right) => new Date(right.reviewed_at ?? right.created_at).getTime() - new Date(left.reviewed_at ?? left.created_at).getTime()),
+    [applications]
   );
 
   const primaryCandidates = useMemo(
-    () => users.filter((user) => user.active && isValidAssignmentForRole('primary', user)),
-    [users]
+    () => interviewers.filter((candidate) => candidate.active && canBePrimary(candidate)),
+    [interviewers]
   );
-
   const secondaryCandidates = useMemo(
-    () => users.filter((user) => user.active && isValidAssignmentForRole('secondary', user)),
-    [users]
+    () => interviewers.filter((candidate) => candidate.active && canBeSecondary(candidate)),
+    [interviewers]
   );
 
   const selectedApplicant = useMemo(
-    () => eligibleApplicants.find((applicant) => applicant.id === draft.applicantId) ?? null,
+    () => eligibleApplicants.find((applicant) => String(applicant.id) === draft.applicantId) ?? null,
     [draft.applicantId, eligibleApplicants]
   );
 
@@ -124,54 +146,53 @@ const DevopsAssignments = () => {
     if (eligibleApplicants.length === 0) return;
 
     setDraft((currentDraft) => {
-      if (currentDraft.applicantId && eligibleApplicants.some((applicant) => applicant.id === currentDraft.applicantId)) {
+      if (currentDraft.applicantId && eligibleApplicants.some((applicant) => String(applicant.id) === currentDraft.applicantId)) {
         return currentDraft;
       }
 
       const defaultApplicant = eligibleApplicants[0];
-      const defaultAssignments = getCurrentRoundAssignments(assignments, defaultApplicant.id, defaultApplicant.currentRound!);
+      const defaultRound = defaultApplicant.current_round ?? 'Round 1';
+      const defaultAssignments = getCurrentRoundAssignments(assignments, defaultApplicant.id, defaultRound);
 
       return {
-        applicantId: defaultApplicant.id,
-        primaryInterviewerId: defaultAssignments.find((assignment) => assignment.role === 'primary')?.interviewerId ?? '',
-        secondaryInterviewerId: defaultAssignments.find((assignment) => assignment.role === 'secondary')?.interviewerId ?? '',
+        applicantId: String(defaultApplicant.id),
+        primaryInterviewerId: String(defaultAssignments.find((assignment) => assignment.role === 'primary')?.interviewer_id ?? ''),
+        secondaryInterviewerId: String(defaultAssignments.find((assignment) => assignment.role === 'secondary')?.interviewer_id ?? ''),
         room: defaultAssignments[0]?.room ?? '',
-        scheduledTime: defaultAssignments[0]?.scheduledTime ?? '',
+        scheduledTime: defaultAssignments[0]?.scheduled_time ? defaultAssignments[0].scheduled_time.slice(0, 16) : '',
       };
     });
   }, [assignments, eligibleApplicants]);
 
   const handleApplicantChange = (applicantId: string) => {
-    const applicant = eligibleApplicants.find((entry) => entry.id === applicantId) ?? null;
-    if (!applicant || !applicant.currentRound) return;
+    const applicant = eligibleApplicants.find((entry) => String(entry.id) === applicantId) ?? null;
+    if (!applicant || !applicant.current_round) return;
 
-    const currentAssignments = getCurrentRoundAssignments(assignments, applicant.id, applicant.currentRound);
-
+    const currentAssignments = getCurrentRoundAssignments(assignments, applicant.id, applicant.current_round);
     setDraft({
-      applicantId: applicant.id,
-      primaryInterviewerId: currentAssignments.find((assignment) => assignment.role === 'primary')?.interviewerId ?? '',
-      secondaryInterviewerId: currentAssignments.find((assignment) => assignment.role === 'secondary')?.interviewerId ?? '',
+      applicantId,
+      primaryInterviewerId: String(currentAssignments.find((assignment) => assignment.role === 'primary')?.interviewer_id ?? ''),
+      secondaryInterviewerId: String(currentAssignments.find((assignment) => assignment.role === 'secondary')?.interviewer_id ?? ''),
       room: currentAssignments[0]?.room ?? '',
-      scheduledTime: currentAssignments[0]?.scheduledTime ?? '',
+      scheduledTime: currentAssignments[0]?.scheduled_time ? currentAssignments[0].scheduled_time.slice(0, 16) : '',
     });
   };
 
   const handleSave = async () => {
-    if (!selectedApplicant || !selectedApplicant.currentRound || !currentUser) return;
+    if (!selectedApplicant || !selectedApplicant.current_round || !user) return;
 
-    const primaryUser = users.find((user) => user.id === draft.primaryInterviewerId) ?? null;
-    const secondaryUser = users.find((user) => user.id === draft.secondaryInterviewerId) ?? null;
+    const primaryUser = primaryCandidates.find((candidate) => String(candidate.id) === draft.primaryInterviewerId) ?? null;
+    const secondaryUser = secondaryCandidates.find((candidate) => String(candidate.id) === draft.secondaryInterviewerId) ?? null;
 
-    if (!primaryUser || !isValidAssignmentForRole('primary', primaryUser)) {
+    if (!primaryUser) {
       toast({
         title: 'Primary interviewer required',
-        description: 'Select a PM or Partner as the primary interviewer.',
+        description: 'Select a PM, Partner, Executive, or Admin as the primary interviewer.',
         variant: 'destructive',
       });
       return;
     }
-
-    if (!secondaryUser || !isValidAssignmentForRole('secondary', secondaryUser)) {
+    if (!secondaryUser) {
       toast({
         title: 'Secondary interviewer required',
         description: 'Select a Consultant or LC as the secondary interviewer.',
@@ -180,56 +201,57 @@ const DevopsAssignments = () => {
       return;
     }
 
-    const scheduledTime = draft.scheduledTime.trim() || null;
-    const room = draft.room.trim() || null;
-    const assignedAt = new Date().toISOString();
+    setSaving(true);
+    try {
+      const savedAssignments = await adminApi.saveAssignments(selectedApplicant.id, {
+        round: selectedApplicant.current_round,
+        primary_interviewer_id: primaryUser.id,
+        secondary_interviewer_id: secondaryUser.id,
+        room: draft.room.trim() || null,
+        scheduled_time: draft.scheduledTime ? new Date(draft.scheduledTime).toISOString() : null,
+      });
 
-    await assignmentsService.upsertAssignment({
-      id: `assignment-${selectedApplicant.id}-${selectedApplicant.currentRound}-primary`,
-      applicantId: selectedApplicant.id,
-      round: selectedApplicant.currentRound,
-      role: 'primary',
-      interviewerId: primaryUser.id,
-      assignedByUserId: currentUser.id,
-      assignedAt,
-      room,
-      scheduledTime,
-    });
+      setAssignments((current) => {
+        const next = current.filter(
+          (assignment) =>
+            !(
+              assignment.application_id === selectedApplicant.id &&
+              assignment.round === selectedApplicant.current_round
+            )
+        );
+        return [...next, ...savedAssignments];
+      });
 
-    await assignmentsService.upsertAssignment({
-      id: `assignment-${selectedApplicant.id}-${selectedApplicant.currentRound}-secondary`,
-      applicantId: selectedApplicant.id,
-      round: selectedApplicant.currentRound,
-      role: 'secondary',
-      interviewerId: secondaryUser.id,
-      assignedByUserId: currentUser.id,
-      assignedAt,
-      room,
-      scheduledTime,
-    });
-
-    toast({
-      title: 'Interview assignment saved',
-      description: `${selectedApplicant.name} now has ${primaryUser.name} and ${secondaryUser.name} assigned for ${getInterviewRoundLabel(selectedApplicant.currentRound)}.`,
-    });
+      toast({
+        title: 'Interview assignment saved',
+        description: `${selectedApplicant.name} now has ${primaryUser.name ?? primaryUser.email} and ${secondaryUser.name ?? secondaryUser.email} assigned for ${selectedApplicant.current_round}.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Could not save assignment',
+        description: error instanceof Error ? error.message : 'The backend rejected this assignment update.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const applicantCards = eligibleApplicants.map((applicant) => {
-    const currentAssignments = getCurrentRoundAssignments(assignments, applicant.id, applicant.currentRound!);
+    const currentRound = applicant.current_round ?? 'Round 1';
+    const currentAssignments = getCurrentRoundAssignments(assignments, applicant.id, currentRound);
     const primaryAssignment = currentAssignments.find((assignment) => assignment.role === 'primary') ?? null;
     const secondaryAssignment = currentAssignments.find((assignment) => assignment.role === 'secondary') ?? null;
-    const primaryUser = users.find((user) => user.id === primaryAssignment?.interviewerId) ?? null;
-    const secondaryUser = users.find((user) => user.id === secondaryAssignment?.interviewerId) ?? null;
     const fullyAssigned = Boolean(primaryAssignment && secondaryAssignment);
 
     return (
       <button
         key={applicant.id}
         type="button"
-        onClick={() => handleApplicantChange(applicant.id)}
+        onClick={() => handleApplicantChange(String(applicant.id))}
         className={[
           'rounded-3xl border p-5 text-left transition-all',
-          draft.applicantId === applicant.id
+          draft.applicantId === String(applicant.id)
             ? 'border-cyan-300/40 bg-cyan-400/10 shadow-[0_20px_60px_rgba(34,211,238,0.12)]'
             : 'border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]',
         ].join(' ')}
@@ -237,11 +259,11 @@ const DevopsAssignments = () => {
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-white/40">
-              {getApplicationStatusLabel(applicant.status)} • {getInterviewRoundLabel(applicant.currentRound)}
+              {applicant.recruiting_status.replace(/_/g, ' ')} • {currentRound}
             </p>
             <h3 className="mt-2 text-lg font-semibold text-white">{applicant.name}</h3>
             <p className="mt-1 text-sm text-white/55">
-              {applicant.teamApplyingFor} • Cycle {applicant.cycle} • {applicant.schoolYear}
+              {applicant.cycle_name ?? 'No cycle'} • {applicant.email}
             </p>
           </div>
           <span
@@ -259,13 +281,13 @@ const DevopsAssignments = () => {
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
             <p className="text-[11px] uppercase tracking-[0.2em] text-white/40">Primary</p>
-            <p className="mt-2 text-sm font-medium text-white">{primaryUser?.name ?? 'Unassigned'}</p>
-            <p className="mt-1 text-xs text-white/50">{primaryUser ? getDisplayRole(primaryUser.role) : 'PM or Partner only'}</p>
+            <p className="mt-2 text-sm font-medium text-white">{primaryAssignment?.interviewer_name ?? 'Unassigned'}</p>
+            <p className="mt-1 text-xs text-white/50">{primaryAssignment ? formatAdminRoleLabel(primaryAssignment.interviewer_role) : 'PM or Partner only'}</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
             <p className="text-[11px] uppercase tracking-[0.2em] text-white/40">Secondary</p>
-            <p className="mt-2 text-sm font-medium text-white">{secondaryUser?.name ?? 'Unassigned'}</p>
-            <p className="mt-1 text-xs text-white/50">{secondaryUser ? getDisplayRole(secondaryUser.role) : 'Consultant or LC only'}</p>
+            <p className="mt-2 text-sm font-medium text-white">{secondaryAssignment?.interviewer_name ?? 'Unassigned'}</p>
+            <p className="mt-1 text-xs text-white/50">{secondaryAssignment ? formatAdminRoleLabel(secondaryAssignment.interviewer_role) : 'Consultant or LC only'}</p>
           </div>
         </div>
       </button>
@@ -273,10 +295,14 @@ const DevopsAssignments = () => {
   });
 
   const assignmentRows = useMemo(() => {
-    const grouped = new Map<string, { applicant: Applicant; primary: Assignment | null; secondary: Assignment | null }>();
+    const grouped = new Map<
+      number,
+      { applicant: AdminApplicationResponse; primary: InterviewAssignmentResponse | null; secondary: InterviewAssignmentResponse | null }
+    >();
 
     eligibleApplicants.forEach((applicant) => {
-      const currentAssignments = getCurrentRoundAssignments(assignments, applicant.id, applicant.currentRound!);
+      const currentRound = applicant.current_round ?? 'Round 1';
+      const currentAssignments = getCurrentRoundAssignments(assignments, applicant.id, currentRound);
       grouped.set(applicant.id, {
         applicant,
         primary: currentAssignments.find((assignment) => assignment.role === 'primary') ?? null,
@@ -284,14 +310,38 @@ const DevopsAssignments = () => {
       });
     });
 
-    return Array.from(grouped.values()).sort(
-      (left, right) =>
-        new Date(
-          right.primary?.assignedAt ?? right.secondary?.assignedAt ?? right.applicant.updatedAt
-        ).getTime() -
-        new Date(left.primary?.assignedAt ?? left.secondary?.assignedAt ?? left.applicant.updatedAt).getTime()
-    );
+    return Array.from(grouped.values()).sort((left, right) => {
+      const leftTimestamp = left.primary?.assigned_at ?? left.secondary?.assigned_at ?? left.applicant.reviewed_at ?? left.applicant.created_at;
+      const rightTimestamp = right.primary?.assigned_at ?? right.secondary?.assigned_at ?? right.applicant.reviewed_at ?? right.applicant.created_at;
+      return new Date(rightTimestamp).getTime() - new Date(leftTimestamp).getTime();
+    });
   }, [assignments, eligibleApplicants]);
+
+  if (authLoading || loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-white">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!canAssignInterviewers) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <section className="px-4 pb-24 pt-28">
+          <div className="mx-auto max-w-3xl">
+            <Card className="border-white/10 bg-white/[0.03]">
+              <CardContent className="p-10 text-center text-white/60">
+                Your role does not have permission to assign interviewers.
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -315,7 +365,7 @@ const DevopsAssignments = () => {
               <p className="text-xs uppercase tracking-[0.32em] text-cyan-200/70">Recruiting workflow</p>
               <h1 className="mt-3 text-3xl font-semibold text-white">Manual interviewer assignment</h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-white/60">
-                This page sits directly beside <span className="text-white/80">#/tech/manage</span> and uses the shared recruiting store to staff active interview rounds without a backend dependency.
+                This page now reads and writes live interview assignments through the FastAPI backend.
               </p>
             </div>
 
@@ -360,7 +410,7 @@ const DevopsAssignments = () => {
               <CardHeader>
                 <CardTitle className="text-white">Assignment editor</CardTitle>
                 <CardDescription>
-                  Primary is limited to PM or Partner. Secondary is limited to Consultant or LC. Room and time stay optional.
+                  Primary is limited to PM, Partner, Executive, or Admin. Secondary is limited to Consultant or LC.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
@@ -377,7 +427,7 @@ const DevopsAssignments = () => {
                     >
                       {eligibleApplicants.map((applicant) => (
                         <option key={applicant.id} value={applicant.id} className="bg-slate-900 text-white">
-                          {applicant.name} • {getInterviewRoundLabel(applicant.currentRound)}
+                          {applicant.name} • {applicant.current_round ?? 'Round 1'}
                         </option>
                       ))}
                     </select>
@@ -394,11 +444,11 @@ const DevopsAssignments = () => {
                       className="h-11 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 text-sm text-white outline-none"
                     >
                       <option value="" className="bg-slate-900 text-white">
-                        Select PM or Partner
+                        Select PM, Partner, Executive, or Admin
                       </option>
-                      {primaryCandidates.map((user) => (
-                        <option key={user.id} value={user.id} className="bg-slate-900 text-white">
-                          {user.name} • {getDisplayRole(user.role)}
+                      {primaryCandidates.map((candidate) => (
+                        <option key={candidate.id} value={candidate.id} className="bg-slate-900 text-white">
+                          {(candidate.name ?? candidate.email)} • {getAssignmentCandidateRoleLabel(candidate)}
                         </option>
                       ))}
                     </select>
@@ -417,9 +467,9 @@ const DevopsAssignments = () => {
                       <option value="" className="bg-slate-900 text-white">
                         Select Consultant or LC
                       </option>
-                      {secondaryCandidates.map((user) => (
-                        <option key={user.id} value={user.id} className="bg-slate-900 text-white">
-                          {user.name} • {getDisplayRole(user.role)}
+                      {secondaryCandidates.map((candidate) => (
+                        <option key={candidate.id} value={candidate.id} className="bg-slate-900 text-white">
+                          {(candidate.name ?? candidate.email)} • {getAssignmentCandidateRoleLabel(candidate)}
                         </option>
                       ))}
                     </select>
@@ -456,7 +506,7 @@ const DevopsAssignments = () => {
                   <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                     <UserCheck className="h-5 w-5 text-cyan-200" />
                     <p className="mt-3 text-xs uppercase tracking-[0.2em] text-white/45">Primary rule</p>
-                    <p className="mt-2 text-sm text-white/75">Only Partner or PM can be saved into the primary slot.</p>
+                    <p className="mt-2 text-sm text-white/75">Only PM, Partner, Executive, or Admin can be saved into the primary slot.</p>
                   </div>
                   <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                     <ShieldCheck className="h-5 w-5 text-emerald-200" />
@@ -472,16 +522,17 @@ const DevopsAssignments = () => {
 
                 <Button
                   type="button"
-                  onClick={handleSave}
-                  disabled={!selectedApplicant || !currentUser}
+                  onClick={() => void handleSave()}
+                  disabled={!selectedApplicant || saving}
                   className="h-11 w-full bg-cyan-500 text-slate-950 hover:bg-cyan-400"
                 >
-                  Save manual assignment
+                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Save interview assignment
                 </Button>
 
-                {currentUser ? (
+                {user ? (
                   <p className="text-xs uppercase tracking-[0.2em] text-white/40">
-                    Acting as {currentUser.name} • {getDisplayRole(currentUser.role)} for local shared-state saves
+                    Acting as {user.name ?? user.email} • {formatAdminRoleLabel(user.role)}
                   </p>
                 ) : null}
               </CardContent>
@@ -491,16 +542,11 @@ const DevopsAssignments = () => {
           <Card className="mt-6 border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.98),rgba(8,13,22,0.99))] shadow-[0_24px_60px_rgba(0,0,0,0.34)]">
             <CardHeader>
               <CardTitle className="text-white">Current assignments</CardTitle>
-              <CardDescription>
-                Existing assignments are read directly from the shared recruiting store and grouped per applicant and round.
-              </CardDescription>
+              <CardDescription>Existing assignments are read directly from the backend and grouped per applicant and round.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {assignmentRows.length > 0 ? (
                 assignmentRows.map(({ applicant, primary, secondary }) => {
-                  const primaryUser = users.find((user) => user.id === primary?.interviewerId) ?? null;
-                  const secondaryUser = users.find((user) => user.id === secondary?.interviewerId) ?? null;
-                  const assignedBy = users.find((user) => user.id === (primary?.assignedByUserId ?? secondary?.assignedByUserId ?? '')) ?? null;
                   const scheduleSource = primary ?? secondary;
 
                   return (
@@ -510,24 +556,24 @@ const DevopsAssignments = () => {
                     >
                       <div>
                         <p className="text-xs uppercase tracking-[0.24em] text-white/40">
-                          {applicant.name} • {getInterviewRoundLabel(applicant.currentRound)}
+                          {applicant.name} • {applicant.current_round ?? 'Round 1'}
                         </p>
                         <p className="mt-2 text-sm text-white/60">
-                          {applicant.email} • {applicant.teamApplyingFor} • Cycle {applicant.cycle}
+                          {applicant.email} • {applicant.cycle_name ?? 'No cycle'}
                         </p>
-                        <p className="mt-3 text-sm text-white/70">{applicant.notes}</p>
+                        <p className="mt-3 text-sm text-white/70">{applicant.notes ?? applicant.interest ?? 'No additional notes.'}</p>
                       </div>
 
                       <div className="grid gap-3">
                         <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
                           <p className="text-[11px] uppercase tracking-[0.2em] text-white/40">Primary</p>
-                          <p className="mt-2 text-sm font-medium text-white">{primaryUser?.name ?? 'Unassigned'}</p>
-                          <p className="mt-1 text-xs text-white/50">{primaryUser ? getDisplayRole(primaryUser.role) : 'PM or Partner'}</p>
+                          <p className="mt-2 text-sm font-medium text-white">{primary?.interviewer_name ?? 'Unassigned'}</p>
+                          <p className="mt-1 text-xs text-white/50">{primary ? formatAdminRoleLabel(primary.interviewer_role) : 'PM or Partner'}</p>
                         </div>
                         <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
                           <p className="text-[11px] uppercase tracking-[0.2em] text-white/40">Secondary</p>
-                          <p className="mt-2 text-sm font-medium text-white">{secondaryUser?.name ?? 'Unassigned'}</p>
-                          <p className="mt-1 text-xs text-white/50">{secondaryUser ? getDisplayRole(secondaryUser.role) : 'Consultant or LC'}</p>
+                          <p className="mt-2 text-sm font-medium text-white">{secondary?.interviewer_name ?? 'Unassigned'}</p>
+                          <p className="mt-1 text-xs text-white/50">{secondary ? formatAdminRoleLabel(secondary.interviewer_role) : 'Consultant or LC'}</p>
                         </div>
                       </div>
 
@@ -536,7 +582,7 @@ const DevopsAssignments = () => {
                           <p className="text-[11px] uppercase tracking-[0.2em] text-white/40">Schedule</p>
                           <p className="mt-2 flex items-center gap-2 text-sm text-white">
                             <CalendarClock className="h-4 w-4 text-cyan-200" />
-                            {formatDateTime(scheduleSource?.scheduledTime ?? null)}
+                            {formatDateTime(scheduleSource?.scheduled_time ?? null)}
                           </p>
                           <p className="mt-2 flex items-center gap-2 text-sm text-white/70">
                             <DoorOpen className="h-4 w-4 text-cyan-200" />
@@ -545,8 +591,10 @@ const DevopsAssignments = () => {
                         </div>
                         <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
                           <p className="text-[11px] uppercase tracking-[0.2em] text-white/40">Saved</p>
-                          <p className="mt-2 text-sm text-white">{formatAssignedAt(primary?.assignedAt ?? secondary?.assignedAt ?? applicant.updatedAt)}</p>
-                          <p className="mt-1 text-xs text-white/50">By {assignedBy?.name ?? 'Shared recruiting store'}</p>
+                          <p className="mt-2 text-sm text-white">
+                            {formatAssignedAt(primary?.assigned_at ?? secondary?.assigned_at ?? applicant.reviewed_at ?? applicant.created_at)}
+                          </p>
+                          <p className="mt-1 text-xs text-white/50">By {primary?.assigned_by_user_name ?? secondary?.assigned_by_user_name ?? 'Backend workflow'}</p>
                         </div>
                       </div>
                     </div>

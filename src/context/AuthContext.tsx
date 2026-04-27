@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 
-import { defaultAppPathForUser, roleRouteMap, type AdminAuthenticatedUser } from '@/lib/admin-auth';
+import { defaultAppPathForUser, type AdminAuthenticatedUser } from '@/lib/admin-auth';
 import { apiFetch, setAccessTokenProvider } from '@/lib/api-client';
 import {
   acquireAccessToken,
@@ -40,6 +40,96 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const signInPaths = new Set(['/sign-in', '/tech/sign-in', '/devops/sign-in']);
+const publicPostLoginPathPrefixes = [
+  '/',
+  '/about',
+  '/leadership',
+  '/join',
+  '/apply',
+  '/recruitment-resources',
+  '/tech',
+  '/tech/apply',
+  '/tech/status',
+  '/tech/assessment',
+  '/devops',
+  '/devops/apply',
+  '/devops/status',
+  '/devops/assessment',
+] as const;
+
+const normalizeRolePath = (path: string | null | undefined) => {
+  if (!path) {
+    return '/sign-in';
+  }
+
+  return path.startsWith('/') ? path : `/${path}`;
+};
+
+const isSignInPath = (path: string | null | undefined) => signInPaths.has(normalizeRolePath(path));
+
+const isPublicPostLoginPath = (path: string) =>
+  publicPostLoginPathPrefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(`${prefix}?`));
+
+const canAccessRequestedPath = (user: AdminAuthenticatedUser | null, path: string) => {
+  if (!user) {
+    return false;
+  }
+
+  if (isPublicPostLoginPath(path)) {
+    return true;
+  }
+
+  if (path.startsWith('/tech/interviews')) {
+    return user.permissions.includes('view_assigned_interviews');
+  }
+
+  if (path.startsWith('/tech/assignments')) {
+    return user.permissions.includes('assign_interviewers');
+  }
+
+  if (path.startsWith('/tech/manage')) {
+    return (
+      user.permissions.includes('view_all_applicants') ||
+      user.permissions.includes('assign_interviewers') ||
+      user.permissions.includes('decide_round_1') ||
+      user.permissions.includes('decide_round_2') ||
+      user.permissions.includes('see_relative_score') ||
+      user.permissions.includes('see_database')
+    );
+  }
+
+  return false;
+};
+
+const resolvePostLoginPath = (
+  user: AdminAuthenticatedUser | null,
+  requestedPath: string | null | undefined
+) => {
+  const defaultDestination = normalizeRolePath(defaultAppPathForUser(user));
+  const normalizedRequestedPath = normalizeRolePath(requestedPath);
+
+  if (!requestedPath || isSignInPath(normalizedRequestedPath)) {
+    return defaultDestination;
+  }
+
+  return canAccessRequestedPath(user, normalizedRequestedPath)
+    ? normalizedRequestedPath
+    : defaultDestination;
+};
+
+const replaceHashRouterPath = (path: string) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const normalizedPath = normalizeRolePath(path);
+  window.history.replaceState(
+    null,
+    document.title,
+    `${window.location.pathname}${window.location.search}#${normalizedPath}`
+  );
+};
 
 function AuthProviderInner({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
@@ -128,12 +218,9 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
         const backendUser = isCancelled ? null : await refreshUser({ token: redirectToken });
 
         if (!isCancelled && shouldRedirectToRoleRoute) {
-          const destination = backendUser?.role ? roleRouteMap[backendUser.role] ?? '/sign-in' : '/sign-in';
-          window.history.replaceState(
-            null,
-            document.title,
-            `${window.location.pathname}${window.location.search}#${destination}`
-          );
+          const requestedPath = consumePostLoginPath();
+          const destination = resolvePostLoginPath(backendUser, requestedPath);
+          replaceHashRouterPath(destination);
           navigate(destination, { replace: true });
         }
 
@@ -159,16 +246,13 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   }, [clearSessionState, navigate, refreshUser]);
 
   useEffect(() => {
-    const isSignInRoute =
-      location.pathname === '/sign-in' ||
-      location.pathname === '/tech/sign-in' ||
-      location.pathname === '/devops/sign-in';
+    const isSignInRoute = isSignInPath(location.pathname);
 
     if (!isSignInRoute || isLoading || !user || !account || !accessToken) {
       return;
     }
 
-    const destination = defaultAppPathForUser(user);
+    const destination = normalizeRolePath(defaultAppPathForUser(user));
     if (destination !== location.pathname) {
       navigate(destination, { replace: true });
     }

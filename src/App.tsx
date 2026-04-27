@@ -23,23 +23,6 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-function RolePlaceholder({ title }: { title: string }) {
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex min-h-screen max-w-5xl items-center justify-center px-6">
-        <div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-white/[0.04] p-10 text-center shadow-2xl shadow-slate-950/30">
-          <p className="text-xs uppercase tracking-[0.32em] text-cyan-200/70">Role Dashboard</p>
-          <h1 className="mt-4 text-4xl font-semibold text-white">{title}</h1>
-          <p className="mt-4 text-sm leading-7 text-white/65">
-            This placeholder route is live so the post-login redirect works. The full dashboard UI for this role will
-            be added in the next phase.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => {
@@ -67,12 +50,11 @@ const App = () => (
         <Route path="/apply" element={<Apply />} />
         <Route path="/recruitment-resources" element={<RecruitmentResources />} />
         <Route path="/sign-in" element={<SignIn />} />
-        <Route path="/applicant" element={<RequireAuth><RolePlaceholder title="Applicant" /></RequireAuth>} />
-        <Route path="/consultant" element={<RequireAuth><RolePlaceholder title="Consultant" /></RequireAuth>} />
-        <Route path="/lc" element={<RequireAuth><RolePlaceholder title="LC" /></RequireAuth>} />
-        <Route path="/pm" element={<RequireAuth><RolePlaceholder title="PM" /></RequireAuth>} />
-        <Route path="/partner" element={<RequireAuth><RolePlaceholder title="Partner" /></RequireAuth>} />
-        <Route path="/admin" element={<Navigate to="/partner" replace />} />
+        <Route path="/consultant" element={<Navigate to="/tech/interviews" replace />} />
+        <Route path="/lc" element={<Navigate to="/tech/interviews" replace />} />
+        <Route path="/pm" element={<Navigate to="/tech/manage" replace />} />
+        <Route path="/partner" element={<Navigate to="/tech/manage" replace />} />
+        <Route path="/admin" element={<Navigate to="/tech/manage" replace />} />
         <Route path="/tech" element={<DevopsLanding />} />
         <Route path="/tech/sign-in" element={<Navigate to="/sign-in" replace />} />
         <Route path="/tech/apply" element={<DevopsApply />} />

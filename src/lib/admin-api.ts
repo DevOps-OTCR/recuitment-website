@@ -1,4 +1,4 @@
-import { apiFetch } from './api-client';
+import { apiFetch, apiFetchResponse } from './api-client';
 
 export interface AdminEvaluationPayload {
   interviewer_name: string;
@@ -39,6 +39,8 @@ export interface AdminApplicationResponse {
   is_flagged: boolean;
   integrity_notes: string | null;
   archived_at: string | null;
+  recruiting_status: 'applied' | 'round_1' | 'round_2' | 'accepted' | 'rejected';
+  current_round: 'Round 1' | 'Round 2' | null;
 }
 
 export interface AdminEvaluationResponse {
@@ -67,6 +69,58 @@ export interface AdminEvaluationResponse {
   created_at: string;
 }
 
+export interface AssignableUserResponse {
+  id: number;
+  email: string;
+  name: string | null;
+  role: 'APPLICANT' | 'CONSULTANT' | 'LC' | 'PM' | 'PARTNER' | 'EXECUTIVE' | 'ADMIN';
+  active: boolean;
+}
+
+export interface InterviewAssignmentResponse {
+  id: number;
+  application_id: number;
+  applicant_name: string;
+  applicant_email: string;
+  interest: string | null;
+  notes: string | null;
+  cycle_name: string | null;
+  status: string;
+  recruiting_status: 'applied' | 'round_1' | 'round_2' | 'accepted' | 'rejected';
+  current_round: 'Round 1' | 'Round 2' | null;
+  final_decision: string;
+  role: 'primary' | 'secondary';
+  round: 'Round 1' | 'Round 2';
+  interviewer_id: number;
+  interviewer_name: string | null;
+  interviewer_email: string;
+  interviewer_role: 'APPLICANT' | 'CONSULTANT' | 'LC' | 'PM' | 'PARTNER' | 'EXECUTIVE' | 'ADMIN';
+  assigned_by_user_id: number | null;
+  assigned_by_user_name: string | null;
+  assigned_at: string;
+  room: string | null;
+  scheduled_time: string | null;
+}
+
+export interface UpsertInterviewAssignmentsPayload {
+  round: 'Round 1' | 'Round 2';
+  primary_interviewer_id: number;
+  secondary_interviewer_id: number;
+  room?: string | null;
+  scheduled_time?: string | null;
+}
+
+export interface ApplicationDecisionRequest {
+  action:
+    | 'reject_after_application_review'
+    | 'advance_to_round_1'
+    | 'reject_after_round_1'
+    | 'advance_to_round_2'
+    | 'reject_after_round_2'
+    | 'accept_final';
+  notes?: string | null;
+}
+
 export interface AdminDatabaseOverviewResponse {
   generated_at: string;
   persistence: {
@@ -77,6 +131,7 @@ export interface AdminDatabaseOverviewResponse {
     table:
       | 'applications'
       | 'evaluations'
+      | 'interview_assignments'
       | 'assessment_links'
       | 'attempts'
       | 'submissions'
@@ -91,6 +146,7 @@ export interface AdminDatabaseTablePreviewResponse {
   table:
     | 'applications'
     | 'evaluations'
+    | 'interview_assignments'
     | 'assessment_links'
     | 'attempts'
     | 'submissions'
@@ -103,7 +159,7 @@ export interface AdminDatabaseTablePreviewResponse {
 }
 
 class AdminApiClient {
-  private timeoutMs = 2500;
+  private timeoutMs = 5000;
 
   private async fetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     return apiFetch<T>(endpoint, {
@@ -112,12 +168,29 @@ class AdminApiClient {
     });
   }
 
-  listApplications() {
-    return this.fetch<AdminApplicationResponse[]>('/api/admin/applications');
+  private async fetchResponse(endpoint: string, options: RequestInit = {}): Promise<Response> {
+    return apiFetchResponse(endpoint, {
+      ...options,
+      timeoutMs: this.timeoutMs,
+    });
   }
 
-  listEvaluations() {
-    return this.fetch<AdminEvaluationResponse[]>('/api/admin/evaluations');
+  listApplications() {
+    return this.fetch<AdminApplicationResponse[]>('/api/admin/applications?archived=1');
+  }
+
+  getResume(applicationId: number) {
+    return this.fetchResponse(`/api/admin/applications/${applicationId}/resume`);
+  }
+
+  listEvaluations(applicationId?: number) {
+    const suffix = applicationId ? `?application_id=${applicationId}` : '';
+    return this.fetch<AdminEvaluationResponse[]>(`/api/admin/evaluations${suffix}`);
+  }
+
+  listMyInterviews(applicationId?: number) {
+    const suffix = applicationId ? `?application_id=${applicationId}` : '';
+    return this.fetch<AdminEvaluationResponse[]>(`/api/auth/me/interviews${suffix}`);
   }
 
   createEvaluation(applicationId: number, payload: AdminEvaluationPayload) {
@@ -125,6 +198,33 @@ class AdminApiClient {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  }
+
+  applyDecision(applicationId: number, payload: ApplicationDecisionRequest) {
+    return this.fetch<AdminApplicationResponse>(`/api/admin/applications/${applicationId}/decision`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  listInterviewers() {
+    return this.fetch<AssignableUserResponse[]>('/api/admin/interviewers');
+  }
+
+  listAssignments(applicationId?: number) {
+    const suffix = applicationId ? `?application_id=${applicationId}` : '';
+    return this.fetch<InterviewAssignmentResponse[]>(`/api/admin/assignments${suffix}`);
+  }
+
+  saveAssignments(applicationId: number, payload: UpsertInterviewAssignmentsPayload) {
+    return this.fetch<InterviewAssignmentResponse[]>(`/api/admin/applications/${applicationId}/assignments`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  listMyAssignedInterviews() {
+    return this.fetch<InterviewAssignmentResponse[]>('/api/auth/me/assigned-interviews');
   }
 
   getDatabaseOverview() {

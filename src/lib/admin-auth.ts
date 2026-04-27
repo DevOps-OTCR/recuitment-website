@@ -1,11 +1,11 @@
 export const roleRouteMap = {
-  APPLICANT: '/applicant',
-  CONSULTANT: '/consultant',
-  LC: '/lc',
-  PM: '/pm',
-  PARTNER: '/partner',
-  EXECUTIVE: '/partner',
-  ADMIN: '/pm',
+  APPLICANT: '/tech/status',
+  CONSULTANT: '/tech/interviews',
+  LC: '/tech/interviews',
+  PM: '/tech/manage',
+  PARTNER: '/tech/manage',
+  EXECUTIVE: '/tech/manage',
+  ADMIN: '/tech/manage',
 } as const;
 
 export type AdminUserRole = keyof typeof roleRouteMap;

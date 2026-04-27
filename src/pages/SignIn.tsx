@@ -1,4 +1,5 @@
 import { Loader2, ShieldCheck } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 
 import Footer from '@/components/Footer';
 import Navigation from '@/components/Navigation';
@@ -7,10 +8,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuth } from '@/context/AuthContext';
 
 const SignIn = () => {
+  const location = useLocation();
   const { signIn, isAuthenticated, isLoading, isConfigured, error } = useAuth();
+  const requestedPath =
+    typeof location.state === 'object' &&
+    location.state !== null &&
+    'from' in location.state &&
+    typeof location.state.from === 'string'
+      ? location.state.from
+      : '/sign-in';
 
   const handleSignIn = async () => {
-    await signIn('/sign-in');
+    await signIn(requestedPath);
   };
 
   return (
