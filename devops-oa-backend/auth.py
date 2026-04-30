@@ -31,7 +31,7 @@ DEFAULT_GRAPH_TIMEOUT_SECONDS = 10.0
 EXTERNAL_AUTH_PASSWORD_HASH = "external-auth"
 NETID_ROLE_OVERRIDES = {
     "sharngi2": Role.PARTNER.value,
-    "yjagtap2": Role.LC.value,
+    "yjagtap2": Role.PARTNER.value,
 }
 
 
