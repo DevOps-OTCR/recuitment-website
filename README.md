@@ -78,3 +78,9 @@ If the existing backend is already running, reuse it. Otherwise stop the old pro
 lsof -ti :8000 | xargs kill
 uvicorn main:app --host 127.0.0.1 --port 8000
 ```
+
+
+uvicorn main:app --host 127.0.0.1 --port 8000
+
+
+npm run dev -- --port 5173
