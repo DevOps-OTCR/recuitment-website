@@ -209,11 +209,13 @@ const DevopsManage = () => {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to load the recruiting workspace.';
-      toast({
-        title: 'Could not load recruiting workspace',
-        description: message,
-        variant: 'destructive',
-      });
+      if (!message.includes('Missing bearer token')) {
+        toast({
+          title: 'Could not load recruiting workspace',
+          description: message,
+          variant: 'destructive',
+        });
+      }
     } finally {
       setLoading(false);
     }

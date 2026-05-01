@@ -119,6 +119,7 @@ const DevopsApply = () => {
         name: formValues.name.trim(),
         email: formValues.email.trim().toLowerCase(),
         interest: interestSummary,
+        cycle: formValues.cycle,
         resume: resumeFile,
       });
 

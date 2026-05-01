@@ -68,6 +68,19 @@ const formatUpdatedAt = (value: string) =>
     year: 'numeric',
   });
 
+const formatDateTime = (value: string) =>
+  (
+    /(?:Z|[+-]\d{2}:\d{2})$/.test(value)
+      ? new Date(value)
+      : new Date(value.replace(' ', 'T'))
+  ).toLocaleString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
 const mapBackendStatus = (status: PublicApplicationStatusResponse['status']): ApplicationStatus | null => {
   switch (status) {
     case 'pending':
@@ -81,12 +94,37 @@ const mapBackendStatus = (status: PublicApplicationStatusResponse['status']): Ap
   }
 };
 
+const mapRecruitingStatus = (
+  response: PublicApplicationStatusResponse
+): ApplicationStatus | null => {
+  switch (response.recruiting_status) {
+    case 'applied':
+      return ApplicationStatus.Applied;
+    case 'round_1':
+      return ApplicationStatus.Round1;
+    case 'round_2':
+      return ApplicationStatus.Round2;
+    case 'accepted':
+      return ApplicationStatus.Accepted;
+    case 'rejected':
+      return ApplicationStatus.Rejected;
+    default:
+      return mapBackendStatus(response.status);
+  }
+};
+
 type StatusLookupResult = {
   applicantName: string;
   applicantEmail: string;
   status: ApplicationStatus;
   createdAt: string;
+  updatedAt?: string | null;
   assessmentUrl?: string;
+  currentRound?: 'Round 1' | 'Round 2' | null;
+  interviewScheduled: boolean;
+  interviewRound?: 'Round 1' | 'Round 2' | null;
+  interviewRoom?: string | null;
+  interviewTime?: string | null;
 };
 
 const DevopsStatus = () => {
@@ -114,7 +152,7 @@ const DevopsStatus = () => {
         return;
       }
 
-      const mappedStatus = mapBackendStatus(response.status);
+      const mappedStatus = mapRecruitingStatus(response);
       if (!mappedStatus || !response.name || !response.created_at) {
         throw new Error('Backend returned an unexpected application status payload.');
       }
@@ -124,7 +162,13 @@ const DevopsStatus = () => {
         applicantEmail: normalizeEmail(email),
         status: mappedStatus,
         createdAt: response.created_at,
+        updatedAt: response.reviewed_at,
         assessmentUrl: response.assessment_url,
+        currentRound: response.current_round,
+        interviewScheduled: Boolean(response.interview_scheduled),
+        interviewRound: response.interview_round,
+        interviewRoom: response.interview_room,
+        interviewTime: response.interview_time,
       });
     } catch (error) {
       setLookupResult(null);
@@ -227,6 +271,14 @@ const DevopsStatus = () => {
                     </div>
                     <h2 className="mt-4 text-2xl font-semibold text-white">{activeStatus.headline}</h2>
                     <p className="mt-2 max-w-2xl text-sm text-white/75">{activeStatus.description}</p>
+                    {lookupResult.interviewScheduled ? (
+                      <p className="mt-3 text-sm text-cyan-100">
+                        Interview scheduled
+                        {lookupResult.interviewRound ? ` for ${lookupResult.interviewRound}` : ''}.
+                        {lookupResult.interviewTime ? ` ${formatDateTime(lookupResult.interviewTime)}.` : ''}
+                        {lookupResult.interviewRoom ? ` Room: ${lookupResult.interviewRoom}.` : ''}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -238,8 +290,13 @@ const DevopsStatus = () => {
                   </div>
                   <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
                     <p className="text-xs uppercase tracking-[0.18em] text-white/45">Application</p>
-                    <p className="mt-2 text-base font-medium text-white">Backend application record located</p>
+                    <p className="mt-2 text-base font-medium text-white">
+                      {lookupResult.currentRound ? `${lookupResult.currentRound} workflow active` : 'Backend application record located'}
+                    </p>
                     <p className="mt-1 text-sm text-white/60">Submitted {formatUpdatedAt(lookupResult.createdAt)}</p>
+                    {lookupResult.updatedAt ? (
+                      <p className="mt-1 text-sm text-white/60">Last updated {formatUpdatedAt(lookupResult.updatedAt)}</p>
+                    ) : null}
                   </div>
                 </div>
 

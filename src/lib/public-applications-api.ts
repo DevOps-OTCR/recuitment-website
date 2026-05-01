@@ -4,6 +4,7 @@ export interface PublicApplicationSubmitPayload {
   name: string;
   email: string;
   interest: string;
+  cycle: '1' | '2';
   resume: File;
 }
 
@@ -20,10 +21,18 @@ export interface PublicApplicationStatusResponse {
   found: boolean;
   message?: string;
   status?: 'pending' | 'approved' | 'rejected';
+  recruiting_status?: 'applied' | 'round_1' | 'round_2' | 'accepted' | 'rejected';
+  current_round?: 'Round 1' | 'Round 2' | null;
+  final_decision?: 'YES' | 'NO' | 'MAYBE';
   name?: string;
   created_at?: string;
+  reviewed_at?: string | null;
   assessment_token?: string;
   assessment_url?: string;
+  interview_scheduled?: boolean;
+  interview_round?: 'Round 1' | 'Round 2' | null;
+  interview_room?: string | null;
+  interview_time?: string | null;
 }
 
 class PublicApplicationsApiClient {
@@ -34,6 +43,7 @@ class PublicApplicationsApiClient {
     formData.append('name', payload.name);
     formData.append('email', payload.email);
     formData.append('interest', payload.interest);
+    formData.append('cycle', payload.cycle);
     formData.append('resume', payload.resume);
 
     return apiFetch<PublicApplicationResponse>('/api/applications', {

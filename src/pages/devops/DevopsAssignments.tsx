@@ -34,7 +34,12 @@ const assignmentNavButtonClass = (active: boolean) =>
 const formatDateTime = (value: string | null) => {
   if (!value) return 'TBD';
 
-  return new Date(value).toLocaleString('en-US', {
+  const parsed =
+    /(?:Z|[+-]\d{2}:\d{2})$/.test(value)
+      ? new Date(value)
+      : new Date(value.replace(' ', 'T'));
+
+  return parsed.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
@@ -49,6 +54,22 @@ const formatAssignedAt = (value: string) =>
     hour: 'numeric',
     minute: '2-digit',
   });
+
+const toDateTimeLocalValue = (value: string | null) => {
+  if (!value) return '';
+
+  if (!/(?:Z|[+-]\d{2}:\d{2})$/.test(value)) {
+    return value.replace(' ', 'T').slice(0, 16);
+  }
+
+  const parsed = new Date(value);
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  const hours = String(parsed.getHours()).padStart(2, '0');
+  const minutes = String(parsed.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
 
 type AssignmentDraft = {
   applicantId: string;
@@ -105,11 +126,14 @@ const DevopsAssignments = () => {
       setAssignments(assignmentsResponse);
       setInterviewers(interviewersResponse.map(mapAssignableUser));
     } catch (error) {
-      toast({
-        title: 'Could not load assignments workspace',
-        description: error instanceof Error ? error.message : 'The backend did not return assignment data.',
-        variant: 'destructive',
-      });
+      const message = error instanceof Error ? error.message : 'The backend did not return assignment data.';
+      if (!message.includes('Missing bearer token')) {
+        toast({
+          title: 'Could not load assignments workspace',
+          description: message,
+          variant: 'destructive',
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -159,7 +183,7 @@ const DevopsAssignments = () => {
         primaryInterviewerId: String(defaultAssignments.find((assignment) => assignment.role === 'primary')?.interviewer_id ?? ''),
         secondaryInterviewerId: String(defaultAssignments.find((assignment) => assignment.role === 'secondary')?.interviewer_id ?? ''),
         room: defaultAssignments[0]?.room ?? '',
-        scheduledTime: defaultAssignments[0]?.scheduled_time ? defaultAssignments[0].scheduled_time.slice(0, 16) : '',
+        scheduledTime: toDateTimeLocalValue(defaultAssignments[0]?.scheduled_time ?? null),
       };
     });
   }, [assignments, eligibleApplicants]);
@@ -174,7 +198,7 @@ const DevopsAssignments = () => {
       primaryInterviewerId: String(currentAssignments.find((assignment) => assignment.role === 'primary')?.interviewer_id ?? ''),
       secondaryInterviewerId: String(currentAssignments.find((assignment) => assignment.role === 'secondary')?.interviewer_id ?? ''),
       room: currentAssignments[0]?.room ?? '',
-      scheduledTime: currentAssignments[0]?.scheduled_time ? currentAssignments[0].scheduled_time.slice(0, 16) : '',
+      scheduledTime: toDateTimeLocalValue(currentAssignments[0]?.scheduled_time ?? null),
     });
   };
 
@@ -208,7 +232,7 @@ const DevopsAssignments = () => {
         primary_interviewer_id: primaryUser.id,
         secondary_interviewer_id: secondaryUser.id,
         room: draft.room.trim() || null,
-        scheduled_time: draft.scheduledTime ? new Date(draft.scheduledTime).toISOString() : null,
+        scheduled_time: draft.scheduledTime ? `${draft.scheduledTime}:00` : null,
       });
 
       setAssignments((current) => {

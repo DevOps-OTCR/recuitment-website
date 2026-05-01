@@ -27,6 +27,7 @@ from models import (
     Submission,
     Application,
     ApplicationStatus,
+    Cycle,
     Evaluation,
     InterviewAssignment,
     ProgressSnapshot,
@@ -623,6 +624,7 @@ async def submit_application(
     name: str = Form(...),
     email: str = Form(...),
     interest: str = Form(""),
+    cycle: str = Form(...),
     resume: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
@@ -638,6 +640,18 @@ async def submit_application(
             status_code=400, 
             detail="An application with this email already exists. Please contact us if you need to update your application."
         )
+
+    normalized_cycle = cycle.strip()
+    if normalized_cycle not in {"1", "2"}:
+        raise HTTPException(status_code=400, detail="Cycle must be 1 or 2.")
+
+    cycle_name = f"Cycle {normalized_cycle}"
+    cycle_record = db.query(Cycle).filter(Cycle.name == cycle_name).order_by(Cycle.id.asc()).first()
+    if cycle_record is None:
+        cycle_record = Cycle(name=cycle_name, semester="Local")
+        db.add(cycle_record)
+        db.commit()
+        db.refresh(cycle_record)
     
     # Save resume file (Supabase Storage or local disk)
     file_ext = os.path.splitext(resume.filename)[1] if resume.filename else ".pdf"
@@ -664,6 +678,7 @@ async def submit_application(
         name=name.strip(),
         email=email.lower().strip(),
         interest=interest.strip() if interest else None,
+        cycle_id=cycle_record.id,
         resume_filename=resume.filename,
         resume_path=resume_path,
         status=ApplicationStatus.PENDING.value,
@@ -685,18 +700,48 @@ async def submit_application(
 @router.get("/applications/check/{email}")
 async def check_application_status(email: str, db: Session = Depends(get_db)):
     """Check application status by email (public)."""
-    application = db.query(Application).filter(
-        Application.email == email.lower()
-    ).first()
+    application = (
+        db.query(Application)
+        .options(
+            joinedload(Application.assessment_link).joinedload(AssessmentLink.attempts),
+            joinedload(Application.evaluations),
+            joinedload(Application.interview_assignments),
+        )
+        .filter(Application.email == email.lower())
+        .first()
+    )
     
     if not application:
         return {"found": False, "message": "No application found with this email."}
-    
+
+    recruiting_status, current_round = _derive_recruiting_status(application)
+    scheduled_assignments = [
+        assignment
+        for assignment in (application.interview_assignments or [])
+        if assignment.scheduled_time or assignment.room
+    ]
+    latest_scheduled_assignment = (
+        max(
+            scheduled_assignments,
+            key=lambda entry: entry.scheduled_time or entry.assigned_at or datetime.min,
+        )
+        if scheduled_assignments
+        else None
+    )
+
     response = {
         "found": True,
         "status": application.status,
+        "recruiting_status": recruiting_status,
+        "current_round": current_round,
+        "final_decision": application.final_decision.value,
         "name": application.name,
         "created_at": application.created_at,
+        "reviewed_at": application.reviewed_at,
+        "interview_scheduled": latest_scheduled_assignment is not None,
+        "interview_round": latest_scheduled_assignment.round if latest_scheduled_assignment else current_round,
+        "interview_room": latest_scheduled_assignment.room if latest_scheduled_assignment else None,
+        "interview_time": latest_scheduled_assignment.scheduled_time if latest_scheduled_assignment else None,
     }
     
     # If approved and has assessment link, include token
