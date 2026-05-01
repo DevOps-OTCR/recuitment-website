@@ -1,11 +1,17 @@
-import { CheckCircle2, ExternalLink, FileText, HelpCircle, XCircle } from 'lucide-react';
+import { CheckCircle2, ExternalLink, HelpCircle, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { RecruitingDecisionAction, RecruitingRole } from '@/features/recruiting';
 
 import StatusSummary from './StatusSummary';
-import { feedbackMetricFields, formatRatingBand, type ApplicantRecord, type FeedbackEntry, type InterviewRound } from './types';
+import {
+  feedbackMetricFields,
+  formatRatingBand,
+  type ApplicantRecord,
+  type FeedbackEntry,
+  type InterviewRound,
+} from './types';
 
 const recommendationToneClasses: Record<string, string> = {
   YES: 'border-emerald-300/30 bg-emerald-400/10 text-emerald-100',
@@ -37,9 +43,9 @@ interface ApplicantDetailProps {
   yesCount: number;
   noCount: number;
   maybeCount: number;
-  overallStatus: string;
-  averageScore: number | null;
-  comparisonAverage?: number | null;
+  applicantStatusLabel: string;
+  relativeScore: number | null;
+  relativeScoreTag: string;
   selectedRound: InterviewRound;
   availableRounds: InterviewRound[];
   onSelectRound: (round: InterviewRound) => void;
@@ -50,11 +56,13 @@ interface ApplicantDetailProps {
 }
 
 const recruitingStatusToneClasses: Record<string, string> = {
-  applied: 'border-white/10 bg-white/[0.04] text-white/75',
-  round_1: 'border-sky-300/25 bg-sky-400/10 text-sky-100',
-  round_2: 'border-cyan-300/25 bg-cyan-400/10 text-cyan-100',
+  'not moved to round 1': 'border-white/10 bg-white/[0.04] text-white/75',
+  'pending round 1': 'border-sky-300/25 bg-sky-400/10 text-sky-100',
+  'passed round 1': 'border-cyan-300/25 bg-cyan-400/10 text-cyan-100',
+  'passed round 2': 'border-emerald-300/20 bg-emerald-400/10 text-emerald-100',
+  'failed round 1': 'border-rose-300/25 bg-rose-400/10 text-rose-100',
+  'failed round 2': 'border-rose-300/30 bg-rose-500/10 text-rose-100',
   accepted: 'border-emerald-300/25 bg-emerald-400/10 text-emerald-100',
-  rejected: 'border-rose-300/25 bg-rose-400/10 text-rose-100',
 };
 
 const recruitingDecisionOptions: Array<{
@@ -115,9 +123,9 @@ const ApplicantDetail = ({
   yesCount,
   noCount,
   maybeCount,
-  overallStatus,
-  averageScore,
-  comparisonAverage = null,
+  applicantStatusLabel,
+  relativeScore,
+  relativeScoreTag,
   selectedRound,
   availableRounds,
   onSelectRound,
@@ -137,6 +145,8 @@ const ApplicantDetail = ({
   const availableDecisionOptions = recruitingDecisionOptions.filter((option) =>
     (allowedDecisionActionsByStatus[applicant.status] ?? []).includes(option.action)
   );
+  const applicantStatusToneClassName =
+    recruitingStatusToneClasses[applicantStatusLabel.toLowerCase()] ?? recruitingStatusToneClasses['not moved to round 1'];
 
   return (
   <div className="space-y-5">
@@ -173,9 +183,9 @@ const ApplicantDetail = ({
             yesCount={yesCount}
             noCount={noCount}
             maybeCount={maybeCount}
-            statusLabel={overallStatus}
-            averageScore={averageScore}
-            comparisonAverage={comparisonAverage}
+            statusLabel={applicantStatusLabel}
+            relativeScore={relativeScore}
+            relativeScoreTag={relativeScoreTag}
           />
         </div>
       </CardContent>
@@ -192,8 +202,8 @@ const ApplicantDetail = ({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${recruitingStatusToneClasses[applicant.status] ?? recruitingStatusToneClasses.applied}`}>
-              {applicant.status.replace(/_/g, ' ')}
+            <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${applicantStatusToneClassName}`}>
+              {applicantStatusLabel}
             </span>
             <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/65">
               Viewer: {viewerRole}
@@ -205,7 +215,7 @@ const ApplicantDetail = ({
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
             <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-100/65">Current status</p>
-            <p className="mt-2 text-sm font-medium text-white">{applicant.status.replace(/_/g, ' ')}</p>
+            <p className="mt-2 text-sm font-medium text-white">{applicantStatusLabel}</p>
           </div>
           <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
             <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-100/65">Final decision</p>

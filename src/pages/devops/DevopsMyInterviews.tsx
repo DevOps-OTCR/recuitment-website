@@ -132,7 +132,7 @@ const DevopsMyInterviews = () => {
 
     setSubmittingFeedback(true);
     try {
-      const createdEvaluation = await adminApi.createEvaluation(selectedAssignment.application_id, {
+      const payload = {
         interviewer_name: user.name ?? user.email,
         interviewee_name: entry.intervieweeName,
         interviewee_gender: entry.intervieweeGender,
@@ -149,9 +149,20 @@ const DevopsMyInterviews = () => {
         recommendation: entry.recommendation,
         final_round_summary: entry.finalRoundSummary,
         overall_performance_overview: entry.overallPerformanceOverview,
-      });
+      };
+      const savedEvaluation = myLatestEvaluation
+        ? await adminApi.updateEvaluation(myLatestEvaluation.id, payload)
+        : await adminApi.createEvaluation(selectedAssignment.application_id, payload);
 
-      setEvaluations((current) => [createdEvaluation, ...current]);
+      setEvaluations((current) => {
+        if (!myLatestEvaluation) {
+          return [savedEvaluation, ...current];
+        }
+
+        return current.map((evaluation) =>
+          evaluation.id === savedEvaluation.id ? savedEvaluation : evaluation
+        );
+      });
       toast({
         title: 'Feedback saved',
         description: `${selectedAssignment.applicant_name} was updated in the backend for ${selectedAssignment.round}.`,

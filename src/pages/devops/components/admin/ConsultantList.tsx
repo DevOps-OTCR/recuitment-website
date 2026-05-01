@@ -15,8 +15,8 @@ interface ConsultantListProps {
   onRoundChange: (round: InterviewRound) => void;
   onSelectApplicant: (id: number) => void;
   getStatusLabel: (applicant: ApplicantRecord) => string;
-  getAverageScore: (applicantId: number) => number | null;
-  overallAverageScore: number | null;
+  getRoundCompositeScore: (applicantId: number) => number | null;
+  overallRoundCompositeScore: number | null;
 }
 
 const ConsultantList = ({
@@ -29,12 +29,12 @@ const ConsultantList = ({
   onRoundChange,
   onSelectApplicant,
   getStatusLabel,
-  getAverageScore,
-  overallAverageScore,
+  getRoundCompositeScore,
+  overallRoundCompositeScore,
 }: ConsultantListProps) => {
   const maxTotalScore = feedbackMetricFields.length * 3;
   const scoreValues = applicants
-    .map((applicant) => ({ applicantId: applicant.id, score: getAverageScore(applicant.id) }))
+    .map((applicant) => ({ applicantId: applicant.id, score: getRoundCompositeScore(applicant.id) }))
     .filter((entry): entry is { applicantId: number; score: number } => entry.score !== null);
 
   const getScoreToneClassName = (applicantId: number, score: number) => {
@@ -42,12 +42,12 @@ const ConsultantList = ({
     const benchmark =
       comparisonPool.length > 0
         ? comparisonPool.reduce((sum, entry) => sum + entry.score, 0) / comparisonPool.length
-        : overallAverageScore;
+        : overallRoundCompositeScore;
 
     if (benchmark === null) return 'border-cyan-300/20 bg-cyan-300/10 text-cyan-100';
 
-    if (score > benchmark + 0.05) return 'border-emerald-300/25 bg-emerald-400/10 text-emerald-100';
-    if (score < benchmark - 0.05) return 'border-red-300/25 bg-red-400/10 text-red-100';
+    if (score > benchmark + 0.75) return 'border-emerald-300/25 bg-emerald-400/10 text-emerald-100';
+    if (score < benchmark - 0.75) return 'border-red-300/25 bg-red-400/10 text-red-100';
     return 'border-amber-300/25 bg-amber-400/10 text-amber-100';
   };
 
@@ -73,9 +73,9 @@ const ConsultantList = ({
               ))}
             </div>
           </div>
-          {overallAverageScore !== null ? (
+          {overallRoundCompositeScore !== null ? (
             <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-white/70">
-              Avg {(overallAverageScore * feedbackMetricFields.length).toFixed(1)}/{maxTotalScore}
+              Avg {overallRoundCompositeScore.toFixed(1)}/{maxTotalScore}
             </div>
           ) : null}
         </div>
@@ -100,7 +100,7 @@ const ConsultantList = ({
             {applicants.map((applicant) => {
               const isActive = applicant.id === selectedApplicantId;
               const statusLabel = getStatusLabel(applicant);
-              const averageScore = getAverageScore(applicant.id);
+              const roundCompositeScore = getRoundCompositeScore(applicant.id);
 
               return (
                 <button
@@ -123,12 +123,12 @@ const ConsultantList = ({
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="truncate font-medium text-white">{applicant.name}</p>
-                            {averageScore !== null ? (
+                            {roundCompositeScore !== null ? (
                               <span className={cn(
                                 'shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-[0.18em]',
-                                getScoreToneClassName(applicant.id, averageScore)
+                                getScoreToneClassName(applicant.id, roundCompositeScore)
                               )}>
-                                {averageScore.toFixed(1)}
+                                {roundCompositeScore.toFixed(1)}
                               </span>
                             ) : null}
                           </div>

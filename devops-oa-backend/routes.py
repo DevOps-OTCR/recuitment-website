@@ -1215,6 +1215,64 @@ async def create_evaluation(
     return _evaluation_to_response(evaluation)
 
 
+@router.put("/admin/evaluations/{evaluation_id}", response_model=EvaluationResponse)
+async def update_evaluation(
+    evaluation_id: int,
+    payload: EvaluationPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(requires_permissions("submit_feedback")),
+):
+    """Update an existing interviewer evaluation."""
+    evaluation = (
+        db.query(Evaluation)
+        .options(joinedload(Evaluation.application))
+        .filter(Evaluation.id == evaluation_id)
+        .first()
+    )
+    if not evaluation:
+        raise HTTPException(status_code=404, detail="Evaluation not found")
+
+    identities = set(_evaluation_identity_candidates(current_user))
+    if (evaluation.interviewer_name or "").strip().lower() not in identities:
+        raise HTTPException(status_code=403, detail="You can only edit your own feedback.")
+
+    recommendation_bucket = _recommendation_bucket(payload.recommendation)
+
+    evaluation.round = payload.round
+    evaluation.interviewee_name = payload.interviewee_name.strip()
+    evaluation.interviewee_gender = payload.interviewee_gender
+    evaluation.interviewer_role = payload.interviewer_role
+    evaluation.leadership_score = payload.leadership_score
+    evaluation.interest_in_otcr_score = payload.interest_in_otcr_score
+    evaluation.behavioral_performance_score = payload.behavioral_performance_score
+    evaluation.business_acumen_score = payload.business_acumen_score
+    evaluation.qualitative_creativity_score = payload.qualitative_creativity_score
+    evaluation.quantitative_structure_score = payload.quantitative_structure_score
+    evaluation.case_performance_score = payload.case_performance_score
+    evaluation.creativity_conversation_score = payload.creativity_conversation_score
+    evaluation.recommendation = recommendation_bucket.value
+    evaluation.recommendation_label = payload.recommendation.value
+    evaluation.culture_fit_score = payload.behavioral_performance_score
+    evaluation.technical_score = payload.case_performance_score
+    evaluation.communication_score = payload.case_performance_score
+    evaluation.comments = payload.overall_performance_overview.strip()
+    evaluation.final_round_summary = payload.final_round_summary.strip()
+    evaluation.overall_performance_overview = payload.overall_performance_overview.strip()
+    if evaluation.application is not None:
+        evaluation.application.reviewed_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(evaluation)
+
+    evaluation = (
+        db.query(Evaluation)
+        .options(joinedload(Evaluation.application))
+        .filter(Evaluation.id == evaluation.id)
+        .first()
+    )
+    return _evaluation_to_response(evaluation)
+
+
 @router.get("/admin/database/overview", response_model=DatabaseOverviewResponse)
 async def get_database_overview(
     db: Session = Depends(get_db),

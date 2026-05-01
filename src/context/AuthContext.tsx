@@ -88,6 +88,17 @@ const canAccessRequestedPath = (user: AdminAuthenticatedUser | null, path: strin
     return user.permissions.includes('assign_interviewers');
   }
 
+  if (path.startsWith('/tech/manage/feedback')) {
+    return (
+      user.permissions.includes('submit_feedback') ||
+      user.permissions.includes('view_assigned_interviews')
+    );
+  }
+
+  if (path.startsWith('/tech/manage/database')) {
+    return user.permissions.includes('see_database');
+  }
+
   if (path.startsWith('/tech/manage')) {
     return (
       user.permissions.includes('view_all_applicants') ||
@@ -310,7 +321,7 @@ export function useAuth(): AuthContextValue {
 
 export function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -328,6 +339,11 @@ export function RequireAuth({ children }: { children: ReactNode }) {
         state={{ from: `${location.pathname}${location.search}${location.hash}` }}
       />
     );
+  }
+
+  const requestedPath = `${location.pathname}${location.search}${location.hash}`;
+  if (user && !canAccessRequestedPath(user, requestedPath)) {
+    return <Navigate to={normalizeRolePath(defaultAppPathForUser(user))} replace />;
   }
 
   return <>{children}</>;

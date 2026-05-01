@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeftRight, CalendarClock, ClipboardCheck, DoorOpen, Loader2, ShieldCheck, UserCheck, Users } from 'lucide-react';
+import {
+  CalendarClock,
+  ClipboardCheck,
+  ClipboardList,
+  Database,
+  DoorOpen,
+  FilePenLine,
+  LayoutGrid,
+  Loader2,
+  ShieldCheck,
+  UserCheck,
+  Users,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import Footer from '@/components/Footer';
@@ -351,13 +363,25 @@ const DevopsAssignments = () => {
         <div className="relative mx-auto max-w-7xl">
           <div className="mb-5 flex flex-wrap items-center gap-3">
             <Link to="/tech/manage" className={assignmentNavButtonClass(false)}>
-              <ArrowLeftRight className="h-4 w-4" />
-              Manage Dashboard
+              <LayoutGrid className="h-4 w-4" />
+              Dashboard
+            </Link>
+            <Link to="/tech/manage/applicants" className={assignmentNavButtonClass(false)}>
+              <ClipboardList className="h-4 w-4" />
+              Applicants
             </Link>
             <span className={assignmentNavButtonClass(true)}>
               <ClipboardCheck className="h-4 w-4" />
-              Interview Assignments
+              Assignments
             </span>
+            <Link to="/tech/manage/feedback" className={assignmentNavButtonClass(false)}>
+              <FilePenLine className="h-4 w-4" />
+              Feedback
+            </Link>
+            <Link to="/tech/manage/database" className={assignmentNavButtonClass(false)}>
+              <Database className="h-4 w-4" />
+              Database
+            </Link>
           </div>
 
           <div className="mb-8 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">

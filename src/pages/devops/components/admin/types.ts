@@ -60,6 +60,11 @@ export interface FeedbackEntry {
   submittedAt: string;
 }
 
+export interface ApplicantCompositeScoreSummary {
+  scoreTag: 'Round 1 only' | 'Round 1 and Round 2' | 'No feedback yet';
+  relativeScore: number | null;
+}
+
 export const normalizeRatingBand = (value: number | null | undefined): RatingBand => {
   if (value === 1 || value === 2 || value === 3) return value;
   if (value == null || Number.isNaN(value)) return 2;

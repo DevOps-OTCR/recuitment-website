@@ -200,6 +200,13 @@ class AdminApiClient {
     });
   }
 
+  updateEvaluation(evaluationId: number, payload: AdminEvaluationPayload) {
+    return this.fetch<AdminEvaluationResponse>(`/api/admin/evaluations/${evaluationId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
   applyDecision(applicationId: number, payload: ApplicationDecisionRequest) {
     return this.fetch<AdminApplicationResponse>(`/api/admin/applications/${applicationId}/decision`, {
       method: 'POST',

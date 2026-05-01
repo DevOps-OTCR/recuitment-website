@@ -3,12 +3,13 @@ import {
   CalendarPlus2,
   ClipboardList,
   Database,
+  FilePenLine,
   LayoutGrid,
   Loader2,
   LogOut,
   RefreshCcw,
 } from 'lucide-react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 
 import Footer from '@/components/Footer';
 import Navigation from '@/components/Navigation';
@@ -19,13 +20,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import {
   adminApi,
-  type AdminApplicationResponse,
   type AdminEvaluationResponse,
 } from '@/lib/admin-api';
 import ApplicantDetail from '@/pages/devops/components/admin/ApplicantDetail';
 import ConsultantList from '@/pages/devops/components/admin/ConsultantList';
 import DatabaseView from '@/pages/devops/components/admin/DatabaseView';
+import FeedbackForm from '@/pages/devops/components/admin/FeedbackForm';
 import {
+  type ApplicantCompositeScoreSummary,
   feedbackMetricFields,
   type ApplicantRecord,
   type DatabaseOverview,
@@ -89,6 +91,9 @@ const getVoteCounts = (entries: FeedbackEntry[]) =>
 const getEntryAverageScore = (entry: FeedbackEntry) =>
   feedbackMetricFields.reduce((sum, field) => sum + entry[field.key], 0) / feedbackMetricFields.length;
 
+const getEntryCompositeScore = (entry: FeedbackEntry) =>
+  feedbackMetricFields.reduce((sum, field) => sum + entry[field.key], 0);
+
 const getAverageScore = (entries: FeedbackEntry[]) => {
   if (entries.length === 0) return null;
 
@@ -99,18 +104,90 @@ const getAverageScore = (entries: FeedbackEntry[]) => {
   return total / reviewerAverages.length;
 };
 
+const getRoundCompositeScore = (entries: FeedbackEntry[]) => {
+  if (entries.length === 0) return null;
+
+  const uniqueReviewerEntries = normalizeRoundEntries(entries);
+  if (uniqueReviewerEntries.length === 0) return null;
+
+  const total = uniqueReviewerEntries.reduce((sum, entry) => sum + getEntryCompositeScore(entry), 0);
+  return total / uniqueReviewerEntries.length;
+};
+
+type ApplicantCompositeInputs = {
+  poolKey: 'round_1_only' | 'round_1_and_2' | 'none';
+  scoreTag: ApplicantCompositeScoreSummary['scoreTag'];
+  round1Composite: number | null;
+  round2Composite: number | null;
+  applicantComposite: number | null;
+};
+
+const getApplicantCompositeInputs = (entries: FeedbackEntry[]): ApplicantCompositeInputs => {
+  const round1Composite = getRoundCompositeScore(entries.filter((entry) => entry.round === 'Round 1'));
+  const round2Composite = getRoundCompositeScore(entries.filter((entry) => entry.round === 'Round 2'));
+
+  if (round1Composite !== null && round2Composite !== null) {
+    return {
+      poolKey: 'round_1_and_2',
+      scoreTag: 'Round 1 and Round 2',
+      round1Composite,
+      round2Composite,
+      applicantComposite: round1Composite + round2Composite,
+    };
+  }
+
+  if (round1Composite !== null) {
+    return {
+      poolKey: 'round_1_only',
+      scoreTag: 'Round 1 only',
+      round1Composite,
+      round2Composite,
+      applicantComposite: round1Composite,
+    };
+  }
+
+  return {
+    poolKey: 'none',
+    scoreTag: 'No feedback yet',
+    round1Composite,
+    round2Composite,
+    applicantComposite: null,
+  };
+};
+
 const interviewRounds: InterviewRound[] = ['Round 1', 'Round 2'];
+const identityKey = (value: string | null | undefined) => value?.trim().toLowerCase() ?? '';
 
-const getOverallStatus = (_applicant: ApplicantRecord, entries: FeedbackEntry[]) => {
-  const votes = getVoteCounts(entries);
+const getApplicantStatusLabel = (applicant: ApplicantRecord, entries: FeedbackEntry[]) => {
+  const hasRound1Feedback = entries.some((entry) => entry.round === 'Round 1');
+  const hasRound2Feedback = entries.some((entry) => entry.round === 'Round 2');
+  const notes = (applicant.notes ?? '').toLowerCase();
+  const normalizedStatus = applicant.status.toLowerCase();
+  const normalizedDecision = applicant.final_decision.toLowerCase();
 
-  if (votes.yes >= 2) return 'YES';
-  if (votes.no >= 2) return 'NO';
-  if (entries.length === 0) return 'Pending';
-  if (votes.yes > votes.no && votes.yes > 0) return 'YES';
-  if (votes.no > votes.yes && votes.no > 0) return 'NO';
-  if (votes.maybe > 0) return 'Pending';
-  return 'Pending';
+  if (normalizedStatus === 'accepted' || normalizedDecision === 'accepted' || normalizedDecision === 'yes') {
+    return 'Accepted';
+  }
+
+  if (normalizedStatus === 'rejected' || normalizedDecision === 'rejected' || normalizedDecision === 'no') {
+    if (hasRound2Feedback || notes.includes('rejected after round 2')) {
+      return 'Failed Round 2';
+    }
+    if (hasRound1Feedback || notes.includes('rejected after round 1')) {
+      return 'Failed Round 1';
+    }
+    return 'Not moved to Round 1';
+  }
+
+  if (normalizedStatus === 'round_2') {
+    return hasRound2Feedback ? 'Passed Round 2' : 'Passed Round 1';
+  }
+
+  if (normalizedStatus === 'round_1') {
+    return 'Pending Round 1';
+  }
+
+  return 'Not moved to Round 1';
 };
 
 const adminViewButtonClass = (active: boolean) =>
@@ -150,12 +227,12 @@ const mapDatabasePreview = (
 const DevopsManage = () => {
   const { toast } = useToast();
   const location = useLocation();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, isLoading: authLoading, signOut } = useAuth();
 
   const [loading, setLoading] = useState(false);
   const [databaseLoading, setDatabaseLoading] = useState(false);
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [applications, setApplications] = useState<ApplicantRecord[]>([]);
   const [selectedApplicantId, setSelectedApplicantId] = useState<number | null>(null);
   const [searchValue, setSearchValue] = useState('');
@@ -170,12 +247,15 @@ const DevopsManage = () => {
   const [pendingDecision, setPendingDecision] = useState<{ applicant: ApplicantRecord; action: RecruitingDecisionAction } | null>(null);
 
   const isApplicantsView = location.pathname === '/tech/manage/applicants';
+  const isFeedbackView = location.pathname === '/tech/manage/feedback';
   const isDatabaseView = location.pathname === '/tech/manage/database';
   const requestedApplicantIdParam = searchParams.get('applicantId');
+  const requestedRoundParam = searchParams.get('round');
   const requestedApplicantId =
     requestedApplicantIdParam && Number.isFinite(Number(requestedApplicantIdParam))
       ? Number(requestedApplicantIdParam)
       : null;
+  const requestedFeedbackRound: InterviewRound = requestedRoundParam === 'Round 2' ? 'Round 2' : 'Round 1';
 
   const viewerRole = useMemo(
     () => roleToViewerRole(user?.role) as RecruitingRole,
@@ -183,6 +263,9 @@ const DevopsManage = () => {
   );
   const canManageDecisions =
     hasBackendPermission(user, 'decide_round_1') || hasBackendPermission(user, 'decide_round_2');
+  const canSubmitFeedback = hasBackendPermission(user, 'submit_feedback');
+  const canAccessFeedbackForm =
+    canSubmitFeedback || hasBackendPermission(user, 'view_assigned_interviews');
   const canSeeRelativeScore = hasBackendPermission(user, 'see_relative_score');
   const canSeeDatabase = hasBackendPermission(user, 'see_database');
 
@@ -268,6 +351,11 @@ const DevopsManage = () => {
       }),
     [applications, cycleFilter, searchValue]
   );
+  const scoreComparisonApplicants = useMemo(
+    () =>
+      applications.filter((applicant) => cycleFilter === 'all' || applicant.cycle_name === cycleFilter),
+    [applications, cycleFilter]
+  );
 
   useEffect(() => {
     if (!filteredApplicants.length) {
@@ -285,6 +373,35 @@ const DevopsManage = () => {
   }, [applications, requestedApplicantId]);
 
   const selectedApplicant = filteredApplicants.find((applicant) => applicant.id === selectedApplicantId) ?? null;
+  const requestedFeedbackApplicant =
+    requestedApplicantId !== null ? applications.find((applicant) => applicant.id === requestedApplicantId) ?? null : null;
+  const currentUserFeedbackIdentities = useMemo(() => {
+    const identities = [user?.name, user?.email]
+      .map(identityKey)
+      .filter(Boolean);
+    return new Set(identities);
+  }, [user?.email, user?.name]);
+  const initialFeedbackEntry = useMemo(() => {
+    if (!requestedFeedbackApplicant || !canSeeRelativeScore || currentUserFeedbackIdentities.size === 0) {
+      return null;
+    }
+
+    const matchingEntries = (feedbackByApplicant[requestedFeedbackApplicant.id] ?? [])
+      .filter(
+        (entry) =>
+          entry.round === requestedFeedbackRound &&
+          currentUserFeedbackIdentities.has(identityKey(entry.interviewerName))
+      )
+      .sort((left, right) => new Date(right.submittedAt).getTime() - new Date(left.submittedAt).getTime());
+
+    return matchingEntries[0] ?? null;
+  }, [
+    canSeeRelativeScore,
+    currentUserFeedbackIdentities,
+    feedbackByApplicant,
+    requestedFeedbackApplicant,
+    requestedFeedbackRound,
+  ]);
   const getAvailableRounds = (_applicantId: number): InterviewRound[] => interviewRounds;
   const getSelectedRound = (applicantId: number): InterviewRound => selectedRoundsByApplicant[applicantId] ?? 'Round 1';
   const getEntriesForRound = (applicantId: number, round: InterviewRound) =>
@@ -334,6 +451,75 @@ const DevopsManage = () => {
     void loadApplicantWorkspace();
   };
 
+  const handleSubmitFeedback = async (entry: Omit<FeedbackEntry, 'id' | 'submittedAt'>) => {
+    if (!user || !canSubmitFeedback) return;
+
+    setSubmittingFeedback(true);
+    try {
+      const payload = {
+        interviewer_name: user.name ?? user.email,
+        interviewee_name: entry.intervieweeName,
+        interviewee_gender: entry.intervieweeGender,
+        interviewer_role: entry.interviewerRole,
+        round: entry.round,
+        leadership_score: entry.leadershipScore,
+        interest_in_otcr_score: entry.interestInOtcrScore,
+        behavioral_performance_score: entry.behavioralPerformanceScore,
+        business_acumen_score: entry.businessAcumenScore,
+        qualitative_creativity_score: entry.qualitativeCreativityScore,
+        quantitative_structure_score: entry.quantitativeStructureScore,
+        case_performance_score: entry.casePerformanceScore,
+        creativity_conversation_score: entry.creativityConversationScore,
+        recommendation: entry.recommendation,
+        final_round_summary: entry.finalRoundSummary,
+        overall_performance_overview: entry.overallPerformanceOverview,
+      };
+      const savedEvaluation = initialFeedbackEntry
+        ? await adminApi.updateEvaluation(Number(initialFeedbackEntry.id), payload)
+        : await adminApi.createEvaluation(entry.applicantId, payload);
+      const mappedEntry = mapEvaluationToFeedbackEntry(savedEvaluation);
+
+      setFeedbackByApplicant((current) => ({
+        ...current,
+        [mappedEntry.applicantId]: (() => {
+          const existingEntries = current[mappedEntry.applicantId] ?? [];
+          if (!initialFeedbackEntry) {
+            return [mappedEntry, ...existingEntries];
+          }
+
+          let didReplace = false;
+          const nextEntries = existingEntries.map((existingEntry) => {
+            if (existingEntry.id !== mappedEntry.id) {
+              return existingEntry;
+            }
+
+            didReplace = true;
+            return mappedEntry;
+          });
+
+          return didReplace ? nextEntries : [mappedEntry, ...existingEntries];
+        })(),
+      }));
+      setSelectedApplicantId(mappedEntry.applicantId);
+      setSelectedRoundsByApplicant((current) => ({
+        ...current,
+        [mappedEntry.applicantId]: mappedEntry.round,
+      }));
+      toast({
+        title: 'Feedback saved',
+        description: `${mappedEntry.intervieweeName || mappedEntry.applicantName} now has a persisted review in the backend.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Could not save feedback',
+        description: error instanceof Error ? error.message : 'The backend rejected the evaluation payload.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
+
   const handleConfirmDecision = async () => {
     if (!pendingDecision) return;
 
@@ -362,17 +548,56 @@ const DevopsManage = () => {
 
   const voteCountsForApplicant = (applicantId: number) => getVoteCounts(getEntriesForRound(applicantId, listRound));
   const statusForApplicant = (applicant: ApplicantRecord) => applicant.status.replace(/_/g, ' ');
-  const scoreForApplicant = (applicantId: number) =>
-    canSeeRelativeScore ? getAverageScore(getEntriesForRound(applicantId, listRound)) : null;
-  const overallApplicantAverageScore = useMemo(() => {
+  const roundCompositeScoreForApplicant = (applicantId: number) =>
+    canSeeRelativeScore
+      ? getRoundCompositeScore((feedbackByApplicant[applicantId] ?? []).filter((entry) => entry.round === listRound))
+      : null;
+  const overallApplicantRoundCompositeScore = useMemo(() => {
     if (!canSeeRelativeScore) return null;
-    const scores = filteredApplicants
-      .map((applicant) => scoreForApplicant(applicant.id))
+    const scores = scoreComparisonApplicants
+      .map((applicant) => roundCompositeScoreForApplicant(applicant.id))
       .filter((score): score is number => score !== null);
 
     if (scores.length === 0) return null;
     return scores.reduce((sum, score) => sum + score, 0) / scores.length;
-  }, [canSeeRelativeScore, feedbackByApplicant, filteredApplicants, listRound]);
+  }, [canSeeRelativeScore, feedbackByApplicant, listRound, scoreComparisonApplicants]);
+  const selectedApplicantCompositeSummary = useMemo<ApplicantCompositeScoreSummary | null>(() => {
+    if (!canSeeRelativeScore || !selectedApplicant) return null;
+
+    const applicantInputs = getApplicantCompositeInputs(feedbackByApplicant[selectedApplicant.id] ?? []);
+    if (applicantInputs.poolKey === 'none') {
+      return {
+        scoreTag: applicantInputs.scoreTag,
+        relativeScore: null,
+      };
+    }
+
+    const cohortScores = scoreComparisonApplicants
+      .map((applicant) => {
+        const comparisonInputs = getApplicantCompositeInputs(feedbackByApplicant[applicant.id] ?? []);
+        if (applicantInputs.poolKey === 'round_1_only') {
+          return comparisonInputs.round1Composite;
+        }
+
+        return comparisonInputs.poolKey === 'round_1_and_2'
+          ? comparisonInputs.applicantComposite
+          : null;
+      })
+      .filter((score): score is number => score !== null);
+
+    const cohortAverage =
+      cohortScores.length > 0
+        ? cohortScores.reduce((sum, score) => sum + score, 0) / cohortScores.length
+        : null;
+
+    return {
+      scoreTag: applicantInputs.scoreTag,
+      relativeScore:
+        applicantInputs.applicantComposite === null || cohortAverage === null
+          ? null
+          : applicantInputs.applicantComposite - cohortAverage,
+    };
+  }, [canSeeRelativeScore, feedbackByApplicant, scoreComparisonApplicants, selectedApplicant]);
 
   if (authLoading) {
     return (
@@ -389,7 +614,7 @@ const DevopsManage = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_26%),radial-gradient(circle_at_80%_20%,rgba(34,197,94,0.10),transparent_18%),linear-gradient(180deg,rgba(3,8,17,0.92),rgba(3,8,17,1))]" />
         <div className="relative mx-auto max-w-7xl">
           <div className="mb-5 flex flex-wrap items-center gap-3">
-            <Button asChild variant="outline" className={adminViewButtonClass(!isApplicantsView && !isDatabaseView)}>
+            <Button asChild variant="outline" className={adminViewButtonClass(!isApplicantsView && !isFeedbackView && !isDatabaseView)}>
               <Link to="/tech/manage">
                 <LayoutGrid className="h-4 w-4" />
                 Dashboard
@@ -407,6 +632,14 @@ const DevopsManage = () => {
                 Applicants
               </Link>
             </Button>
+            {canAccessFeedbackForm ? (
+              <Button asChild variant="outline" className={adminViewButtonClass(isFeedbackView)}>
+                <Link to="/tech/manage/feedback">
+                  <FilePenLine className="h-4 w-4" />
+                  Feedback
+                </Link>
+              </Button>
+            ) : null}
             <Button asChild variant="outline" className={adminViewButtonClass(isDatabaseView)}>
               <Link to="/tech/manage/database">
                 <Database className="h-4 w-4" />
@@ -421,18 +654,22 @@ const DevopsManage = () => {
               <div className="mt-3 flex items-center gap-4">
                 <img src={otcrTechLogo} alt="OTCR Technologies" className="h-10 w-auto" />
                 <h1 className="text-3xl font-semibold text-white">
-                  {!isApplicantsView && !isDatabaseView
+                  {!isApplicantsView && !isFeedbackView && !isDatabaseView
                     ? 'Consultant review dashboard'
                     : isApplicantsView
                       ? 'Applicants'
+                      : isFeedbackView
+                        ? 'Feedback form'
                       : 'Database'}
                 </h1>
               </div>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-white/60">
-                {!isApplicantsView && !isDatabaseView
-                  ? 'Choose between applicant review, assignments, and a live backend database preview.'
+                {!isApplicantsView && !isFeedbackView && !isDatabaseView
+                  ? 'Choose between applicant review, assignments, the standalone feedback form, and a live backend database preview.'
                   : isApplicantsView
                     ? 'This applicant review workspace is now backed by the FastAPI API and persisted backend state.'
+                    : isFeedbackView
+                      ? 'Submit the consultant interview rubric directly into the backend evaluations table.'
                     : 'Inspect live backend tables, row counts, and recent records without leaving the admin dashboard.'}
               </p>
             </div>
@@ -456,7 +693,7 @@ const DevopsManage = () => {
                 variant="outline"
                 className="h-11 border-white/10 bg-white/5 text-white hover:bg-white/10"
                 onClick={handleRefresh}
-                disabled={loading || databaseLoading}
+                disabled={loading || databaseLoading || submittingFeedback}
               >
                 {loading || databaseLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -472,7 +709,7 @@ const DevopsManage = () => {
             </div>
           </div>
 
-          {!isApplicantsView && !isDatabaseView ? (
+          {!isApplicantsView && !isFeedbackView && !isDatabaseView ? (
             <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
               <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 <Link
@@ -502,6 +739,22 @@ const DevopsManage = () => {
                   </p>
                   <p className="mt-6 text-sm font-medium text-cyan-100">Open assignment workspace</p>
                 </Link>
+
+                {canAccessFeedbackForm ? (
+                  <Link
+                    to="/tech/manage/feedback"
+                    className="group rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.98),rgba(8,13,22,0.99))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.34)] transition-all hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-[linear-gradient(180deg,rgba(19,34,55,0.98),rgba(8,13,22,0.99))]"
+                  >
+                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-100">
+                      <FilePenLine className="h-6 w-6" />
+                    </span>
+                    <h2 className="mt-6 text-2xl font-semibold text-white">Feedback</h2>
+                    <p className="mt-3 text-sm leading-6 text-white/55">
+                      Open the standalone feedback form and persist interviewer rubric submissions directly to the backend.
+                    </p>
+                    <p className="mt-6 text-sm font-medium text-cyan-100">Open feedback form</p>
+                  </Link>
+                ) : null}
 
                 <Link
                   to="/tech/manage/database"
@@ -581,6 +834,7 @@ const DevopsManage = () => {
                       const selectedRound = getSelectedRound(selectedApplicant.id);
                       const roundEntries = getEntriesForRound(selectedApplicant.id, selectedRound);
                       const roundVoteCounts = getVoteCounts(roundEntries);
+                      const applicantEntries = feedbackByApplicant[selectedApplicant.id] ?? [];
 
                       return (
                         <ApplicantDetail
@@ -589,9 +843,13 @@ const DevopsManage = () => {
                           yesCount={roundVoteCounts.yes}
                           noCount={roundVoteCounts.no}
                           maybeCount={roundVoteCounts.maybe}
-                          overallStatus={getOverallStatus(selectedApplicant, roundEntries)}
-                          averageScore={canSeeRelativeScore ? getAverageScore(roundEntries) : null}
-                          comparisonAverage={overallApplicantAverageScore}
+                          applicantStatusLabel={getApplicantStatusLabel(selectedApplicant, applicantEntries)}
+                          relativeScore={selectedApplicantCompositeSummary?.relativeScore ?? null}
+                          relativeScoreTag={
+                            canSeeRelativeScore
+                              ? selectedApplicantCompositeSummary?.scoreTag ?? 'No feedback yet'
+                              : 'Unavailable'
+                          }
                           selectedRound={selectedRound}
                           availableRounds={getAvailableRounds(selectedApplicant.id)}
                           onSelectRound={(round) =>
@@ -625,11 +883,41 @@ const DevopsManage = () => {
                     onRoundChange={setListRound}
                     onSelectApplicant={setSelectedApplicantId}
                     getStatusLabel={statusForApplicant}
-                    getAverageScore={scoreForApplicant}
-                    overallAverageScore={overallApplicantAverageScore}
+                    getRoundCompositeScore={roundCompositeScoreForApplicant}
+                    overallRoundCompositeScore={overallApplicantRoundCompositeScore}
                   />
                 </div>
               </div>
+            )
+          ) : null}
+
+          {isFeedbackView ? (
+            canSubmitFeedback ? (
+              loading && applications.length === 0 ? (
+                <div className="flex items-center justify-center py-24">
+                  <Loader2 className="h-8 w-8 animate-spin text-white/50" />
+                </div>
+              ) : (
+                <div className="mx-auto w-full max-w-[1360px]">
+                  <FeedbackForm
+                    applicants={applications}
+                    initialApplicantId={requestedFeedbackApplicant?.id ?? null}
+                    initialRound={requestedFeedbackRound}
+                    initialEntry={initialFeedbackEntry}
+                    lockedInterviewerName={user?.name ?? user?.email ?? null}
+                    lockedIntervieweeName={requestedFeedbackApplicant?.name ?? null}
+                    lockedRound={requestedFeedbackApplicant ? requestedFeedbackRound : null}
+                    onSubmitFeedback={handleSubmitFeedback}
+                    submitting={submittingFeedback}
+                  />
+                </div>
+              )
+            ) : (
+              <Card className="border-white/10 bg-white/[0.03]">
+                <CardContent className="p-10 text-center text-white/55">
+                  Your role does not have permission to submit interviewer feedback.
+                </CardContent>
+              </Card>
             )
           ) : null}
 
