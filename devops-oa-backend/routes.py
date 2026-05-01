@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, Optional, List, Literal
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse, Response, RedirectResponse
-from sqlalchemy import func, inspect, text
+from sqlalchemy import func, inspect, or_, text
 from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel, Field
 
@@ -104,6 +104,11 @@ class ApplicationResponse(BaseModel):
     status: str
     created_at: datetime
     message: str
+
+
+class PublicApplicationSearchResult(BaseModel):
+    name: str
+    email: str
 
 
 class ApplicationListItem(BaseModel):
@@ -580,12 +585,27 @@ class AuthenticatedUserResponse(BaseModel):
     permissions: List[str]
 
 
+class ApplicantInterviewAssignmentResponse(BaseModel):
+    id: int
+    round: Literal["Round 1", "Round 2"]
+    role: Literal["primary", "secondary"]
+    interviewer_name: Optional[str] = None
+    interviewer_role: Optional[str] = None
+    room: Optional[str] = None
+    scheduled_time: Optional[datetime] = None
+
+
 class MyApplicationResponse(BaseModel):
     id: int
     name: str
     email: str
+    interest: Optional[str] = None
+    resume_filename: Optional[str] = None
     status: str
     final_decision: str
+    recruiting_status: str
+    current_round: Optional[str] = None
+    cycle_name: Optional[str] = None
     created_at: datetime
     reviewed_at: Optional[datetime]
     assessment_token: Optional[str] = None
@@ -594,6 +614,7 @@ class MyApplicationResponse(BaseModel):
     sections_completed: List[str] = Field(default_factory=list)
     evaluation_count: int = 0
     latest_interview_round: Optional[str] = None
+    interview_assignments: List[ApplicantInterviewAssignmentResponse] = Field(default_factory=list)
 
 
 def _user_to_response(user: User) -> AuthenticatedUserResponse:
@@ -614,6 +635,48 @@ def _evaluation_identity_candidates(user: User) -> list[str]:
     return sorted(value for value in identities if value)
 
 
+ILLINOIS_EMAIL_DOMAIN = "@illinois.edu"
+
+
+def _normalize_email_address(email: str) -> str:
+    return (email or "").strip().lower()
+
+
+def _is_illinois_email(email: str) -> bool:
+    normalized_email = _normalize_email_address(email)
+    return "@" in normalized_email and normalized_email.endswith(ILLINOIS_EMAIL_DOMAIN)
+
+
+def _count_substring_matches(source: str, query: str) -> int:
+    if not query:
+        return 0
+
+    count = 0
+    search_index = 0
+    while search_index < len(source):
+        match_index = source.find(query, search_index)
+        if match_index == -1:
+            break
+        count += 1
+        search_index = match_index + 1
+    return count
+
+
+def _applicant_assignment_to_response(
+    assignment: InterviewAssignment,
+) -> ApplicantInterviewAssignmentResponse:
+    interviewer = assignment.interviewer
+    return ApplicantInterviewAssignmentResponse(
+        id=assignment.id,
+        round=assignment.round,
+        role=assignment.role,
+        interviewer_name=interviewer.name if interviewer else None,
+        interviewer_role=role_for_user(interviewer) if interviewer else None,
+        room=assignment.room,
+        scheduled_time=assignment.scheduled_time,
+    )
+
+
 # ============================================================================
 # Application Endpoints (Public)
 # ============================================================================
@@ -627,12 +690,16 @@ async def submit_application(
     db: Session = Depends(get_db),
 ):
     """Submit an application with resume."""
+    normalized_email = _normalize_email_address(email)
+
     # Validate email format
-    if not email or "@" not in email:
+    if not normalized_email or "@" not in normalized_email:
         raise HTTPException(status_code=400, detail="Invalid email address")
+    if not _is_illinois_email(normalized_email):
+        raise HTTPException(status_code=400, detail="Use your @illinois.edu email address.")
     
     # Check for existing application with same email
-    existing = db.query(Application).filter(Application.email == email.lower()).first()
+    existing = db.query(Application).filter(Application.email == normalized_email).first()
     if existing:
         raise HTTPException(
             status_code=400, 
@@ -662,7 +729,7 @@ async def submit_application(
     # Create application
     application = Application(
         name=name.strip(),
-        email=email.lower().strip(),
+        email=normalized_email,
         interest=interest.strip() if interest else None,
         resume_filename=resume.filename,
         resume_path=resume_path,
@@ -682,9 +749,67 @@ async def submit_application(
     )
 
 
+@router.get("/applications/search", response_model=List[PublicApplicationSearchResult])
+async def search_applications(
+    q: str,
+    limit: int = 12,
+    db: Session = Depends(get_db),
+):
+    """Search applicants by name or email for the public status entrypoint."""
+    normalized_query = _normalize_email_address(q)
+    if not normalized_query:
+        return []
+
+    safe_limit = max(1, min(limit, 25))
+    applications = (
+        db.query(Application)
+        .filter(
+            or_(
+                func.lower(Application.name).contains(normalized_query),
+                func.lower(Application.email).contains(normalized_query),
+            )
+        )
+        .all()
+    )
+
+    ranked_results = sorted(
+        (
+            {
+                "name": application.name,
+                "email": application.email,
+                "match_index": min(
+                    index
+                    for index in (
+                        application.name.strip().lower().find(normalized_query),
+                        application.email.strip().lower().find(normalized_query),
+                    )
+                    if index != -1
+                ),
+                "matched_characters": max(
+                    _count_substring_matches(application.name.strip().lower(), normalized_query),
+                    _count_substring_matches(application.email.strip().lower(), normalized_query),
+                )
+                * len(normalized_query),
+            }
+            for application in applications
+        ),
+        key=lambda result: (
+            -result["matched_characters"],
+            result["match_index"],
+            result["name"].lower(),
+            result["email"],
+        ),
+    )
+
+    return [
+        PublicApplicationSearchResult(name=result["name"], email=result["email"])
+        for result in ranked_results[:safe_limit]
+    ]
+
+
 @router.get("/applications/check/{email}")
 async def check_application_status(email: str, db: Session = Depends(get_db)):
-    """Check application status by email (public)."""
+    """Check whether an application exists by email (public)."""
     application = db.query(Application).filter(
         Application.email == email.lower()
     ).first()
@@ -692,19 +817,11 @@ async def check_application_status(email: str, db: Session = Depends(get_db)):
     if not application:
         return {"found": False, "message": "No application found with this email."}
     
-    response = {
+    return {
         "found": True,
-        "status": application.status,
         "name": application.name,
-        "created_at": application.created_at,
+        "email": application.email,
     }
-    
-    # If approved and has assessment link, include token
-    if application.status == ApplicationStatus.APPROVED.value and application.assessment_link:
-        response["assessment_token"] = application.assessment_link.token
-        response["assessment_url"] = f"{settings.frontend_base_url}/{application.assessment_link.token}"
-    
-    return response
 
 
 # ============================================================================
@@ -722,14 +839,16 @@ async def get_authenticated_user(
 @router.get("/auth/me/application", response_model=MyApplicationResponse)
 async def get_my_application(
     db: Session = Depends(get_db),
-    current_user: User = Depends(requires_roles(Role.APPLICANT)),
+    current_user: User = Depends(get_current_user),
 ):
-    """Return the signed-in applicant's own application and interview progress."""
+    """Return the signed-in user's own application and interview progress, if one exists."""
     application = (
         db.query(Application)
         .options(
             joinedload(Application.assessment_link).joinedload(AssessmentLink.attempts),
+            joinedload(Application.cycle),
             joinedload(Application.evaluations),
+            joinedload(Application.interview_assignments).joinedload(InterviewAssignment.interviewer),
         )
         .filter(Application.email == current_user.email)
         .first()
@@ -756,12 +875,28 @@ async def get_my_application(
             key=lambda entry: entry.created_at or datetime.min,
         )
 
+    recruiting_status, current_round = _derive_recruiting_status(application)
+    interview_assignments = sorted(
+        (_applicant_assignment_to_response(assignment) for assignment in application.interview_assignments or []),
+        key=lambda assignment: (
+            assignment.scheduled_time is None,
+            assignment.scheduled_time or datetime.max,
+            assignment.round,
+            assignment.role,
+        ),
+    )
+
     return MyApplicationResponse(
         id=application.id,
         name=application.name,
         email=application.email,
+        interest=application.interest,
+        resume_filename=application.resume_filename,
         status=application.status,
         final_decision=application.final_decision.value,
+        recruiting_status=recruiting_status,
+        current_round=current_round,
+        cycle_name=application.cycle.name if application.cycle else None,
         created_at=application.created_at,
         reviewed_at=application.reviewed_at,
         assessment_token=assessment_token,
@@ -770,6 +905,51 @@ async def get_my_application(
         sections_completed=list(attempt.sections_completed or []) if attempt else [],
         evaluation_count=len(application.evaluations or []),
         latest_interview_round=latest_evaluation.round if latest_evaluation else None,
+        interview_assignments=interview_assignments,
+    )
+
+
+@router.get("/auth/me/application/resume")
+async def get_my_application_resume(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Stream the signed-in user's own resume file."""
+    application = db.query(Application).filter(Application.email == current_user.email).first()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found for the signed-in user.")
+
+    if not application.resume_path:
+        resume_url = _extract_resume_url(application)
+        if resume_url:
+            return RedirectResponse(resume_url)
+        raise HTTPException(status_code=404, detail="Resume not found")
+
+    filename = application.resume_filename or "resume.pdf"
+    media_type = "application/pdf" if filename.lower().endswith(".pdf") else "application/octet-stream"
+    disposition = f"inline; filename={filename!r}"
+
+    if is_supabase_path(application.resume_path):
+        data = download_resume(application.resume_path)
+        if data is None:
+            raise HTTPException(status_code=404, detail="Resume file missing")
+        return Response(
+            content=data,
+            media_type=media_type,
+            headers={"Content-Disposition": disposition},
+        )
+
+    if not os.path.isfile(application.resume_path):
+        resume_url = _extract_resume_url(application)
+        if resume_url:
+            return RedirectResponse(resume_url)
+        raise HTTPException(status_code=404, detail="Resume file missing")
+
+    return FileResponse(
+        application.resume_path,
+        filename=filename,
+        media_type=media_type,
+        headers={"Content-Disposition": disposition},
     )
 
 

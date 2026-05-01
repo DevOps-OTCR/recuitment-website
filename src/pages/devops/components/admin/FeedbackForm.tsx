@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, Loader2, Search } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -134,22 +134,6 @@ const restoreFeedbackDraft = (intervieweeName = '', round: InterviewRound = 'Rou
 const isPristineFeedbackDraft = (form: FeedbackFormState, intervieweeName = '', round: InterviewRound = 'Round 1') =>
   JSON.stringify(form) === JSON.stringify(initialState(intervieweeName, round));
 
-const countSubstringMatches = (source: string, query: string) => {
-  if (!query) return 0;
-
-  let count = 0;
-  let searchIndex = 0;
-
-  while (searchIndex < source.length) {
-    const matchIndex = source.indexOf(query, searchIndex);
-    if (matchIndex === -1) break;
-    count += 1;
-    searchIndex = matchIndex + 1;
-  }
-
-  return count;
-};
-
 const ChoicePillGroup = <T extends string>({
   value,
   onChange,
@@ -202,7 +186,6 @@ const FeedbackForm = ({
     () => applicants.find((candidate) => candidate.id === initialApplicantId) ?? null,
     [applicants, initialApplicantId]
   );
-  const intervieweeFieldRef = useRef<HTMLDivElement | null>(null);
   const [form, setForm] = useState<FeedbackFormState>(() => {
     const restored = initialEntry
       ? stateFromEntry(initialEntry)
@@ -216,8 +199,6 @@ const FeedbackForm = ({
     };
   });
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
-  const [isIntervieweeMenuOpen, setIsIntervieweeMenuOpen] = useState(false);
-  const [highlightedApplicantIndex, setHighlightedApplicantIndex] = useState(0);
   const previousInitialApplicantNameRef = useRef(initialApplicant?.name ?? '');
   const previousEntryIdRef = useRef(initialEntry?.id ?? null);
 
@@ -328,111 +309,11 @@ const FeedbackForm = ({
     }
   }, [form, initialApplicant?.name, initialRound, lockedIntervieweeName, lockedRound]);
 
-  useEffect(() => {
-    if (lockedIntervieweeName) {
-      setIsIntervieweeMenuOpen(false);
-    }
-  }, [lockedIntervieweeName]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!intervieweeFieldRef.current?.contains(event.target as Node)) {
-        setIsIntervieweeMenuOpen(false);
-      }
-    };
-
-    window.addEventListener('mousedown', handlePointerDown);
-    return () => window.removeEventListener('mousedown', handlePointerDown);
-  }, []);
-
   const matchedApplicant = useMemo(() => {
     const lookup = nameKey(form.intervieweeName);
     if (!lookup) return initialApplicant;
     return applicants.find((candidate) => nameKey(candidate.name) === lookup) ?? null;
   }, [applicants, form.intervieweeName, initialApplicant]);
-
-  const applicantNameOptions = useMemo(
-    () =>
-      Array.from(new Set(applicants.map((candidate) => candidate.name.trim()).filter(Boolean))).sort((left, right) =>
-        left.localeCompare(right)
-      ),
-    [applicants]
-  );
-
-  const intervieweeQuery = form.intervieweeName.trim();
-  const filteredApplicantNameOptions = useMemo(() => {
-    const normalizedQuery = nameKey(intervieweeQuery);
-    if (!normalizedQuery) {
-      return applicantNameOptions.slice(0, 12);
-    }
-
-    return applicantNameOptions
-      .map((name) => {
-        const normalizedName = nameKey(name);
-        const matchIndex = normalizedName.indexOf(normalizedQuery);
-        const matchedCharacters = countSubstringMatches(normalizedName, normalizedQuery) * normalizedQuery.length;
-        return { name, matchIndex, matchedCharacters };
-      })
-      .filter((entry) => entry.matchIndex !== -1)
-      .sort((left, right) => {
-        if (left.matchedCharacters !== right.matchedCharacters) {
-          return right.matchedCharacters - left.matchedCharacters;
-        }
-        if (left.matchIndex !== right.matchIndex) {
-          return left.matchIndex - right.matchIndex;
-        }
-        return left.name.localeCompare(right.name);
-      })
-      .map((entry) => entry.name)
-      .slice(0, 12);
-  }, [applicantNameOptions, intervieweeQuery]);
-
-  useEffect(() => {
-    setHighlightedApplicantIndex(0);
-  }, [intervieweeQuery]);
-
-  const selectIntervieweeName = (name: string) => {
-    setForm((current) => ({ ...current, intervieweeName: name }));
-    setIsIntervieweeMenuOpen(false);
-    setHighlightedApplicantIndex(0);
-  };
-
-  const handleIntervieweeNameKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!isIntervieweeMenuOpen) {
-      if (event.key === 'ArrowDown' && filteredApplicantNameOptions.length > 0) {
-        event.preventDefault();
-        setIsIntervieweeMenuOpen(true);
-      }
-      return;
-    }
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      setHighlightedApplicantIndex((current) =>
-        Math.min(current + 1, filteredApplicantNameOptions.length - 1)
-      );
-      return;
-    }
-
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      setHighlightedApplicantIndex((current) => Math.max(current - 1, 0));
-      return;
-    }
-
-    if (event.key === 'Enter' && filteredApplicantNameOptions[highlightedApplicantIndex]) {
-      event.preventDefault();
-      selectIntervieweeName(filteredApplicantNameOptions[highlightedApplicantIndex]);
-      return;
-    }
-
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      setIsIntervieweeMenuOpen(false);
-    }
-  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -474,6 +355,8 @@ const FeedbackForm = ({
     setValidationMessage(null);
   };
 
+  const applicantNameOptions = applicants.map((candidate) => candidate.name);
+
   return (
     <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.97),rgba(8,13,22,0.99))] shadow-[0_24px_70px_rgba(0,0,0,0.34)]">
       <CardHeader className="space-y-2 px-4 pb-4 pt-4 sm:px-5">
@@ -503,73 +386,20 @@ const FeedbackForm = ({
 
             <div className="space-y-2">
               <Label htmlFor="intervieweeName" className="text-white/70">Interviewee&apos;s Name (double check spelling)</Label>
-              <div ref={intervieweeFieldRef} className="relative">
-                {!lockedIntervieweeName ? (
-                  <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-white/35" />
-                ) : null}
-                <Input
-                  id="intervieweeName"
-                  value={form.intervieweeName}
-                  onChange={(event) => {
-                    const nextValue = event.target.value;
-                    setForm((current) => ({ ...current, intervieweeName: nextValue }));
-                    if (!lockedIntervieweeName) {
-                      setIsIntervieweeMenuOpen(true);
-                    }
-                  }}
-                  onFocus={() => {
-                    if (!lockedIntervieweeName) {
-                      setIsIntervieweeMenuOpen(true);
-                    }
-                  }}
-                  onKeyDown={handleIntervieweeNameKeyDown}
-                  className={cn(
-                    'h-11 border-white/10 bg-white/5 text-white',
-                    !lockedIntervieweeName && 'pl-9'
-                  )}
-                  placeholder="Search"
-                  readOnly={Boolean(lockedIntervieweeName)}
-                  autoComplete="off"
-                />
-                {!lockedIntervieweeName && isIntervieweeMenuOpen ? (
-                  <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.99),rgba(8,13,22,1))] shadow-[0_22px_60px_rgba(0,0,0,0.45)]">
-                    {filteredApplicantNameOptions.length > 0 ? (
-                      <div className="max-h-64 overflow-y-auto p-2">
-                        {filteredApplicantNameOptions.map((name, index) => {
-                          const isHighlighted = index === highlightedApplicantIndex;
-                          const isSelected = nameKey(form.intervieweeName) === nameKey(name);
-
-                          return (
-                            <button
-                              key={name}
-                              type="button"
-                              onMouseDown={(event) => event.preventDefault()}
-                              onMouseEnter={() => setHighlightedApplicantIndex(index)}
-                              onClick={() => selectIntervieweeName(name)}
-                              className={cn(
-                                'flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition-all',
-                                isHighlighted || isSelected
-                                  ? 'bg-cyan-400/10 text-white'
-                                  : 'text-white/75 hover:bg-white/[0.05] hover:text-white'
-                              )}
-                            >
-                              <span className="truncate text-sm font-medium">{name}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : intervieweeQuery ? (
-                      <div className="px-3 py-4 text-sm text-white/50">
-                        No applicants contain that search.
-                      </div>
-                    ) : (
-                      <div className="px-3 py-4 text-sm text-white/50">
-                        Type a letter to search all applicants by name.
-                      </div>
-                    )}
-                  </div>
-                ) : null}
-              </div>
+              <Input
+                id="intervieweeName"
+                list="applicant-name-options"
+                value={form.intervieweeName}
+                onChange={(event) => setForm((current) => ({ ...current, intervieweeName: event.target.value }))}
+                className="h-11 border-white/10 bg-white/5 text-white"
+                placeholder="Select or type the applicant name"
+                readOnly={Boolean(lockedIntervieweeName)}
+              />
+              <datalist id="applicant-name-options">
+                {applicantNameOptions.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
               {matchedApplicant ? (
                 <div className="flex items-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100">
                   <CheckCircle2 className="h-4 w-4" />
@@ -754,3 +584,4 @@ const FeedbackForm = ({
 };
 
 export default FeedbackForm;
+
