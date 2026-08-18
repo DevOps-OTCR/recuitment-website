@@ -75,7 +75,7 @@ const Apply = () => {
                 </Button>
               </a>
               <a
-                href="https://docs.google.com/forms/d/e/1FAIpQLSci6UG2bIJP4G36TDTlZ1IWg2GkAF_WaUk1uzh_ibmnkDohiw/viewform"
+                href="https://docs.google.com/forms/d/1EhjSbp5X06GLFBy6pY3oTAaHrpmnH2_0MkmDNrDGBZo/viewform"
                 target="_blank"
                 rel="noopener noreferrer"
               >
