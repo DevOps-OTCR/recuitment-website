@@ -285,6 +285,39 @@ const About = () => {
                 <p className="text-white/80">Process improvement and operational efficiency enhancements to maximize performance.</p>
               </div>
             </FadeContent>
+            <FadeContent delay={0.8}>
+              <div className="professional-card p-8 text-center group">
+                <div className="w-16 h-16 bg-teal-primary rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-all duration-300">
+                  <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/>
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-teal-primary mb-4 group-hover:text-white transition-colors duration-300">Technology Consulting</h3>
+                <p className="text-white/80">Technical strategy and delivery for technology clients, from architecture and system design to full-stack implementation.</p>
+              </div>
+            </FadeContent>
+            <FadeContent delay={1.0}>
+              <div className="professional-card p-8 text-center group">
+                <div className="w-16 h-16 bg-blue-accent rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-all duration-300">
+                  <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M4 6h18V4H4c-1.1 0-2 .9-2 2v11H0v3h14v-3H4V6zm19 2h-6c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V9c0-.55-.45-1-1-1zm-1 9h-4v-7h4v7z"/>
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-blue-accent mb-4 group-hover:text-white transition-colors duration-300">Product Engineering</h3>
+                <p className="text-white/80">Designing, building, and maintaining the internal platforms OTCR runs on, from project dashboards to recruiting and knowledge systems.</p>
+              </div>
+            </FadeContent>
+            <FadeContent delay={1.2}>
+              <div className="professional-card p-8 text-center group">
+                <div className="w-16 h-16 bg-cyan-accent rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-all duration-300">
+                  <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M15 9H9v6h6V9zm-2 4h-2v-2h2v2zm8-2V9h-2V7c0-1.1-.9-2-2-2h-2V3h-2v2h-2V3H9v2H7c-1.1 0-2 .9-2 2v2H3v2h2v2H3v2h2v2c0 1.1.9 2 2 2h2v2h2v-2h2v2h2v-2h2c1.1 0 2-.9 2-2v-2h2v-2h-2v-2h2zm-4 6H7V7h10v10z"/>
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-cyan-accent mb-4 group-hover:text-white transition-colors duration-300">Data &amp; AI Solutions</h3>
+                <p className="text-white/80">Applied data and AI engagements, including retrieval-based tools that turn firm and client knowledge into searchable insight.</p>
+              </div>
+            </FadeContent>
           </div>
         </div>
       </section>
