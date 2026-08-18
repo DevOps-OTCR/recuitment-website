@@ -51,7 +51,7 @@ const Apply = () => {
             </h2>
             <div className="flex flex-col sm:flex-row flex-wrap gap-4 justify-center items-center">
               <a
-                href="https://docs.google.com/forms/d/e/1FAIpQLSd9imBmn6u_4MKFTn4ZD5lzQkMQQzDkCsdaKQTgS-nZFq4VnQ/viewform"
+                href="https://docs.google.com/forms/d/e/1FAIpQLScRGd_jSfsG86TSIEvweEsDQ6qSc35pk3S81C0U3R1eT7LIWw/viewform?usp=header"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -62,14 +62,18 @@ const Apply = () => {
                   Consultant Application
                 </Button>
               </a>
-              {/* <Link to="/tech/apply">
+              <a
+                href="https://docs.google.com/forms/d/e/1FAIpQLSc8ufeVn9KoAHKiBEY_Y2BKxA-uFw13qmfVbQLdos7HNlmj3Q/viewform?usp=header"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <Button
                   size="lg"
                   className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-4 text-base font-medium hover-scale"
                 >
-                  Technologies Application
+                  Technology Application
                 </Button>
-              </Link> */}
+              </a>
               <a
                 href="https://docs.google.com/forms/d/e/1FAIpQLSci6UG2bIJP4G36TDTlZ1IWg2GkAF_WaUk1uzh_ibmnkDohiw/viewform"
                 target="_blank"
