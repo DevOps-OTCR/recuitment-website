@@ -5,14 +5,15 @@ import ScrollReveal from '@/reactbits/textanimations/ScrollReveal/ScrollReveal';
 import FadeContent from '@/reactbits/animations/FadeContent/FadeContent';
 import SplitText from '@/reactbits/textanimations/SplitText/SplitText';
 
-import atharvaImg from '/src/assets/atharva_sindwani.jpeg';
 import lakshImg from '/src/assets/laksh.jpeg';
-import isaiahImg from '/src/assets/Isaiah.jpeg';
 import aaronImg from '/src/assets/aaron.jpeg';
-import swarnikaImg from '/src/assets/swarnika.jpeg';
-import isabellaImg from '/src/assets/Isabella.jpeg';
-import adeetyaImg from '/src/assets/adeetya.jpeg';
-import mihikaImg from '/src/assets/mihika.jpeg';
+import shritanImg from '/src/assets/shritan.jpeg';
+import ivanImg from '/src/assets/ivan.jpeg';
+import rohanImg from '/src/assets/rohan.jpeg';
+import manImg from '/src/assets/man.jpeg';
+import anuImg from '/src/assets/anu.jpeg';
+import chinmayImg from '/src/assets/chinmay.jpeg';
+import rishabhImg from '/src/assets/rishabh.jpeg';
 import chicagoSkyline from '/src/assets/chicago_skyline.png';
 
 const partners = [
@@ -31,47 +32,54 @@ const partners = [
     mail: 'lsharma2@illinois.edu'
   },
   {
-    name: 'Isaiah Ketedji',
+    name: 'Man Kwanpracha',
     role: 'Project Excellence Partner',
-    img: isaiahImg,
-    linkedin: 'https://www.linkedin.com/in/isaiah-ketedji-57247824a/',
-    mail: 'ketedji2@illinois.edu'
+    img: manImg,
+    linkedin: '',
+    mail: ''
   },
   {
-    name: 'Swarnika Bhardwaj',
+    name: 'Shritan Bhupathiraju',
     role: 'Corporate Affairs Partner',
-    img: swarnikaImg,
-    linkedin: 'https://www.linkedin.com/in/swarnika-bhardwaj31/',
-    mail: 'sb113@illinois.edu'
+    img: shritanImg,
+    linkedin: '',
+    mail: ''
   },
   {
-    name: 'Atharva Sindwani',
+    name: 'Ivan Nang',
     role: 'Professional Development Partner',
-    img: atharvaImg,
-    linkedin: 'https://www.linkedin.com/in/atharva-sindwani-686b292a7/',
-    mail: 'as203@illinois.edu'
+    img: ivanImg,
+    linkedin: '',
+    mail: ''
   },
   {
-    name: 'Isabella Watson',
+    name: 'Anu Ghosh',
     role: 'Alumni Relations Partner',
-    img: isabellaImg,
-    linkedin: 'https://www.linkedin.com/in/isabella-watson-353038270/',
-    mail: 'iwatson3@illinois.edu'
+    img: anuImg,
+    linkedin: '',
+    mail: ''
   },
   {
-    name: 'Adeetya Upadhyay',
+    name: 'Chinmay Rawat',
     role: 'Technology Partner',
-    img: adeetyaImg,
-    linkedin: 'https://www.linkedin.com/in/adeetya-upadhyay/',
-    mail: 'adeeu2@illinois.edu'
+    img: chinmayImg,
+    linkedin: '',
+    mail: ''
   },
   {
-    name: 'Mihika Hemrajani',
+    name: 'Rohan Raman',
     role: 'Social Partner',
-    img: mihikaImg,
-    linkedin: 'https://www.linkedin.com/in/mihika-hemrajani/',
-    mail: 'mihikah2@illinois.edu'
+    img: rohanImg,
+    linkedin: '',
+    mail: ''
   },
+  {
+    name: 'Rishabh Chhabra',
+    role: 'Finance Partner',
+    img: rishabhImg,
+    linkedin: '',
+    mail: ''
+  }
 ];
 
 const Leadership = () => {
@@ -160,11 +168,7 @@ const Leadership = () => {
                     <img 
                       src={partner.img} 
                       alt={partner.name} 
-                      className={`w-full h-64 object-cover ${
-                        partner.name === 'Atharva Sindwani' ? 'object-bottom' : 
-                        partner.name === 'Isabella Watson' || partner.name === 'Adeetya Upadhyay' ? 'object-center' : 
-                        'object-top'
-                      } group-hover:scale-110 transition-transform duration-300`} 
+                      className="w-full h-64 object-cover object-top group-hover:scale-110 transition-transform duration-300" 
                     />
                   ) : (
                     <div className="w-full h-64 bg-navy-light flex items-center justify-center text-4xl text-teal-primary group-hover:text-teal-light transition-colors duration-300">
@@ -187,9 +191,11 @@ const Leadership = () => {
                           <Linkedin className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
                         </a>
                       )}
-                      <a href={`mailto:${partner.mail}`} className="text-muted-foreground hover:text-accent transition-all duration-300 p-2 rounded-full hover:bg-accent/10 group" >
-                        <Mail className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
-                      </a>
+                      {partner.mail && (
+                        <a href={`mailto:${partner.mail}`} className="text-muted-foreground hover:text-accent transition-all duration-300 p-2 rounded-full hover:bg-accent/10 group" >
+                          <Mail className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
+                        </a>
+                      )}
                     </div>
                   </div>
                 </div>
