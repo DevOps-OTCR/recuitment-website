@@ -168,10 +168,10 @@ const Leadership = () => {
                     <img 
                       src={partner.img} 
                       alt={partner.name} 
-                      className="w-full h-64 object-cover object-top group-hover:scale-110 transition-transform duration-300" 
+                      className="w-full aspect-square object-cover object-top group-hover:scale-110 transition-transform duration-300" 
                     />
                   ) : (
-                    <div className="w-full h-64 bg-navy-light flex items-center justify-center text-4xl text-teal-primary group-hover:text-teal-light transition-colors duration-300">
+                    <div className="w-full aspect-square bg-navy-light flex items-center justify-center text-4xl text-teal-primary group-hover:text-teal-light transition-colors duration-300">
                       <div className="w-16 h-16 rounded-full bg-teal-primary/20 flex items-center justify-center">
                         ?
                       </div>
