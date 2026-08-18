@@ -16,8 +16,8 @@ import team from '/src/assets/team.png';
 
 const stats = [
   { number: '25+', label: 'Years of Experience', desc: 'Established at the University of Illinois' },
-  { number: '300+', label: 'Alumni Network', desc: 'Successful careers across industries' },
-  { number: '15+', label: 'Industries', desc: 'Diverse sector expertise' },
+  { number: '1000+', label: 'Alumni Network', desc: 'Successful careers across industries' },
+  { number: '20+', label: 'Industries', desc: 'Diverse sector expertise' },
   { number: '100%', label: 'Student-Led', desc: 'Fresh perspectives, proven results' },
 ];
 
@@ -150,11 +150,11 @@ const About = () => {
                 <div className="text-sm text-white/80">Years</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl lg:text-4xl font-bold text-blue-accent mb-2">300+</div>
+                <div className="text-3xl lg:text-4xl font-bold text-blue-accent mb-2">1000+</div>
                 <div className="text-sm text-white/80">Alumni</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl lg:text-4xl font-bold text-cyan-accent mb-2">15+</div>
+                <div className="text-3xl lg:text-4xl font-bold text-cyan-accent mb-2">20+</div>
                 <div className="text-sm text-white/80">Industries</div>
               </div>
             </div>
