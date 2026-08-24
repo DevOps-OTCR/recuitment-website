@@ -73,14 +73,6 @@ const Join = () => {
                   ),
                 },
                 {
-                  title: 'Women in Consulting Night',
-                  date: 'Aug 27',
-                  location: '5pm, Wymer 1020',
-                  description: (
-                    <>Connecting with current members and going over interview/professional tips.</>
-                  ),
-                },
-                {
                   title: '1st Cycle Application Deadline',
                   date: 'Aug 28',
                   location: 'At 11:59pm',
@@ -102,6 +94,14 @@ const Join = () => {
                   location: 'All Day',
                   description: (
                     <>Evaluating applicants’ fit, interest, and potential through initial interviews.</>
+                  ),
+                },
+                {
+                  title: 'Women in Consulting Night',
+                  date: 'Sep 4',
+                  location: '5-6:30pm, Wymer 1010',
+                  description: (
+                    <>Connecting with current members and going over interview/professional tips.</>
                   ),
                 },
               ].map((event, idx, arr) => {
