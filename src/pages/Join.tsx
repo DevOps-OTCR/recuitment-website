@@ -57,47 +57,51 @@ const Join = () => {
               {/* Timeline events */}
               {[
                 {
-                  title: 'Info Night 1',
-                  date: 'Jan 22',
+                  title: 'Quad Day',
+                  date: 'Aug 23',
+                  location: '12-4pm, Quad',
                   description: (
-                    <>
-                      Learn more about us and our recruitment process.<br />
-                      Dress Code: Business Casual
-                    </>
+                    <>Meeting our members to learn about OTCR and how to get involved.</>
                   ),
                 },
                 {
-                  title: 'Cycle 1 Application Deadline',
-                  date: 'Jan 23',
+                  title: 'Info Night 1',
+                  date: 'Aug 24',
+                  location: '6pm, CIF 4025',
                   description: (
-                    <>Submit your application by this deadline. All applications will be evaluated equally regardless of cycle.</>
+                    <>Explaining the organization opportunities, and recruitment process.</>
+                  ),
+                },
+                {
+                  title: 'Women in Consulting Night',
+                  date: 'Aug 27',
+                  location: '5pm, Wymer 1020',
+                  description: (
+                    <>Connecting with current members and going over interview/professional tips.</>
+                  ),
+                },
+                {
+                  title: '1st Cycle Application Deadline',
+                  date: 'Aug 28',
+                  location: 'At 11:59pm',
+                  description: (
+                    <>Deadline to submit applications for the first recruitment cycle.</>
                   ),
                 },
                 {
                   title: 'Info Night 2',
-                  date: 'Jan 28',
+                  date: 'Aug 31',
+                  location: '7pm, Wohlers 141',
                   description: (
-                    <>
-                      Second info night for those who missed the first one.<br />
-                      Dress Code: Business Casual
-                    </>
+                    <>Give prospective members another opportunity to learn about OTCR.</>
                   ),
                 },
                 {
-                  title: 'Case Training + Meet and Greet',
-                  date: 'Jan 29',
+                  title: '1st Cycle 1st Round Interviews Begin',
+                  date: 'Sep 1',
+                  location: 'All Day',
                   description: (
-                    <>
-                      Learn about our case interviews and get to know members of the firm afterwards.<br />
-                      Dress Code: Business Casual
-                    </>
-                  ),
-                },
-                {
-                  title: 'Cycle 2 Application Deadline',
-                  date: 'Jan 30',
-                  description: (
-                    <>Final deadline to submit your membership application. All applications will be evaluated equally regardless of cycle.</>
+                    <>Evaluating applicants’ fit, interest, and potential through initial interviews.</>
                   ),
                 },
               ].map((event, idx, arr) => {
