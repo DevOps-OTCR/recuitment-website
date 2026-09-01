@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, CheckCircle, Loader2, Mail, AlertCircle, Clock } from 'lucide-react';
-import { assessmentApi, AssessmentConfig, ProgressResponse } from '@/lib/assessment-api';
+import { assessmentApi, AssessmentConfig, ProgressResponse, SubmitResponse } from '@/lib/assessment-api';
 import { getOaApiUrl } from '@/lib/oa-api-url';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 import ProgressIndicator from './components/ProgressIndicator';
@@ -35,6 +35,9 @@ const DevopsAssessment = () => {
   const [problemSolvingDraft, setProblemSolvingDraft] = useState<Record<string, string>>({});
   const [codingDraft, setCodingDraft] = useState<string>('');
   const [systemDesignDraft, setSystemDesignDraft] = useState<string>('');
+  // Held here rather than inside CodingSection: that component unmounts whenever the
+  // candidate switches sections, which would otherwise wipe their last test result.
+  const [codingResult, setCodingResult] = useState<SubmitResponse['coding_result'] | null>(null);
   
   // Email verification state
   const [requiresEmail, setRequiresEmail] = useState(false);
@@ -789,6 +792,9 @@ const DevopsAssessment = () => {
             codeDraft={codingDraft || config.coding.problem.starterCode}
             onCodeChange={setCodingDraft}
             submitting={submitting}
+            initialResult={codingResult}
+            onResultChange={setCodingResult}
+            alreadySubmitted={sectionsCompleted.includes('coding')}
           />
         )}
         

@@ -37,6 +37,11 @@ interface CodingSectionProps {
   codeDraft: string;
   onCodeChange: (code: string) => void;
   submitting: boolean;
+  /** Last result, owned by the parent so it survives this component unmounting. */
+  initialResult?: SubmitResponse['coding_result'] | null;
+  onResultChange?: (result: SubmitResponse['coding_result'] | null) => void;
+  /** True when the server already recorded a coding submission for this attempt. */
+  alreadySubmitted?: boolean;
 }
 
 const CodingSection = ({
@@ -47,11 +52,18 @@ const CodingSection = ({
   codeDraft,
   onCodeChange,
   submitting,
+  initialResult,
+  onResultChange,
+  alreadySubmitted,
 }: CodingSectionProps) => {
   const [code, setCode] = useState(codeDraft || config.problem.starterCode);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<SubmitResponse['coding_result'] | null>(null);
-  const [submitted, setSubmitted] = useState(false);
+  const [result, setResult] = useState<SubmitResponse['coding_result'] | null>(
+    initialResult ?? null
+  );
+  // Seeded from server state, so a submitted section stays locked across navigation
+  // and page refreshes rather than silently becoming editable again.
+  const [submitted, setSubmitted] = useState(alreadySubmitted ?? false);
   const [testingCode, setTestingCode] = useState(false);
   const [activeTestCase, setActiveTestCase] = useState(0);
   const [consoleOpen, setConsoleOpen] = useState(true);
@@ -98,6 +110,12 @@ const CodingSection = ({
     return { passed, total: config.testCases.length, details };
   };
 
+  /** Set the result locally and hand it to the parent so it outlives this mount. */
+  const applyResult = (next: SubmitResponse['coding_result'] | null) => {
+    setResult(next);
+    onResultChange?.(next);
+  };
+
   const handleTest = async () => {
     if (!code.trim()) {
       setError('Please write some code before testing.');
@@ -124,7 +142,7 @@ const CodingSection = ({
         testResult = (await assessmentApi.testCode(token, code, 'python3')) || null;
       }
 
-      setResult(testResult);
+      applyResult(testResult);
     } catch (err: any) {
       setError(err.message || 'Failed to run tests. Please try again.');
     } finally {
@@ -141,7 +159,7 @@ const CodingSection = ({
     setError(null);
     try {
       const response = await onSubmit({ code, language: 'python3' });
-      setResult(response.coding_result || null);
+      applyResult(response.coding_result || null);
       setSubmitted(true);
       setConsoleOpen(true);
     } catch (err: any) {
@@ -328,7 +346,7 @@ const CodingSection = ({
                     className={`text-xs font-medium px-1 pb-1 ${
                       !result ? 'text-white border-b-2 border-teal-500' : 'text-zinc-400 hover:text-white'
                     }`}
-                    onClick={() => setResult(null)}
+                    onClick={() => applyResult(null)}
                   >
                     Testcase
                   </button>
