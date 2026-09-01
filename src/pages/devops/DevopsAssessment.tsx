@@ -46,6 +46,11 @@ const DevopsAssessment = () => {
   // Pledge agreement state
   const [pledgeAccepted, setPledgeAccepted] = useState(false);
 
+  // Fullscreen enforcement state
+  const [showFullscreenGate, setShowFullscreenGate] = useState(false);
+  const [fullscreenExits, setFullscreenExits] = useState(0);
+  const fullscreenEngagedRef = useRef(false);
+
   // Load assessment config
   useEffect(() => {
     const loadConfig = async () => {
@@ -203,13 +208,28 @@ const DevopsAssessment = () => {
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Request fullscreen
+  // Request fullscreen. Browsers only honour this from a user gesture, so it is
+  // called from the pledge button and from the "Resume Assessment" button.
   const requestFullscreen = () => {
-    const elem = document.documentElement;
-    if (elem.requestFullscreen) {
-      elem.requestFullscreen().catch(() => {
-        // Fullscreen request denied, continue anyway
-      });
+    const elem = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+    };
+
+    const onEntered = () => {
+      fullscreenEngagedRef.current = true;
+      setShowFullscreenGate(false);
+    };
+    // Denied or dismissed. Never lock the candidate out over this.
+    const onDenied = () => {};
+
+    try {
+      if (elem.requestFullscreen) {
+        Promise.resolve(elem.requestFullscreen()).then(onEntered, onDenied);
+      } else if (elem.webkitRequestFullscreen) {
+        Promise.resolve(elem.webkitRequestFullscreen()).then(onEntered, onDenied);
+      }
+    } catch {
+      onDenied();
     }
   };
 
@@ -358,6 +378,53 @@ const DevopsAssessment = () => {
       localStorage.removeItem(getDraftStorageKey(token));
     }
   }, [isCompleted, token]);
+
+  // Keep the assessment in fullscreen. The Escape key cannot be intercepted and
+  // fullscreen cannot be re-entered without a user gesture, so an exit raises a
+  // blocking gate that the candidate must click through to continue.
+  useEffect(() => {
+    const inFullscreen = () =>
+      !!(
+        document.fullscreenElement ||
+        (document as Document & { webkitFullscreenElement?: Element })
+          .webkitFullscreenElement
+      );
+
+    const handleFullscreenChange = () => {
+      if (inFullscreen()) {
+        fullscreenEngagedRef.current = true;
+        setShowFullscreenGate(false);
+        return;
+      }
+
+      // Only enforce once fullscreen was actually granted, and only while the
+      // candidate is mid-assessment. Otherwise a browser that blocks fullscreen
+      // would trap them behind an overlay they can never clear.
+      if (!fullscreenEngagedRef.current) return;
+      if (!pledgeAccepted || isCompleted) return;
+
+      setShowFullscreenGate(true);
+      setFullscreenExits((n) => n + 1);
+
+      if (token) {
+        fetch(`${getOaApiUrl()}/api/assessment/${token}/focus-loss`, {
+          method: 'POST',
+        }).catch(() => {
+          // Silent fail, continue assessment
+        });
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener(
+        'webkitfullscreenchange',
+        handleFullscreenChange
+      );
+    };
+  }, [pledgeAccepted, isCompleted, token]);
 
   // Loading state
   if (loading) {
@@ -607,6 +674,38 @@ const DevopsAssessment = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Fullscreen enforcement gate */}
+      {showFullscreenGate && (
+        <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-md flex items-center justify-center p-4">
+          <Card className="max-w-md w-full bg-card border-border">
+            <CardHeader className="text-center">
+              <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8 text-amber-500" />
+              </div>
+              <CardTitle className="text-2xl text-white">
+                Return to Full Screen
+              </CardTitle>
+              <CardDescription className="text-base">
+                This assessment must be completed in full screen. Exiting full
+                screen has been recorded.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-center text-muted-foreground">
+                Times exited:{' '}
+                <strong className="text-white">{fullscreenExits}</strong>
+              </p>
+              <Button onClick={requestFullscreen} size="lg" className="w-full">
+                Resume Assessment
+              </Button>
+              <p className="text-xs text-center text-muted-foreground">
+                Your answers are saved. Elapsed time continues to run.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border/50">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">

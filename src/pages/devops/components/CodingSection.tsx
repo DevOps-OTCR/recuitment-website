@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle, XCircle, Play, Terminal, ChevronDown, ChevronUp, Code2, FileText } from 'lucide-react';
 import type { CodingConfig, SubmitResponse } from '@/lib/assessment-api';
 import { assessmentApi } from '@/lib/assessment-api';
+import { runPython, preloadPyodide, pyodideSupported } from '@/lib/pyodide-runner';
 
 // Convert markdown-like text to HTML (tighter spacing, no big paragraph gaps)
 const formatDescription = (text: string): string => {
@@ -59,6 +60,44 @@ const CodingSection = ({
     setCode(codeDraft || config.problem.starterCode);
   }, [codeDraft, config.problem.starterCode]);
 
+  // Start fetching Pyodide as soon as the candidate opens this section, so the
+  // first Run click is not stuck behind a ~10MB download.
+  useEffect(() => {
+    if (pyodideSupported()) preloadPyodide();
+  }, []);
+
+  /**
+   * Run the VISIBLE test cases in the browser.
+   *
+   * Pass/fail matches the backend exactly: compare trimmed stdout against trimmed
+   * expectedOutput. stderr is surfaced to the candidate but does not by itself fail
+   * a test, mirroring run_code_tests() server-side.
+   */
+  const runVisibleTestsLocally = async (): Promise<
+    NonNullable<SubmitResponse['coding_result']>
+  > => {
+    const details = [];
+    let passed = 0;
+
+    for (let i = 0; i < config.testCases.length; i++) {
+      const tc = config.testCases[i];
+      const run = await runPython(code, tc.input ?? '');
+      const actual = (run.stdout || '').trim();
+      const expected = (tc.expectedOutput || '').trim();
+      const ok = !run.timedOut && actual === expected;
+      if (ok) passed++;
+      details.push({
+        test: i + 1,
+        passed: ok,
+        expected,
+        actual,
+        error: run.stderr || '',
+      });
+    }
+
+    return { passed, total: config.testCases.length, details };
+  };
+
   const handleTest = async () => {
     if (!code.trim()) {
       setError('Please write some code before testing.');
@@ -69,8 +108,23 @@ const CodingSection = ({
     setTestingCode(true);
     setConsoleOpen(true);
     try {
-      const testResult = await assessmentApi.testCode(token, code, 'python3');
-      setResult(testResult || null);
+      let testResult: SubmitResponse['coding_result'] | null = null;
+
+      // Prefer in-browser execution. Falls through to the server endpoint if
+      // Pyodide is unavailable or fails to boot.
+      if (pyodideSupported()) {
+        try {
+          testResult = await runVisibleTestsLocally();
+        } catch {
+          testResult = null;
+        }
+      }
+
+      if (!testResult) {
+        testResult = (await assessmentApi.testCode(token, code, 'python3')) || null;
+      }
+
+      setResult(testResult);
     } catch (err: any) {
       setError(err.message || 'Failed to run tests. Please try again.');
     } finally {
