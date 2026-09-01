@@ -1,98 +1,331 @@
-import { useState, useEffect } from 'react';
-import Navigation from '@/components/Navigation';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ClipboardList,
+  Database,
+  FilePenLine,
+  LayoutGrid,
+  Loader2,
+  Lock,
+  LogOut,
+  RefreshCcw,
+} from 'lucide-react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+
 import Footer from '@/components/Footer';
+import Navigation from '@/components/Navigation';
+import { adminApi, type AdminApplicationResponse, type AdminEvaluationResponse, type AdminEvaluationPayload } from '@/lib/admin-api';
+import { getOaApiUrl } from '@/lib/oa-api-url';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Lock, Loader2, CheckCircle, XCircle, Clock, Copy, FileText, LogOut, ExternalLink, AlertCircle, Eye, Archive, ArchiveRestore, Trash2, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import ApplicantDetail from '@/pages/devops/components/admin/ApplicantDetail';
+import ConsultantList from '@/pages/devops/components/admin/ConsultantList';
+import DatabaseView from '@/pages/devops/components/admin/DatabaseView';
+import FeedbackForm from '@/pages/devops/components/admin/FeedbackForm';
+import { mockApplicants, mockFeedback } from '@/pages/devops/components/admin/mockData';
+import {
+  feedbackMetricFields,
+  normalizeRatingBand,
+  type ApplicantRecord,
+  type DatabaseOverview,
+  type DatabaseTableName,
+  type DatabaseTablePreview,
+  type FeedbackEntry,
+  type InterviewRound,
+} from '@/pages/devops/components/admin/types';
 import otcrTechLogo from '@/assets/otcr-technologies-white-nomargins.webp';
 
-import { getOaApiUrl } from '../../lib/oa-api-url';
 const API_BASE_URL = getOaApiUrl();
 const ADMIN_KEY_STORAGE = 'otcr_devops_admin_secret';
 
-interface ApplicationItem {
-  id: number;
-  name: string;
-  email: string;
-  interest: string | null;
-  resume_filename: string | null;
-  status: string;
-  created_at: string;
-  reviewed_at: string | null;
-  notes: string | null;
-  has_assessment_link: boolean;
-  assessment_completed: boolean;
-  assessment_token: string | null;
-  focus_loss_events: number;
-  is_flagged: boolean;
-  integrity_notes: string | null;
-  archived_at: string | null;
-}
+const defaultExecRoster = ['Ava Patel', 'Mihika Rao', 'Isaiah Brooks', 'Laksh Shah'];
+const nameKey = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
 
-interface ProgressDetail {
-  problem_solving?: {
-    answered_count?: number;
-    total?: number;
-    answers?: Array<{ questionId: string; questionText: string; answer: string }>;
+const deriveAssignedExec = (applicant: ApplicantRecord) =>
+  applicant.assigned_exec ??
+  applicant.notes?.match(/assigned[:\s]+([a-zA-Z\s]+)/i)?.[1]?.trim() ??
+  defaultExecRoster[applicant.id % defaultExecRoster.length];
+
+const normalizeErrorMessage = (error: unknown, fallback: string) => {
+  if (!(error instanceof Error)) return fallback;
+  const detail = error.message.replace(/^API Error \d+:\s*/i, '').trim();
+  return detail || fallback;
+};
+
+const mapApplication = (application: AdminApplicationResponse): ApplicantRecord => {
+  const mapped: ApplicantRecord = {
+    id: application.id,
+    name: application.name,
+    email: application.email,
+    interest: application.interest,
+    resume_filename: application.resume_filename,
+    resume_url: application.resume_url ?? null,
+    status: application.status,
+    final_decision: application.final_decision,
+    cycle_name: application.cycle_name,
+    created_at: application.created_at,
+    reviewed_at: application.reviewed_at,
+    notes: application.notes,
+    has_assessment_link: application.has_assessment_link,
+    assessment_completed: application.assessment_completed,
+    assessment_token: application.assessment_token,
+    focus_loss_events: application.focus_loss_events,
+    is_flagged: application.is_flagged,
+    integrity_notes: application.integrity_notes,
+    archived_at: application.archived_at,
+    assigned_exec: null,
   };
-  coding?: { code: string };
-  system_design?: { response: string };
-}
 
-interface ProgressSnapshotItem {
-  snapshot_at: string;
-  sections_completed: string[];
-  current_section: string | null;
-  elapsed_seconds: number;
-  progress_detail?: ProgressDetail | null;
-}
+  return {
+    ...mapped,
+    assigned_exec: deriveAssignedExec(mapped),
+  };
+};
 
-interface SubmissionData {
-  token: string;
-  applicant_name: string | null;
-  email: string | null;
-  started_at: string;
-  completed_at: string | null;
-  sections_completed: string[];
-  focus_loss_events: number;
-  is_flagged: boolean;
-  integrity_notes: string | null;
-  submissions: {
-    section: string;
-    submitted_at: string;
-    payload: any;
-    coding_result: any | null;
-    notes: string | null;
-  }[];
-  progress_snapshots?: ProgressSnapshotItem[];
-}
+const mapEvaluation = (evaluation: AdminEvaluationResponse): FeedbackEntry => ({
+  id: String(evaluation.id),
+  applicantId: evaluation.application_id,
+  applicantName: evaluation.applicant_name,
+  interviewerName: evaluation.interviewer_name,
+  intervieweeName: evaluation.interviewee_name,
+  intervieweeGender: evaluation.interviewee_gender,
+  interviewerRole: evaluation.interviewer_role,
+  round: evaluation.round === 'Round 2' ? 'Round 2' : 'Round 1',
+  leadershipScore: normalizeRatingBand(evaluation.leadership_score),
+  interestInOtcrScore: normalizeRatingBand(evaluation.interest_in_otcr_score),
+  behavioralPerformanceScore: normalizeRatingBand(evaluation.behavioral_performance_score),
+  businessAcumenScore: normalizeRatingBand(evaluation.business_acumen_score),
+  qualitativeCreativityScore: normalizeRatingBand(evaluation.qualitative_creativity_score),
+  quantitativeStructureScore: normalizeRatingBand(evaluation.quantitative_structure_score),
+  casePerformanceScore: normalizeRatingBand(evaluation.case_performance_score),
+  creativityConversationScore: normalizeRatingBand(evaluation.creativity_conversation_score),
+  recommendation: evaluation.recommendation,
+  finalRoundSummary: evaluation.final_round_summary ?? '',
+  overallPerformanceOverview: evaluation.overall_performance_overview ?? evaluation.comments ?? '',
+  submittedAt: evaluation.created_at,
+});
+
+const mapDatabaseOverview = (overview: Awaited<ReturnType<typeof adminApi.getDatabaseOverview>>): DatabaseOverview => ({
+  generatedAt: overview.generated_at,
+  persistence: overview.persistence,
+  tables: overview.tables,
+});
+
+const mapDatabasePreview = (preview: Awaited<ReturnType<typeof adminApi.getDatabaseTable>>): DatabaseTablePreview => ({
+  table: preview.table,
+  count: preview.count,
+  columns: preview.columns,
+  rows: preview.rows,
+});
+
+const fetchWorkspaceSnapshot = async (secret: string) => {
+  const [applicationResponse, evaluationResponse] = await Promise.all([
+    adminApi.listApplications(secret),
+    adminApi.listEvaluations(secret),
+  ]);
+
+  return {
+    applications: applicationResponse.map(mapApplication),
+    evaluations: evaluationResponse.map(mapEvaluation),
+  };
+};
+
+const groupFeedbackEntries = (entries: FeedbackEntry[]) =>
+  entries.reduce<Record<number, FeedbackEntry[]>>((acc, entry) => {
+    acc[entry.applicantId] = [entry, ...(acc[entry.applicantId] ?? [])];
+    return acc;
+  }, {});
+
+const normalizeRoundEntries = (entries: FeedbackEntry[]) => {
+  const orderedEntries = entries
+    .slice()
+    .sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
+
+  const assignedRoles = new Set<'Primary' | 'Secondary'>();
+
+  return orderedEntries.map((entry) => {
+    let normalizedRole = entry.interviewerRole;
+
+    if (assignedRoles.has(normalizedRole)) {
+      normalizedRole = normalizedRole === 'Primary' ? 'Secondary' : 'Primary';
+    }
+
+    if (!assignedRoles.has(normalizedRole)) {
+      assignedRoles.add(normalizedRole);
+    }
+
+    return normalizedRole === entry.interviewerRole
+      ? entry
+      : {
+          ...entry,
+          interviewerRole: normalizedRole,
+        };
+  });
+};
+
+const getVoteCounts = (entries: FeedbackEntry[]) =>
+  normalizeRoundEntries(entries).reduce(
+    (acc, entry) => {
+      if (entry.recommendation === 'YES' || entry.recommendation === 'LEAN YES') acc.yes += 1;
+      if (entry.recommendation === 'NO' || entry.recommendation === 'LEAN NO') acc.no += 1;
+      if (entry.recommendation === 'MAYBE') acc.maybe += 1;
+      return acc;
+    },
+    { yes: 0, no: 0, maybe: 0 }
+  );
+
+const getEntryAverageScore = (entry: FeedbackEntry) =>
+  feedbackMetricFields.reduce((sum, field) => sum + entry[field.key], 0) / feedbackMetricFields.length;
+
+const getAverageScore = (entries: FeedbackEntry[]) => {
+  if (entries.length === 0) return null;
+
+  const uniqueReviewerEntries = normalizeRoundEntries(entries);
+
+  const reviewerAverages = uniqueReviewerEntries.map(getEntryAverageScore);
+  const total = reviewerAverages.reduce((sum, value) => sum + value, 0);
+
+  return total / reviewerAverages.length;
+};
+
+const interviewRounds: InterviewRound[] = ['Round 1', 'Round 2'];
+
+const getOverallStatus = (applicant: ApplicantRecord, entries: FeedbackEntry[]) => {
+  const votes = getVoteCounts(entries);
+
+  if (votes.yes >= 2) return 'YES';
+  if (votes.no >= 2) return 'NO';
+  if (entries.length === 0) {
+    return 'Pending';
+  }
+  if (votes.yes > votes.no && votes.yes > 0) return 'YES';
+  if (votes.no > votes.yes && votes.no > 0) return 'NO';
+  if (votes.maybe > 0) return 'Pending';
+  return 'Pending';
+};
+
+const buildFallbackApplicants = () =>
+  mockApplicants.map((applicant) => ({
+    ...applicant,
+    assigned_exec: deriveAssignedExec(applicant),
+  }));
+
+const initialFallbackApplicants = buildFallbackApplicants();
+
+const adminViewButtonClass = (active: boolean) =>
+  cn(
+    'h-11 rounded-xl border transition-all',
+    active
+      ? 'border-cyan-300/50 bg-cyan-400/10 text-white hover:bg-cyan-400/15'
+      : 'border-white/10 bg-white/5 text-white/75 hover:bg-white/10 hover:text-white'
+  );
 
 const DevopsManage = () => {
   const { toast } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
   const [adminSecret, setAdminSecret] = useState('');
   const [storedSecret, setStoredSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [applications, setApplications] = useState<ApplicationItem[]>([]);
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState<number | null>(null);
-  const [approvedLink, setApprovedLink] = useState<{ id: number; url: string } | null>(null);
-  const [viewingSubmission, setViewingSubmission] = useState<SubmissionData | null>(null);
-  const [loadingSubmission, setLoadingSubmission] = useState(false);
-  const [archivedFilter, setArchivedFilter] = useState<'active' | 'archived' | 'all'>('active');
-  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
-  const [expandedSnapshotIndex, setExpandedSnapshotIndex] = useState<number | null>(null);
+  const [applications, setApplications] = useState<ApplicantRecord[]>(initialFallbackApplicants);
+  const [selectedApplicantId, setSelectedApplicantId] = useState<number | null>(initialFallbackApplicants[0]?.id ?? null);
+  const [searchValue, setSearchValue] = useState('');
+  const [cycleFilter, setCycleFilter] = useState<'all' | string>('all');
+  const [feedbackByApplicant, setFeedbackByApplicant] = useState<Record<number, FeedbackEntry[]>>(mockFeedback);
+  const [usingMockData, setUsingMockData] = useState(true);
+  const [databaseOverview, setDatabaseOverview] = useState<DatabaseOverview | null>(null);
+  const [databasePreview, setDatabasePreview] = useState<DatabaseTablePreview | null>(null);
+  const [databaseLoading, setDatabaseLoading] = useState(false);
+  const [databaseError, setDatabaseError] = useState<string | null>(null);
+  const [selectedDatabaseTable, setSelectedDatabaseTable] = useState<DatabaseTableName>('evaluations');
+  const [selectedRoundsByApplicant, setSelectedRoundsByApplicant] = useState<Record<number, InterviewRound>>({});
+  const [listRound, setListRound] = useState<InterviewRound>('Round 1');
 
-  const formatDuration = (start?: string | null, end?: string | null) => {
-    if (!start || !end) return '—';
-    const ms = new Date(end).getTime() - new Date(start).getTime();
-    if (ms <= 0) return '—';
-    const totalMinutes = Math.floor(ms / 60000);
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  const isApplicantsView = location.pathname === '/tech/manage/applicants';
+  const isFeedbackView = location.pathname === '/tech/manage/feedback';
+  const isDatabaseView = location.pathname === '/tech/manage/database';
+  const requestedApplicantIdParam = searchParams.get('applicantId');
+  const requestedRoundParam = searchParams.get('round');
+  const requestedApplicantId =
+    requestedApplicantIdParam && Number.isFinite(Number(requestedApplicantIdParam))
+      ? Number(requestedApplicantIdParam)
+      : null;
+  const requestedFeedbackRound: InterviewRound = requestedRoundParam === 'Round 2' ? 'Round 2' : 'Round 1';
+
+  const headers = () => ({
+    'X-Admin-Secret': storedSecret || '',
+  });
+
+  const fetchAdminWorkspace = async (secret: string) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { applications: mappedApplications, evaluations: mappedEvaluations } = await fetchWorkspaceSnapshot(secret);
+
+      if (mappedApplications.length === 0) {
+        const fallback = buildFallbackApplicants();
+        setApplications(fallback);
+        setFeedbackByApplicant(mockFeedback);
+        setUsingMockData(true);
+        setSelectedApplicantId((current) => current ?? fallback[0]?.id ?? null);
+        setError('Backend is reachable but returned no applicants. Showing mock applicant data for the dashboard.');
+        return;
+      }
+
+      setApplications(mappedApplications);
+      setFeedbackByApplicant(groupFeedbackEntries(mappedEvaluations));
+      setUsingMockData(false);
+      setSelectedApplicantId((current) => current ?? mappedApplications[0]?.id ?? null);
+    } catch (fetchError: unknown) {
+      const fallback = buildFallbackApplicants();
+      setApplications(fallback);
+      setFeedbackByApplicant(mockFeedback);
+      setUsingMockData(true);
+      setSelectedApplicantId((current) => current ?? fallback[0]?.id ?? null);
+
+      const message = normalizeErrorMessage(fetchError, 'Backend unavailable. Showing mock applicant data.');
+      if (/invalid admin secret/i.test(message) || /invalid admin key/i.test(message)) {
+        sessionStorage.removeItem(ADMIN_KEY_STORAGE);
+        setStoredSecret(null);
+        setApplications(initialFallbackApplicants);
+        setFeedbackByApplicant(mockFeedback);
+        setUsingMockData(true);
+        setError('Invalid admin key. Please enter it again.');
+        navigate('/tech/manage', { replace: true });
+        return;
+      }
+
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDatabasePreview = async (secret: string, table: DatabaseTableName) => {
+    setDatabaseLoading(true);
+    setDatabaseError(null);
+
+    try {
+      const [overviewResponse, previewResponse] = await Promise.all([
+        adminApi.getDatabaseOverview(secret),
+        adminApi.getDatabaseTable(secret, table),
+      ]);
+
+      setDatabaseOverview(mapDatabaseOverview(overviewResponse));
+      setDatabasePreview(mapDatabasePreview(previewResponse));
+    } catch (previewError: unknown) {
+      setDatabaseError(normalizeErrorMessage(previewError, 'Failed to load database preview.'));
+    } finally {
+      setDatabaseLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -101,45 +334,73 @@ const DevopsManage = () => {
   }, []);
 
   useEffect(() => {
-    setExpandedSnapshotIndex(null);
-  }, [viewingSubmission?.token]);
-
-  const headers = () => ({
-    'X-Admin-Secret': storedSecret || '',
-  });
-
-  const fetchApplications = async () => {
     if (!storedSecret) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (archivedFilter === 'archived') params.set('archived', 'only');
-      else if (archivedFilter === 'all') params.set('archived', '1');
-      const res = await fetch(`${API_BASE_URL}/api/admin/applications?${params}`, { headers: headers() });
-      if (res.status === 403) {
-        sessionStorage.removeItem(ADMIN_KEY_STORAGE);
-        setStoredSecret(null);
-        setError('Invalid admin key. Please enter it again.');
-        setLoading(false);
-        return;
-      }
-      if (!res.ok) throw new Error('Failed to load applications');
-      const data = await res.json();
-      setApplications(data);
-    } catch (e: any) {
-      setError(e.message || 'Failed to load applications.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    void fetchAdminWorkspace(storedSecret);
+  }, [storedSecret]);
 
   useEffect(() => {
-    if (storedSecret) fetchApplications();
-  }, [storedSecret, archivedFilter]);
+    if (!storedSecret || !isDatabaseView) return;
+    void fetchDatabasePreview(storedSecret, selectedDatabaseTable);
+  }, [storedSecret, isDatabaseView, selectedDatabaseTable]);
 
-  const handleUnlock = (e: React.FormEvent) => {
-    e.preventDefault();
+  const cycleOptions = useMemo(() => {
+    const cycles = Array.from(new Set(applications.map((applicant) => applicant.cycle_name).filter(Boolean)));
+    return ['all', ...cycles] as string[];
+  }, [applications]);
+
+  const filteredApplicants = useMemo(
+    () =>
+      applications.filter((applicant) => {
+        const searchMatches = applicant.name.toLowerCase().includes(searchValue.toLowerCase());
+        const cycleMatches = cycleFilter === 'all' || applicant.cycle_name === cycleFilter;
+        return searchMatches && cycleMatches;
+      }),
+    [applications, cycleFilter, searchValue]
+  );
+
+  useEffect(() => {
+    if (!filteredApplicants.length) {
+      setSelectedApplicantId(null);
+      return;
+    }
+
+    const selectedStillVisible = filteredApplicants.some((applicant) => applicant.id === selectedApplicantId);
+    if (!selectedStillVisible) setSelectedApplicantId(filteredApplicants[0].id);
+  }, [filteredApplicants, selectedApplicantId]);
+
+  useEffect(() => {
+    if (requestedApplicantId === null || !applications.some((applicant) => applicant.id === requestedApplicantId)) return;
+    setSelectedApplicantId(requestedApplicantId);
+  }, [applications, requestedApplicantId]);
+
+  const selectedApplicant = filteredApplicants.find((applicant) => applicant.id === selectedApplicantId) ?? null;
+  const requestedFeedbackApplicant =
+    requestedApplicantId !== null ? applications.find((applicant) => applicant.id === requestedApplicantId) ?? null : null;
+
+  const getAvailableRounds = (_applicantId: number): InterviewRound[] => interviewRounds;
+
+  const getSelectedRound = (applicantId: number): InterviewRound => selectedRoundsByApplicant[applicantId] ?? 'Round 1';
+
+  const getEntriesForRound = (applicantId: number, round: InterviewRound) =>
+    normalizeRoundEntries((feedbackByApplicant[applicantId] ?? []).filter((entry) => entry.round === round));
+
+  const totalFeedbackCount = useMemo(
+    () => Object.values(feedbackByApplicant).reduce((sum, entries) => sum + entries.length, 0),
+    [feedbackByApplicant]
+  );
+
+  const recentFeedback = useMemo(
+    () =>
+      Object.values(feedbackByApplicant)
+        .flat()
+        .slice()
+        .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
+        .slice(0, 5),
+    [feedbackByApplicant]
+  );
+
+  const handleUnlock = (event: React.FormEvent) => {
+    event.preventDefault();
     if (!adminSecret.trim()) return;
     sessionStorage.setItem(ADMIN_KEY_STORAGE, adminSecret.trim());
     setStoredSecret(adminSecret.trim());
@@ -149,222 +410,172 @@ const DevopsManage = () => {
   const handleLogout = () => {
     sessionStorage.removeItem(ADMIN_KEY_STORAGE);
     setStoredSecret(null);
-    setApplications([]);
-    setApprovedLink(null);
+    setApplications(initialFallbackApplicants);
+    setFeedbackByApplicant(mockFeedback);
+    setUsingMockData(true);
+    setDatabaseOverview(null);
+    setDatabasePreview(null);
+    setSelectedApplicantId(initialFallbackApplicants[0]?.id ?? null);
+    navigate('/tech/manage', { replace: true });
   };
 
-  const approve = async (id: number) => {
-    setActionLoading(id);
-    setApprovedLink(null);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/applications/${id}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers() },
-        body: JSON.stringify({}),
-      });
-      if (res.status === 403) {
-        handleLogout();
-        return;
-      }
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.detail || 'Approve failed');
-      }
-      const data = await res.json();
-      const token = data.assessment_link?.token || '';
-      const base = `${window.location.origin}${window.location.pathname || '/'}`.replace(/\/?$/, '');
-      const url = `${base}#/tech/assessment/${token}`;
-      setApprovedLink({ id, url });
-      await fetchApplications();
-    } catch (e: any) {
-      setError(e.message || 'Approve failed');
-    } finally {
-      setActionLoading(null);
+  const handleOpenResume = async (applicant: ApplicantRecord) => {
+    if (applicant.resume_url) {
+      window.open(applicant.resume_url, '_blank', 'noopener,noreferrer');
+      return;
     }
-  };
 
-  const reject = async (id: number) => {
-    setActionLoading(id);
-    setApprovedLink(null);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/applications/${id}/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers() },
-        body: JSON.stringify({}),
+    if (!storedSecret || usingMockData) {
+      toast({
+        title: 'Resume unavailable',
+        description: 'This applicant is using fallback data, so there is no backend resume stream.',
       });
-      if (res.status === 403) {
-        handleLogout();
-        return;
-      }
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.detail || 'Reject failed');
-      }
-      await fetchApplications();
-    } catch (e: any) {
-      setError(e.message || 'Reject failed');
-    } finally {
-      setActionLoading(null);
+      return;
     }
-  };
 
-  const archiveApp = async (id: number) => {
-    setActionLoading(id);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/applications/${id}/archive`, {
-        method: 'POST',
-        headers: headers(),
-      });
-      if (res.status === 403) {
-        handleLogout();
-        return;
-      }
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.detail || 'Archive failed');
-      }
-      await fetchApplications();
-      toast({ title: 'Archived', description: 'Application archived.' });
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message || 'Archive failed', variant: 'destructive' });
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const unarchiveApp = async (id: number) => {
-    setActionLoading(id);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/applications/${id}/unarchive`, {
-        method: 'POST',
-        headers: headers(),
-      });
-      if (res.status === 403) {
-        handleLogout();
-        return;
-      }
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.detail || 'Restore failed');
-      }
-      await fetchApplications();
-      toast({ title: 'Restored', description: 'Application restored from archive.' });
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message || 'Restore failed', variant: 'destructive' });
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const deleteApp = async (id: number) => {
-    setActionLoading(id);
-    setDeleteConfirmId(null);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/applications/${id}`, {
-        method: 'DELETE',
-        headers: headers(),
-      });
-      if (res.status === 403) {
-        handleLogout();
-        return;
-      }
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.detail || 'Delete failed');
-      }
-      await fetchApplications();
-      if (viewingSubmission) setViewingSubmission(null);
-      toast({ title: 'Deleted', description: 'Application permanently deleted.' });
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message || 'Delete failed', variant: 'destructive' });
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const copyLink = (url: string) => {
-    navigator.clipboard.writeText(url);
-    toast({
-      title: 'Link copied!',
-      description: 'Assessment link copied to clipboard.',
-    });
-  };
-
-  const copyEmailTemplate = (name: string, url: string) => {
-    const template = `Hi ${name},
-
-We would like to invite you to complete the OTCR Technologies online assessment. It includes three components: Problem Solving, a Coding challenge, and a System Design section. We recommend setting aside about 30–45 minutes. Please use your Illinois or personal email on file to complete the assessment.
-
-You can take the assessment here:
-
-${url}
-
-Best regards,
-OTCR Technologies`;
-    navigator.clipboard.writeText(template);
-    toast({
-      title: 'Email template copied!',
-      description: 'Email body with assessment link copied to clipboard.',
-    });
-  };
-
-  const openResume = async (id: number) => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/applications/${id}/resume`, { headers: headers() });
-      if (res.status === 403) {
-        handleLogout();
-        return;
-      }
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const u = URL.createObjectURL(blob);
-      window.open(u, '_blank', 'noopener,noreferrer');
+      const response = await fetch(`${API_BASE_URL}/api/admin/applications/${applicant.id}/resume`, { headers: headers() });
+      if (!response.ok) throw new Error('Could not open resume');
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      window.open(objectUrl, '_blank', 'noopener,noreferrer');
     } catch {
-      setError('Could not open resume');
+      toast({
+        title: 'Resume unavailable',
+        description: 'The backend did not return a resume for this applicant.',
+        variant: 'destructive',
+      });
     }
   };
 
-  const viewSubmission = async (token: string) => {
-    setLoadingSubmission(true);
+  const handleOpenFeedbackForm = (applicant: ApplicantRecord, round: InterviewRound = 'Round 1') => {
+    navigate(`/tech/manage/feedback?applicantId=${applicant.id}&round=${encodeURIComponent(round)}`);
+  };
+
+  const handleSubmitFeedback = async (entry: Omit<FeedbackEntry, 'id' | 'submittedAt'>) => {
+    if (!storedSecret) return;
+
+    setSubmittingFeedback(true);
+
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/submissions/${token}`, { headers: headers() });
-      if (res.status === 403) {
-        handleLogout();
-        return;
+      let targetApplicantId = entry.applicantId;
+
+      if (usingMockData) {
+        const { applications: liveApplications, evaluations: liveEvaluations } = await fetchWorkspaceSnapshot(storedSecret);
+
+        if (liveApplications.length === 0) {
+          throw new Error('Backend is reachable but returned no applicants, so feedback could not be attached.');
+        }
+
+        const liveApplicant =
+          liveApplications.find((applicant) => nameKey(applicant.name) === nameKey(entry.intervieweeName)) ??
+          liveApplications.find((applicant) => applicant.id === entry.applicantId) ??
+          null;
+
+        if (!liveApplicant) {
+          throw new Error('Could not match this interviewee to a live applicant record. Refresh the dashboard and try again.');
+        }
+
+        setApplications(liveApplications);
+        setFeedbackByApplicant(groupFeedbackEntries(liveEvaluations));
+        setUsingMockData(false);
+        setError(null);
+        setSelectedApplicantId(liveApplicant.id);
+        targetApplicantId = liveApplicant.id;
+
+        if (requestedApplicantId !== liveApplicant.id) {
+          navigate(`/tech/manage/feedback?applicantId=${liveApplicant.id}`, { replace: true });
+        }
       }
-      if (!res.ok) {
-        throw new Error('Failed to load submission');
+
+      const payload: AdminEvaluationPayload = {
+        interviewer_name: entry.interviewerName,
+        interviewee_name: entry.intervieweeName,
+        interviewee_gender: entry.intervieweeGender,
+        interviewer_role: entry.interviewerRole,
+        round: entry.round,
+        leadership_score: entry.leadershipScore,
+        interest_in_otcr_score: entry.interestInOtcrScore,
+        behavioral_performance_score: entry.behavioralPerformanceScore,
+        business_acumen_score: entry.businessAcumenScore,
+        qualitative_creativity_score: entry.qualitativeCreativityScore,
+        quantitative_structure_score: entry.quantitativeStructureScore,
+        case_performance_score: entry.casePerformanceScore,
+        creativity_conversation_score: entry.creativityConversationScore,
+        recommendation: entry.recommendation,
+        final_round_summary: entry.finalRoundSummary,
+        overall_performance_overview: entry.overallPerformanceOverview,
+      };
+
+      const createdEvaluation = await adminApi.createEvaluation(storedSecret, targetApplicantId, payload);
+      const mappedEntry = mapEvaluation(createdEvaluation);
+
+      setFeedbackByApplicant((current) => ({
+        ...current,
+        [mappedEntry.applicantId]: [mappedEntry, ...(current[mappedEntry.applicantId] ?? [])],
+      }));
+      setSelectedRoundsByApplicant((current) => ({
+        ...current,
+        [mappedEntry.applicantId]: mappedEntry.round,
+      }));
+
+      if (isDatabaseView) {
+        void fetchDatabasePreview(storedSecret, selectedDatabaseTable);
       }
-      const data = await res.json();
-      setViewingSubmission(data);
-    } catch (e: any) {
-      setError(e.message || 'Could not load submission');
+
+      toast({
+        title: 'Feedback saved',
+        description: `${entry.intervieweeName} now has a persisted review in the backend database.`,
+      });
+    } catch (submitError: unknown) {
+      toast({
+        title: 'Could not save feedback',
+        description: normalizeErrorMessage(submitError, 'The backend rejected the evaluation payload.'),
+        variant: 'destructive',
+      });
     } finally {
-      setLoadingSubmission(false);
+      setSubmittingFeedback(false);
     }
   };
+
+  const handleRefresh = () => {
+    if (!storedSecret) return;
+    if (isDatabaseView) {
+      void fetchDatabasePreview(storedSecret, selectedDatabaseTable);
+      return;
+    }
+    void fetchAdminWorkspace(storedSecret);
+  };
+
+  const voteCountsForApplicant = (applicantId: number) => getVoteCounts(getEntriesForRound(applicantId, listRound));
+  const statusForApplicant = (applicant: ApplicantRecord) => getOverallStatus(applicant, getEntriesForRound(applicant.id, listRound));
+  const scoreForApplicant = (applicantId: number) => getAverageScore(getEntriesForRound(applicantId, listRound));
+  const overallApplicantAverageScore = useMemo(() => {
+    const scores = filteredApplicants
+      .map((applicant) => scoreForApplicant(applicant.id))
+      .filter((score): score is number => score !== null);
+
+    if (scores.length === 0) return null;
+    return scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  }, [filteredApplicants, feedbackByApplicant, listRound]);
 
   if (!storedSecret) {
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
-        <section className="pt-32 pb-24 px-4">
-          <div className="max-w-md mx-auto">
-            <div className="flex justify-center mb-8">
-              <img 
-                src={otcrTechLogo} 
-                alt="OTCR Technologies" 
-                className="h-16 w-auto"
-              />
+        <section className="px-4 pb-24 pt-32">
+          <div className="mx-auto max-w-md">
+            <div className="mb-8 flex justify-center">
+              <img src={otcrTechLogo} alt="OTCR Technologies" className="h-16 w-auto" />
             </div>
-            <Card className="bg-card/80 border-border">
+            <Card className="border-white/10 bg-card/80">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-white">
-                  <Lock className="w-5 h-5" />
+                  <Lock className="h-5 w-5" />
                   Admin access
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Enter the admin key to manage applications.
+                  Enter the admin key to open the consultant review dashboard.
                 </p>
               </CardHeader>
               <CardContent>
@@ -375,14 +586,14 @@ OTCR Technologies`;
                       id="admin-key"
                       type="password"
                       value={adminSecret}
-                      onChange={(e) => setAdminSecret(e.target.value)}
+                      onChange={(event) => setAdminSecret(event.target.value)}
                       placeholder="Admin secret"
                       className="mt-2 bg-background/50"
                       autoComplete="current-password"
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={!adminSecret.trim()}>
-                    Unlock
+                    Unlock dashboard
                   </Button>
                 </form>
               </CardContent>
@@ -397,596 +608,308 @@ OTCR Technologies`;
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      <section className="pt-28 pb-24 px-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <img 
-                src={otcrTechLogo} 
-                alt="OTCR Technologies" 
-                className="h-10 w-auto"
-              />
-              <h1 className="text-2xl font-bold text-white">
-                Applications
-              </h1>
-            </div>
-            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground">
-              <LogOut className="w-4 h-4 mr-1" />
-              Lock
+      <section className="relative overflow-hidden px-4 pb-24 pt-28">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_26%),radial-gradient(circle_at_80%_20%,rgba(34,197,94,0.10),transparent_18%),linear-gradient(180deg,rgba(3,8,17,0.92),rgba(3,8,17,1))]" />
+        <div className="relative mx-auto max-w-7xl">
+          <div className="mb-5 flex flex-wrap items-center gap-3">
+            <Button asChild variant="outline" className={adminViewButtonClass(!isApplicantsView && !isFeedbackView && !isDatabaseView)}>
+              <Link to="/tech/manage">
+                <LayoutGrid className="h-4 w-4" />
+                Dashboard
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className={adminViewButtonClass(isApplicantsView)}>
+              <Link to="/tech/manage/applicants">
+                <ClipboardList className="h-4 w-4" />
+                Applicants
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className={adminViewButtonClass(isFeedbackView)}>
+              <Link to="/tech/manage/feedback">
+                <FilePenLine className="h-4 w-4" />
+                Feedback Form
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className={adminViewButtonClass(isDatabaseView)}>
+              <Link to="/tech/manage/database">
+                <Database className="h-4 w-4" />
+                Database
+              </Link>
             </Button>
           </div>
 
-          {error && (
-            <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-              {error}
-            </div>
-          )}
-
-          {approvedLink && (
-            <Card className="mb-6 border-primary/50 bg-primary/5">
-              <CardContent className="pt-4">
-                <p className="text-sm font-medium text-white mb-2">Assessment link created — send this to the candidate:</p>
-                <div className="flex items-center gap-2">
-                  <Input
-                    readOnly
-                    value={approvedLink.url}
-                    className="font-mono text-sm bg-background/50"
-                  />
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    onClick={() => copyLink(approvedLink.url)}
-                    title="Copy link"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-sm text-muted-foreground">Show:</span>
-            <Button
-              variant={archivedFilter === 'active' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => setArchivedFilter('active')}
-              className="text-sm"
-            >
-              Active
-            </Button>
-            <Button
-              variant={archivedFilter === 'archived' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => setArchivedFilter('archived')}
-              className="text-sm"
-            >
-              Archived
-            </Button>
-            <Button
-              variant={archivedFilter === 'all' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => setArchivedFilter('all')}
-              className="text-sm"
-            >
-              All
-            </Button>
-          </div>
-
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : applications.length === 0 ? (
-            <Card className="bg-card/50">
-              <CardContent className="py-12 text-center text-muted-foreground">
-                {archivedFilter === 'archived' ? 'No archived applications.' : archivedFilter === 'all' ? 'No applications.' : 'No applications yet.'}
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="rounded-lg border border-border overflow-x-auto overflow-y-visible">
-              <table className="w-full text-left min-w-[900px]">
-                <thead>
-                  <tr className="border-b border-border bg-card/80">
-                    <th className="px-4 py-3 text-sm font-semibold text-white">Name</th>
-                    <th className="px-4 py-3 text-sm font-semibold text-white">Email</th>
-                    <th className="px-4 py-3 text-sm font-semibold text-white">Why OTCR Tech</th>
-                    <th className="px-4 py-3 text-sm font-semibold text-white">Resume</th>
-                    <th className="px-4 py-3 text-sm font-semibold text-white">Status</th>
-                    <th className="px-4 py-3 text-sm font-semibold text-white">Integrity</th>
-                    <th className="px-4 py-3 text-sm font-semibold text-white">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {applications.map((app) => (
-                    <tr key={app.id} className="border-b border-border/50 bg-card/50 hover:bg-card/70 transition-colors">
-                      <td className="px-4 py-3 text-white font-medium">{app.name}</td>
-                      <td className="px-4 py-3 text-muted-foreground text-sm">{app.email}</td>
-                      <td className="px-4 py-3 text-muted-foreground text-sm max-w-xs">
-                        <div className="overflow-x-auto whitespace-nowrap scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent max-w-[200px] pb-1" title={app.interest ?? ''}>
-                          {app.interest ?? '—'}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {app.resume_filename ? (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 text-teal-primary hover:text-teal-primary/90 hover:bg-teal-primary/10"
-                            onClick={() => openResume(app.id)}
-                            title="Open resume"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </Button>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {app.status === 'approved' && (
-                          <span className="inline-flex items-center gap-1 text-sm text-green-500">
-                            <CheckCircle className="w-4 h-4" /> Approved
-                          </span>
-                        )}
-                        {app.status === 'rejected' && (
-                          <span className="inline-flex items-center gap-1 text-sm text-destructive">
-                            <XCircle className="w-4 h-4" /> Rejected
-                          </span>
-                        )}
-                        {app.status === 'pending' && (
-                          <span className="inline-flex items-center gap-1 text-sm text-amber-500">
-                            <Clock className="w-4 h-4" /> Pending
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {app.is_flagged ? (
-                          <div className="flex items-center gap-2">
-                            <AlertCircle className="w-4 h-4 text-destructive" />
-                            <div className="text-xs">
-                              <p className="text-destructive font-medium">Flagged</p>
-                              <p className="text-muted-foreground">Focus loss: {app.focus_loss_events}</p>
-                              {app.integrity_notes && (
-                                <p className="text-muted-foreground">{app.integrity_notes}</p>
-                              )}
-                            </div>
-                          </div>
-                        ) : app.focus_loss_events > 0 ? (
-                          <p className="text-xs text-muted-foreground">Focus loss: {app.focus_loss_events}</p>
-                        ) : (
-                          <p className="text-xs text-green-500">✓ Clean</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-nowrap items-center gap-1">
-                          {app.status === 'pending' && (
-                            <>
-                              <Button
-                                size="icon"
-                                className="h-8 w-8 bg-primary hover:bg-primary/90"
-                                onClick={() => approve(app.id)}
-                                disabled={actionLoading !== null}
-                                title="Approve"
-                              >
-                                {actionLoading === app.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="destructive"
-                                className="h-8 w-8"
-                                onClick={() => reject(app.id)}
-                                disabled={actionLoading !== null}
-                                title="Reject"
-                              >
-                                {actionLoading === app.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
-                              </Button>
-                            </>
-                          )}
-                          {app.status === 'approved' && app.has_assessment_link && (
-                            app.assessment_completed ? (
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                className="h-8 w-8 text-green-500 hover:text-green-400 hover:bg-green-500/10 border-green-500/30"
-                                onClick={() => app.assessment_token && viewSubmission(app.assessment_token)}
-                                disabled={loadingSubmission}
-                                title="View submission"
-                              >
-                                {loadingSubmission ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
-                              </Button>
-                            ) : (
-                              <>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  className="h-8 w-8 text-teal-primary hover:text-teal-primary/90 hover:bg-teal-primary/10 border-teal-primary/30"
-                                  onClick={() => {
-                                    if (app.assessment_token) {
-                                      const base = `${window.location.origin}${window.location.pathname || '/'}`.replace(/\/?$/, '');
-                                      const url = `${base}#/tech/assessment/${app.assessment_token}`;
-                                      copyLink(url);
-                                    }
-                                  }}
-                                  title="Copy assessment link"
-                                >
-                                  <Copy className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  className="h-8 w-8 text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 border-blue-400/30"
-                                  onClick={() => {
-                                    if (app.assessment_token) {
-                                      const base = `${window.location.origin}${window.location.pathname || '/'}`.replace(/\/?$/, '');
-                                      const url = `${base}#/tech/assessment/${app.assessment_token}`;
-                                      copyEmailTemplate(app.name, url);
-                                    }
-                                  }}
-                                  title="Copy email template"
-                                >
-                                  <FileText className="w-4 h-4" />
-                                </Button>
-                              </>
-                            )
-                          )}
-                          {deleteConfirmId === app.id ? (
-                            <>
-                              <span className="text-xs text-muted-foreground whitespace-nowrap">Delete?</span>
-                              <Button
-                                size="icon"
-                                variant="destructive"
-                                className="h-7 w-7"
-                                onClick={() => deleteApp(app.id)}
-                                disabled={actionLoading !== null}
-                                title="Confirm delete"
-                              >
-                                <Check className="w-3 h-3" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7"
-                                onClick={() => setDeleteConfirmId(null)}
-                                title="Cancel"
-                              >
-                                <XCircle className="w-3 h-3" />
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              {app.archived_at ? (
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7 text-muted-foreground hover:text-white"
-                                  onClick={() => unarchiveApp(app.id)}
-                                  disabled={actionLoading !== null}
-                                  title="Unarchive"
-                                >
-                                  {actionLoading === app.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArchiveRestore className="w-3 h-3" />}
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7 text-muted-foreground hover:text-white"
-                                  onClick={() => archiveApp(app.id)}
-                                  disabled={actionLoading !== null}
-                                  title="Archive"
-                                >
-                                  {actionLoading === app.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Archive className="w-3 h-3" />}
-                                </Button>
-                              )}
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                onClick={() => setDeleteConfirmId(app.id)}
-                                disabled={actionLoading !== null}
-                                title="Permanently delete"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Submission Viewer Modal */}
-      {viewingSubmission && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overflow-auto">
-          <div className="bg-[#1a1a2e] rounded-lg max-w-4xl w-full max-h-[90vh] overflow-auto border border-border">
-            <div className="sticky top-0 bg-[#1a1a2e] border-b border-border p-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-white">Submission Review</h2>
-                <p className="text-sm text-muted-foreground">
-                  {viewingSubmission.applicant_name} ({viewingSubmission.email})
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Started: {new Date(viewingSubmission.started_at).toLocaleString()} · Finished: {viewingSubmission.completed_at ? new Date(viewingSubmission.completed_at).toLocaleString() : '—'} · Duration: {formatDuration(viewingSubmission.started_at, viewingSubmission.completed_at)}
-                </p>
+          <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.32em] text-cyan-200/70">Recruitment admin</p>
+              <div className="mt-3 flex items-center gap-4">
+                <img src={otcrTechLogo} alt="OTCR Technologies" className="h-10 w-auto" />
+                <h1 className="text-3xl font-semibold text-white">
+                  {!isApplicantsView && !isFeedbackView && !isDatabaseView
+                    ? 'Consultant review dashboard'
+                    : isApplicantsView
+                      ? 'Applicants'
+                      : isFeedbackView
+                        ? 'Feedback form'
+                        : 'Database'}
+                </h1>
               </div>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-white/60">
+                {!isApplicantsView && !isFeedbackView && !isDatabaseView
+                  ? 'Choose between applicant review, the standalone interviewer form, and a live database preview powered by the backend.'
+                  : isApplicantsView
+                    ? 'This is the applicant review workspace, now backed by persisted interviewer evaluations from the API.'
+                    : isFeedbackView
+                      ? 'Submit the consultant interview rubric and store it directly in the backend database.'
+                      : 'Inspect the live backend tables, row counts, and recent records without leaving the admin dashboard.'}
+              </p>
+              <p className="mt-2 text-xs uppercase tracking-[0.24em] text-white/40">
+                Visible under <span className="text-white/70">/tech/manage</span> and legacy redirects under <span className="text-white/70">/devops/manage</span>
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {isApplicantsView ? (
+                <>
+                  <select
+                    value={cycleFilter}
+                    onChange={(event) => setCycleFilter(event.target.value)}
+                    className="h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none"
+                  >
+                    {cycleOptions.map((cycle) => (
+                      <option key={cycle} value={cycle} className="bg-slate-900 text-white">
+                        {cycle === 'all' ? 'All cycles' : cycle}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              ) : null}
               <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setViewingSubmission(null)}
-                className="text-muted-foreground hover:text-white"
+                type="button"
+                variant="outline"
+                className="h-11 border-white/10 bg-white/5 text-white hover:bg-white/10"
+                onClick={handleRefresh}
+                disabled={loading || databaseLoading || submittingFeedback}
               >
-                <XCircle className="w-5 h-5" />
+                {loading || databaseLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
+                Refresh
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleLogout} className="text-white/65 hover:text-white">
+                <LogOut className="mr-2 h-4 w-4" />
+                Lock
               </Button>
             </div>
-            
-            <div className="p-4 space-y-6">
-              {/* Integrity Status */}
-              <div className={`p-4 rounded-lg ${viewingSubmission.is_flagged ? 'bg-destructive/10 border border-destructive/30' : 'bg-green-500/10 border border-green-500/30'}`}>
-                <div className="flex items-center gap-2">
-                  {viewingSubmission.is_flagged ? (
-                    <AlertCircle className="w-5 h-5 text-destructive" />
-                  ) : (
-                    <CheckCircle className="w-5 h-5 text-green-500" />
-                  )}
-                  <span className={`font-medium ${viewingSubmission.is_flagged ? 'text-destructive' : 'text-green-500'}`}>
-                    {viewingSubmission.is_flagged ? 'Flagged for Review' : 'No Integrity Issues'}
+          </div>
+
+          {error ? (
+            <div className="mb-5 rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+              {error}
+            </div>
+          ) : null}
+
+          {usingMockData ? (
+            <div className="mb-5 rounded-2xl border border-sky-400/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
+              Backend data was unavailable, so the dashboard is showing mock applicant records and seeded feedback state.
+            </div>
+          ) : null}
+
+          {!isApplicantsView && !isFeedbackView && !isDatabaseView ? (
+            <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
+              <div className="grid gap-6 md:grid-cols-3">
+                <Link
+                  to="/tech/manage/applicants"
+                  className="group rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.98),rgba(8,13,22,0.99))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.34)] transition-all hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-[linear-gradient(180deg,rgba(19,34,55,0.98),rgba(8,13,22,0.99))]"
+                >
+                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-100">
+                    <ClipboardList className="h-6 w-6" />
                   </span>
-                </div>
-                <div className="mt-2 text-sm text-muted-foreground">
-                  <p>Focus loss events: {viewingSubmission.focus_loss_events}</p>
-                  <p>Sections completed: {viewingSubmission.sections_completed.join(', ')}</p>
-                  {viewingSubmission.integrity_notes && (
-                    <p className="mt-1 text-yellow-500">{viewingSubmission.integrity_notes}</p>
-                  )}
-                </div>
+                  <h2 className="mt-6 text-2xl font-semibold text-white">Applicants</h2>
+                  <p className="mt-3 text-sm leading-6 text-white/55">
+                    Open applicant review, search the pipeline, read resumes, and inspect persisted evaluations tied to each candidate.
+                  </p>
+                  <p className="mt-6 text-sm font-medium text-cyan-100">Open applicant workspace</p>
+                </Link>
+
+                <Link
+                  to="/tech/manage/feedback"
+                  className="group rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.98),rgba(8,13,22,0.99))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.34)] transition-all hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-[linear-gradient(180deg,rgba(19,34,55,0.98),rgba(8,13,22,0.99))]"
+                >
+                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-100">
+                    <FilePenLine className="h-6 w-6" />
+                  </span>
+                  <h2 className="mt-6 text-2xl font-semibold text-white">Feedback Form</h2>
+                  <p className="mt-3 text-sm leading-6 text-white/55">
+                    Submit interview feedback directly into the backend `evaluations` table using the exact applicant name.
+                  </p>
+                  <p className="mt-6 text-sm font-medium text-cyan-100">Open feedback form</p>
+                </Link>
+
+                <Link
+                  to="/tech/manage/database"
+                  className="group rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.98),rgba(8,13,22,0.99))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.34)] transition-all hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-[linear-gradient(180deg,rgba(19,34,55,0.98),rgba(8,13,22,0.99))]"
+                >
+                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-100">
+                    <Database className="h-6 w-6" />
+                  </span>
+                  <h2 className="mt-6 text-2xl font-semibold text-white">Database</h2>
+                  <p className="mt-3 text-sm leading-6 text-white/55">
+                    Inspect row counts and preview live tables like applications, evaluations, attempts, and submissions.
+                  </p>
+                  <p className="mt-6 text-sm font-medium text-cyan-100">Open database view</p>
+                </Link>
               </div>
 
-              {/* Progress over time (5-min snapshots) */}
-              {viewingSubmission.progress_snapshots && viewingSubmission.progress_snapshots.length > 0 && (
-                <div className="border border-border rounded-lg overflow-hidden">
-                  <div className="bg-[#0f0f1a] px-4 py-2 border-b border-border">
-                    <h3 className="font-medium text-white">Progress through assessment</h3>
-                    <p className="text-xs text-muted-foreground">Snapshots every 5 min — expand to see code and answers at that time</p>
+              <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(17,25,40,0.98),rgba(8,13,22,0.99))] shadow-[0_24px_60px_rgba(0,0,0,0.34)]">
+                <CardHeader>
+                  <p className="text-xs uppercase tracking-[0.24em] text-cyan-200/70">Snapshot</p>
+                  <CardTitle className="text-xl text-white">Current review state</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                    <div className="rounded-2xl border border-white/8 bg-white/5 p-4">
+                      <p className="text-xs uppercase tracking-[0.2em] text-white/45">Applicants</p>
+                      <p className="mt-3 text-3xl font-semibold text-white">{applications.length}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/8 bg-white/5 p-4">
+                      <p className="text-xs uppercase tracking-[0.2em] text-white/45">Feedback</p>
+                      <p className="mt-3 text-3xl font-semibold text-white">{totalFeedbackCount}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/8 bg-white/5 p-4">
+                      <p className="text-xs uppercase tracking-[0.2em] text-white/45">Persistence</p>
+                      <p className="mt-3 text-lg font-semibold text-white">
+                        {usingMockData ? 'Mock data' : 'Backend connected'}
+                      </p>
+                    </div>
                   </div>
-                  <div className="p-4">
-                    <ul className="space-y-2">
-                      {viewingSubmission.progress_snapshots.map((snap, idx) => {
-                        const sectionLabel = snap.current_section
-                          ? snap.current_section.replace(/_/g, ' ')
-                          : '—';
-                        const completedCount = (snap.sections_completed || []).length;
-                        const min = Math.floor(snap.elapsed_seconds / 60);
-                        const d = snap.progress_detail;
-                        const isExpanded = expandedSnapshotIndex === idx;
-                        const hasSnapshot = !!d;
-                        return (
-                          <li key={idx} className="border border-border/50 rounded-lg overflow-hidden bg-[#0f0f1a]/50">
-                            <div className="flex items-center gap-3 text-sm flex-wrap p-3">
-                              <span className="text-muted-foreground shrink-0 w-14">{min} min</span>
-                              <span className="text-white">
-                                {completedCount} section{completedCount !== 1 ? 's' : ''} done
-                                {snap.current_section && (
-                                  <> · on <span className="capitalize">{sectionLabel}</span></>
-                                )}
+
+                  <div className="rounded-2xl border border-white/8 bg-black/20 p-4">
+                    <p className="text-sm font-medium text-white">Recent feedback</p>
+                    {recentFeedback.length === 0 ? (
+                      <p className="mt-3 text-sm text-white/50">No feedback has been saved yet.</p>
+                    ) : (
+                      <div className="mt-3 space-y-3">
+                        {recentFeedback.map((entry) => (
+                          <div key={entry.id} className="rounded-2xl border border-white/8 bg-white/[0.04] p-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-medium text-white">{entry.intervieweeName || entry.applicantName}</p>
+                                <p className="text-xs text-white/45">{entry.interviewerName}</p>
+                              </div>
+                              <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-100">
+                                {entry.recommendation}
                               </span>
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(snap.snapshot_at).toLocaleTimeString()}
-                              </span>
-                              {hasSnapshot && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="ml-auto h-7 text-xs text-muted-foreground hover:text-white"
-                                  onClick={() => setExpandedSnapshotIndex(isExpanded ? null : idx)}
-                                >
-                                  {isExpanded ? 'Hide content' : 'View content at this time'}
-                                </Button>
-                              )}
                             </div>
-                            {isExpanded && d && (
-                              <div className="border-t border-border p-4 space-y-6 bg-[#0a0a12]">
-                                <div>
-                                  <p className="text-sm font-medium text-muted-foreground mb-2">Problem solving (at this time)</p>
-                                  {d.problem_solving?.answers && d.problem_solving.answers.length > 0 ? (
-                                    <div className="space-y-3">
-                                      {d.problem_solving.answers.map((a, i) => (
-                                        <div key={a.questionId} className="border border-border/50 rounded p-3 bg-[#0f0f1a]">
-                                          <p className="text-muted-foreground text-sm font-medium">Q{i + 1}: {a.questionText}</p>
-                                          <p className="text-white text-sm mt-2 ml-2">Answer: {a.answer || '(not answered yet)'}</p>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <p className="text-xs text-muted-foreground">No problem solving snapshot recorded at this time.</p>
-                                  )}
-                                </div>
-
-                                <div>
-                                  <p className="text-sm text-muted-foreground mb-2">Coding (at this time)</p>
-                                  <pre className="bg-[#0f0f1a] p-3 rounded text-sm text-white overflow-x-auto font-mono whitespace-pre">
-                                    {(d.coding?.code ?? '').trim().length > 0 ? d.coding!.code : 'No code yet'}
-                                  </pre>
-                                </div>
-
-                                <div>
-                                  <p className="text-sm text-muted-foreground mb-2">System design (at this time)</p>
-                                  <div className="bg-[#0f0f1a] p-3 rounded text-sm text-white whitespace-pre-wrap">
-                                    {(d.system_design?.response ?? '').trim().length > 0 ? d.system_design!.response : 'No response yet'}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                </div>
-              )}
-
-              {/* Submissions by Section */}
-              {viewingSubmission.submissions.map((sub, idx) => (
-                <div key={idx} className="border border-border rounded-lg overflow-hidden">
-                  <div className="bg-[#0f0f1a] px-4 py-2 border-b border-border">
-                    <h3 className="font-medium text-white capitalize">{sub.section.replace('_', ' ')}</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Submitted: {new Date(sub.submitted_at).toLocaleString()}
-                    </p>
-                    {/* MCQ Score Summary */}
-                    {sub.section === 'problem_solving' && sub.mcq_score && (
-                      <div className="mt-2">
-                        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-sm font-medium ${
-                          sub.mcq_score.total === 0 
-                            ? 'bg-gray-500/10 border border-gray-500/30 text-gray-400'
-                            : sub.mcq_score.correct === sub.mcq_score.total 
-                              ? 'bg-green-500/10 border border-green-500/30 text-green-400'
-                              : sub.mcq_score.correct >= sub.mcq_score.total / 2
-                                ? 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-400'
-                                : 'bg-red-500/10 border border-red-500/30 text-red-400'
-                        }`}>
-                          MCQ Score: {sub.mcq_score.correct}/{sub.mcq_score.total}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-4">
-                    {sub.section === 'problem_solving' && (
-                      <div className="space-y-4">
-                        {/* Use mcq_results if available (new format), otherwise fall back to payload */}
-                        {sub.mcq_results ? (
-                          sub.mcq_results.map((result: any, idx: number) => (
-                            <div key={result.questionId} className="border border-border/50 rounded p-3 bg-[#0f0f1a]">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex-1">
-                                  <p className="text-muted-foreground text-sm font-medium">
-                                    Q{idx + 1}: {result.questionText}
-                                  </p>
-                                  <div className="mt-2 ml-2">
-                                    <p className="text-white text-sm">
-                                      Answer: <span className={
-                                        result.isManualReview 
-                                          ? 'text-blue-400' 
-                                          : result.isCorrect 
-                                            ? 'text-green-400' 
-                                            : result.isCorrect === false 
-                                              ? 'text-red-400' 
-                                              : 'text-white'
-                                      }>
-                                        {result.userAnswer}
-                                      </span>
-                                    </p>
-                                    {!result.isManualReview && result.correctAnswer && !result.isCorrect && (
-                                      <p className="text-green-400 text-sm mt-1">
-                                        Correct: {result.correctAnswer}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="flex-shrink-0 text-right">
-                                  {result.isManualReview ? (
-                                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-blue-500/10 border border-blue-500/30">
-                                      <span className="text-xs font-medium text-blue-400">Manual Review</span>
-                                    </span>
-                                  ) : result.isCorrect === true ? (
-                                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-green-500/10 border border-green-500/30">
-                                      <span className="text-xs font-medium text-green-400">✓ Correct</span>
-                                    </span>
-                                  ) : result.isCorrect === false ? (
-                                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-red-500/10 border border-red-500/30">
-                                      <span className="text-xs font-medium text-red-400">✗ Incorrect</span>
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-gray-500/10 border border-gray-500/30">
-                                      <span className="text-xs font-medium text-gray-400">Legacy</span>
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        ) : sub.payload && (
-                          // Fallback for old format submissions
-                          Object.entries(sub.payload).map(([qId, answer], idx) => {
-                            const isShortAnswer = qId.includes('short') || idx === Object.entries(sub.payload).length - 1;
-                            
-                            return (
-                              <div key={qId} className="border border-border/50 rounded p-3 bg-[#0f0f1a]">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="flex-1">
-                                    <p className="text-muted-foreground text-sm">Question {qId}:</p>
-                                    <p className="text-white ml-2 text-sm mt-1">{String(answer)}</p>
-                                  </div>
-                                  {isShortAnswer && (
-                                    <div className="flex-shrink-0 text-right">
-                                      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-blue-500/10 border border-blue-500/30">
-                                        <span className="text-xs font-medium text-blue-400">Manual Review</span>
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    )}
-                    
-                    {sub.section === 'coding' && (
-                      <div className="space-y-4">
-                        <div>
-                          <p className="text-sm text-muted-foreground mb-2">Code:</p>
-                          <pre className="bg-[#0f0f1a] p-3 rounded text-sm text-white overflow-x-auto font-mono">
-                            {sub.payload?.code || 'No code submitted'}
-                          </pre>
-                        </div>
-                        {sub.coding_result && (
-                          <div className={`p-3 rounded text-sm ${sub.coding_result.passed ? 'bg-green-500/10 border border-green-500/30' : 'bg-destructive/10 border border-destructive/30'}`}>
-                            <p className={`font-medium ${sub.coding_result.passed ? 'text-green-500' : 'text-destructive'}`}>
-                              {sub.coding_result.passed ? '✓ All Test Cases Passed' : '✗ Test Cases Failed'}
-                            </p>
-                            {sub.coding_result.results && (
-                              <div className="mt-2 space-y-1">
-                                {sub.coding_result.results.map((r: any, i: number) => (
-                                  <div key={i} className="text-xs">
-                                    <span className={r.passed ? 'text-green-500' : 'text-destructive'}>
-                                      Test {i + 1}: {r.passed ? 'Passed' : 'Failed'}
-                                    </span>
-                                    {!r.passed && r.expected !== undefined && (
-                                      <span className="text-muted-foreground ml-2">
-                                        Expected: {JSON.stringify(r.expected)}, Got: {JSON.stringify(r.actual)}
-                                      </span>
-                                    )}
-                                    {r.error && <span className="text-destructive ml-2">{r.error}</span>}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
                           </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {sub.section === 'system_design' && (
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-2">Response:</p>
-                        <div className="bg-[#0f0f1a] p-3 rounded text-sm text-white whitespace-pre-wrap">
-                          {sub.payload?.response || 'No response submitted'}
-                        </div>
+                        ))}
                       </div>
                     )}
                   </div>
-                </div>
-              ))}
+                </CardContent>
+              </Card>
             </div>
-          </div>
-        </div>
-      )}
+          ) : null}
 
+          {isApplicantsView ? (
+            loading && applications.length === 0 ? (
+              <div className="flex items-center justify-center py-24">
+                <Loader2 className="h-8 w-8 animate-spin text-white/50" />
+              </div>
+            ) : (
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_380px]">
+                <div className="order-2 xl:order-1">
+                  {selectedApplicant ? (
+                    (() => {
+                      const selectedRound = getSelectedRound(selectedApplicant.id);
+                      const roundEntries = getEntriesForRound(selectedApplicant.id, selectedRound);
+                      const roundVoteCounts = getVoteCounts(roundEntries);
+
+                      return (
+                        <ApplicantDetail
+                          applicant={selectedApplicant}
+                          feedbackEntries={roundEntries}
+                          yesCount={roundVoteCounts.yes}
+                          noCount={roundVoteCounts.no}
+                          maybeCount={roundVoteCounts.maybe}
+                          overallStatus={getOverallStatus(selectedApplicant, roundEntries)}
+                          averageScore={getAverageScore(roundEntries)}
+                          comparisonAverage={overallApplicantAverageScore}
+                          selectedRound={selectedRound}
+                          availableRounds={getAvailableRounds(selectedApplicant.id)}
+                          onSelectRound={(round) =>
+                            setSelectedRoundsByApplicant((current) => ({
+                              ...current,
+                              [selectedApplicant.id]: round,
+                            }))
+                          }
+                          onOpenResume={handleOpenResume}
+                        />
+                      );
+                    })()
+                  ) : (
+                    <Card className="border-white/10 bg-white/[0.03]">
+                      <CardContent className="p-10 text-center text-white/55">
+                        No applicant selected.
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                <div className="order-1 min-h-[720px] xl:order-2">
+                  <ConsultantList
+                    applicants={filteredApplicants}
+                    selectedApplicantId={selectedApplicantId}
+                    searchValue={searchValue}
+                    onSearchChange={setSearchValue}
+                    rounds={interviewRounds}
+                    activeRound={listRound}
+                    onRoundChange={setListRound}
+                    onSelectApplicant={setSelectedApplicantId}
+                    getStatusLabel={statusForApplicant}
+                    getAverageScore={scoreForApplicant}
+                    overallAverageScore={overallApplicantAverageScore}
+                  />
+                </div>
+              </div>
+            )
+          ) : null}
+
+          {isFeedbackView ? (
+            loading && applications.length === 0 ? (
+              <div className="flex items-center justify-center py-24">
+                <Loader2 className="h-8 w-8 animate-spin text-white/50" />
+              </div>
+            ) : (
+              <div className="mx-auto w-full max-w-[1360px]">
+                <div>
+                  <FeedbackForm
+                    applicants={applications}
+                    initialApplicantId={requestedFeedbackApplicant?.id ?? null}
+                    initialRound={requestedFeedbackRound}
+                    onSubmitFeedback={handleSubmitFeedback}
+                    submitting={submittingFeedback}
+                  />
+                </div>
+              </div>
+            )
+          ) : null}
+
+          {isDatabaseView ? (
+            <DatabaseView
+              overview={databaseOverview}
+              preview={databasePreview}
+              selectedTable={selectedDatabaseTable}
+              loading={databaseLoading}
+              error={databaseError}
+              applicants={applications}
+              feedbackByApplicant={feedbackByApplicant}
+              onSelectTable={setSelectedDatabaseTable}
+              onRefresh={() => {
+                if (!storedSecret) return;
+                void fetchDatabasePreview(storedSecret, selectedDatabaseTable);
+              }}
+            />
+          ) : null}
+        </div>
+      </section>
       <Footer />
     </div>
   );

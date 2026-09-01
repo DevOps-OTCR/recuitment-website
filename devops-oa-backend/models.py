@@ -1,11 +1,18 @@
 """SQLAlchemy models for the DevOps OA backend."""
 
 from datetime import datetime
+from sqlalchemy.sql import func
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON, Boolean, Enum
 from sqlalchemy.orm import relationship
 import enum
 from database import Base
 
+# --- ENUMS ---
+
+class DecisionStatus(enum.Enum):
+    YES = "YES"
+    NO = "NO"
+    MAYBE = "MAYBE"
 
 class ApplicationStatus(str, enum.Enum):
     """Status of an application."""
@@ -13,26 +20,17 @@ class ApplicationStatus(str, enum.Enum):
     APPROVED = "approved"
     REJECTED = "rejected"
 
+# --- MODELS ---
 
-class Application(Base):
-    """Application submitted by a candidate."""
-    __tablename__ = "applications"
+class Cycle(Base):
+    __tablename__ = "cycles"
     
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), nullable=False)
-    email = Column(String(255), nullable=False, index=True)
-    interest = Column(String(500), nullable=True)  # One-liner about tech interest
-    resume_filename = Column(String(255), nullable=True)  # Original filename
-    resume_path = Column(String(500), nullable=True)  # Storage path
-    status = Column(String(20), default=ApplicationStatus.PENDING.value, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    reviewed_at = Column(DateTime, nullable=True)
-    notes = Column(Text, nullable=True)  # Admin notes
-    archived_at = Column(DateTime, nullable=True)  # When set, hidden from default list
-    
-    # Relationship to assessment link (created when approved)
-    assessment_link_id = Column(Integer, ForeignKey("assessment_links.id"), nullable=True)
-    assessment_link = relationship("AssessmentLink", back_populates="application")
+    semester = Column(String(50), nullable=False)  # e.g., "SP26", "FA25"
+    name = Column(String(50), nullable=False)      # e.g., "Cycle 1", "Cycle 2"
+    is_active = Column(Boolean, default=True)
+
+    applications = relationship("Application", back_populates="cycle")
 
 
 class AssessmentLink(Base):
@@ -46,10 +44,83 @@ class AssessmentLink(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     expires_at = Column(DateTime, nullable=True)
     
-    # Relationship to attempts
     attempts = relationship("Attempt", back_populates="link", cascade="all, delete-orphan")
-    # Relationship to application
     application = relationship("Application", back_populates="assessment_link", uselist=False)
+
+
+class Application(Base):
+    """Application submitted by a candidate."""
+    __tablename__ = "applications"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # --- Cycle Routing ---
+    cycle_id = Column(Integer, ForeignKey("cycles.id"), nullable=True)
+    
+    # --- Candidate Info ---
+    name = Column(String(255), nullable=False)             
+    first_name = Column(String(100), nullable=True)        
+    last_name = Column(String(100), nullable=True)         
+    email = Column(String(255), nullable=False, index=True)
+    major = Column(String(100), nullable=True)
+    gpa = Column(String(20), nullable=True) 
+    grad_year = Column(String(10), nullable=True)
+    interest = Column(String(500), nullable=True)          
+    
+    # --- Files & Links ---
+    resume_filename = Column(String(255), nullable=True) 
+    resume_path = Column(String(500), nullable=True)  
+    assessment_link_id = Column(Integer, ForeignKey("assessment_links.id"), nullable=True)
+    
+    # --- Status Tracking ---
+    status = Column(String(20), default=ApplicationStatus.PENDING.value, nullable=False) 
+    final_decision = Column(Enum(DecisionStatus), default=DecisionStatus.MAYBE, nullable=False)
+    
+    # --- Metadata & Logging ---
+    application_data = Column(JSON, nullable=True)         
+    notes = Column(Text, nullable=True)                    
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    reviewed_at = Column(DateTime, nullable=True)
+    archived_at = Column(DateTime, nullable=True) 
+    
+    # --- Relationships ---
+    cycle = relationship("Cycle", back_populates="applications")
+    evaluations = relationship("Evaluation", back_populates="application")
+    assessment_link = relationship("AssessmentLink", back_populates="application", uselist=False)
+
+
+class Evaluation(Base):
+    """Evaluation data from Google Forms/Interviewers."""
+    __tablename__ = "evaluations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    application_id = Column(Integer, ForeignKey("applications.id"), nullable=False)
+    interviewer_name = Column(String(100), nullable=False)
+    round = Column(String(50)) 
+    interviewee_name = Column(String(255), nullable=True)
+    interviewee_gender = Column(String(20), nullable=True)
+    interviewer_role = Column(String(20), nullable=True)
+    
+    culture_fit_score = Column(Integer)
+    technical_score = Column(Integer)
+    communication_score = Column(Integer)
+    leadership_score = Column(Integer)
+    interest_in_otcr_score = Column(Integer)
+    behavioral_performance_score = Column(Integer)
+    business_acumen_score = Column(Integer)
+    qualitative_creativity_score = Column(Integer)
+    quantitative_structure_score = Column(Integer)
+    case_performance_score = Column(Integer)
+    creativity_conversation_score = Column(Integer)
+    
+    recommendation = Column(String(20), nullable=False)
+    recommendation_label = Column(String(20), nullable=True)
+    comments = Column(Text)
+    final_round_summary = Column(Text, nullable=True)
+    overall_performance_overview = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    application = relationship("Application", back_populates="evaluations")
 
 
 class Attempt(Base):
@@ -62,32 +133,27 @@ class Attempt(Base):
     last_activity_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
     
-    # Track which sections are completed
-    sections_completed = Column(JSON, default=list)  # ["problem_solving", "coding", "system_design"]
+    sections_completed = Column(JSON, default=list)  
+    focus_loss_events = Column(Integer, default=0)  
+    is_flagged = Column(Boolean, default=False)  
+    integrity_notes = Column(String(500), nullable=True)  
     
-    # Track integrity violations
-    focus_loss_events = Column(Integer, default=0)  # Count of times assessment window lost focus
-    is_flagged = Column(Boolean, default=False)  # Flag for admin review
-    integrity_notes = Column(String(500), nullable=True)  # Notes about integrity concerns
-    
-    # Relationships
     link = relationship("AssessmentLink", back_populates="attempts")
     submissions = relationship("Submission", back_populates="attempt", cascade="all, delete-orphan")
     progress_snapshots = relationship("ProgressSnapshot", back_populates="attempt", cascade="all, delete-orphan")
 
 
 class ProgressSnapshot(Base):
-    """Periodic progress snapshot during an assessment (e.g. every 5 minutes)."""
+    """Periodic progress snapshot during an assessment."""
     __tablename__ = "assessment_progress_snapshots"
 
     id = Column(Integer, primary_key=True, index=True)
     attempt_id = Column(Integer, ForeignKey("attempts.id"), nullable=False)
     snapshot_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    sections_completed = Column(JSON, default=list)  # ["problem_solving", ...]
-    current_section = Column(String(50), nullable=True)  # section they were on at snapshot time
-    elapsed_seconds = Column(Integer, nullable=False)  # time since attempt started
-    # Actual progress at snapshot time: MCQ answered count, coding/system_design lengths
-    progress_detail = Column(JSON, nullable=True)  # { problem_solving: {answered_count, total}, coding: {length}, system_design: {length} }
+    sections_completed = Column(JSON, default=list)  
+    current_section = Column(String(50), nullable=True)  
+    elapsed_seconds = Column(Integer, nullable=False)  
+    progress_detail = Column(JSON, nullable=True)  
 
     attempt = relationship("Attempt", back_populates="progress_snapshots")
 
@@ -98,11 +164,10 @@ class Submission(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     attempt_id = Column(Integer, ForeignKey("attempts.id"), nullable=False)
-    section = Column(String(50), nullable=False)  # problem_solving, coding, system_design
-    payload = Column(JSON, nullable=False)  # The actual submission content
-    coding_result = Column(JSON, nullable=True)  # Only for coding section: { passed, total, details }
-    notes = Column(String(500), nullable=True)  # Admin notes (e.g., AI detection warnings)
+    section = Column(String(50), nullable=False)  
+    payload = Column(JSON, nullable=False)  
+    coding_result = Column(JSON, nullable=True)  
+    notes = Column(String(500), nullable=True)  
     submitted_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
-    # Relationship
     attempt = relationship("Attempt", back_populates="submissions")
