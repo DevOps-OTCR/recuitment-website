@@ -1,5 +1,6 @@
 """API routes for the DevOps OA backend."""
 
+import copy
 import secrets
 import os
 from datetime import datetime
@@ -817,19 +818,76 @@ def get_or_create_attempt(link: AssessmentLink, db: Session) -> Attempt:
     return attempt
 
 
+def _pin_questions(link: AssessmentLink, db: Session, drawn: list) -> list:
+    """Pin the problem-solving questions the first time this link is served.
+
+    assessment_content.get_assessment_content() draws a random subset of the
+    question pool on EVERY call -- six consecutive requests for one token
+    returned six different question sets. The frontend refetches the config on
+    every page load while restoring drafts from localStorage keyed by question
+    id (ps1..ps5), so without pinning, a candidate who reloads is shown five
+    different questions with their previous answers already filled in against
+    them. Their submitted answers then belong to questions they never read.
+
+    Fails open: if pinned_questions does not exist yet or anything else goes
+    wrong, serve the fresh draw -- exactly the previous behaviour.
+    """
+    try:
+        if link.pinned_questions:
+            return link.pinned_questions
+        if drawn:
+            link.pinned_questions = drawn
+            db.commit()
+    except Exception:
+        db.rollback()
+    return drawn
+
+
+def _strip_grading_material(config: dict) -> dict:
+    """Remove everything a candidate must not see from the public config.
+
+    This endpoint takes no authentication -- the token is the only thing
+    required -- so anything left in the response is readable in DevTools before
+    a single question is answered. That means every MCQ's correctAnswer and the
+    full hiddenTestCases array.
+
+    Safe to remove: the deployed frontend never reads hiddenTestCases (the
+    in-browser Pyodide runner grades the Run button against the visible
+    testCases only), and reads correctAnswer solely in the admin review screen,
+    which is served by the admin-authenticated /admin/submissions/{token}.
+    Server-side grading calls get_assessment_content() directly and never sees
+    this response, so scoring is unaffected.
+    """
+    for question in (config.get("problemSolving", {}).get("questions") or []):
+        question.pop("correctAnswer", None)
+    config.get("coding", {}).pop("hiddenTestCases", None)
+    return config
+
+
 @router.get("/assessment/{token}")
 async def get_assessment_config(token: str, db: Session = Depends(get_db)):
     """Get assessment configuration for a token."""
     link = get_link_or_404(token, db)
-    
-    # Return the full assessment config plus whether email is required
-    config = get_assessment_content()
+
+    # deepcopy before touching anything: the deployed assessment_content module
+    # may return a shared dict, and both helpers below mutate in place.
+    config = copy.deepcopy(get_assessment_content())
+
+    if config.get("problemSolving") is not None:
+        pinned = _pin_questions(
+            link, db, config["problemSolving"].get("questions") or []
+        )
+        # copy again -- pinned may be the ORM-backed list, which must keep its
+        # correctAnswer fields for scoring.
+        config["problemSolving"]["questions"] = copy.deepcopy(pinned)
+
+    config = _strip_grading_material(config)
     config["requiresEmail"] = link.email is not None
-    
+
     # Add secret AI detection flag (hidden watermark)
     # This flag should be returned in submissions to verify authenticity
     config["_aiDetectionFlag"] = secrets.token_hex(16)
-    
+
     return config
 
 
@@ -869,7 +927,9 @@ async def start_assessment(
                 status_code=400, 
                 detail="Email verification required to start this assessment."
             )
-        if request.email.lower().strip() != link.email.lower():
+        # .strip() on BOTH sides: without it, one trailing space in the stored
+        # address is a permanent 403 that the candidate cannot work around.
+        if request.email.lower().strip() != link.email.lower().strip():
             raise HTTPException(
                 status_code=403, 
                 detail="Email does not match. Please use the email you applied with."
