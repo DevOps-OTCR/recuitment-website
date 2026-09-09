@@ -45,7 +45,14 @@ class AssessmentLink(Base):
     label = Column(String(255), nullable=True)  # e.g., "Batch Nov 2025"
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     expires_at = Column(DateTime, nullable=True)
-    
+
+    # The problem-solving questions this link was first served, pinned so that a
+    # reload cannot change them. assessment_content draws a random subset of the
+    # question pool on every call; without pinning, drafts restored from
+    # localStorage (keyed ps1..ps5) reattach to different questions.
+    # Requires: alter table assessment_links add column if not exists pinned_questions json;
+    pinned_questions = Column(JSON, nullable=True)
+
     # Relationship to attempts
     attempts = relationship("Attempt", back_populates="link", cascade="all, delete-orphan")
     # Relationship to application
