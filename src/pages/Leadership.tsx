@@ -35,50 +35,50 @@ const partners = [
     name: 'Man Kwanpracha',
     role: 'Project Excellence Partner',
     img: manImg,
-    linkedin: '',
-    mail: ''
+    linkedin: 'https://www.linkedin.com/in/songkrit-kwanpracha/',
+    mail: 'mank3@illinois.edu'
   },
   {
     name: 'Shritan Bhupathiraju',
     role: 'Corporate Affairs Partner',
     img: shritanImg,
-    linkedin: '',
-    mail: ''
+    linkedin: 'https://www.linkedin.com/in/shritan-bhupathiraju-80b763181/',
+    mail: 'shritan2@illinois.edu'
   },
   {
     name: 'Ivan Nang',
     role: 'Professional Development Partner',
     img: ivanImg,
-    linkedin: '',
-    mail: ''
+    linkedin: 'https://www.linkedin.com/in/ivan-nang/',
+    mail: 'ivannang@illinois.edu'
   },
   {
     name: 'Anu Ghosh',
     role: 'Alumni Relations Partner',
     img: anuImg,
-    linkedin: '',
-    mail: ''
+    linkedin: 'https://www.linkedin.com/in/anurag-ghosh-08b50827b/',
+    mail: 'aghos44@illinois.edu'
   },
   {
     name: 'Chinmay Rawat',
     role: 'Technology Partner',
     img: chinmayImg,
-    linkedin: '',
-    mail: ''
+    linkedin: 'https://www.linkedin.com/in/chinmay-rawat-100977219/',
+    mail: 'crawat2@illinois.edu'
   },
   {
     name: 'Rohan Raman',
     role: 'Social Partner',
     img: rohanImg,
-    linkedin: '',
-    mail: ''
+    linkedin: 'https://www.linkedin.com/in/rohan-raman0/',
+    mail: 'rohanr8@illinois.edu'
   },
   {
     name: 'Rishabh Chhabra',
     role: 'Finance Partner',
     img: rishabhImg,
-    linkedin: '',
-    mail: ''
+    linkedin: 'https://www.linkedin.com/in/rchhabra17/',
+    mail: 'chhabra7@illinois.edu'
   }
 ];
 
