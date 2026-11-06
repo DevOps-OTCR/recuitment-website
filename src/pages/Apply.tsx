@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,21 @@ import FadeContent from '@/reactbits/animations/FadeContent/FadeContent';
 import SplitText from '@/reactbits/textanimations/SplitText/SplitText';
 
 const chicagoSkyline = new URL('../assets/chicago_skyline.png', import.meta.url).href;
+const cycle = 'Fall 2026';
+const interestForm = 'https://docs.google.com/forms/d/1EhjSbp5X06GLFBy6pY3oTAaHrpmnH2_0MkmDNrDGBZo/viewform';
+// Update the cycle and each role's availability when recruitment opens or closes.
+const applications = [
+  {
+    name: 'Consultant',
+    open: false,
+    url: 'https://docs.google.com/forms/d/e/1FAIpQLScRGd_jSfsG86TSIEvweEsDQ6qSc35pk3S81C0U3R1eT7LIWw/viewform?usp=header',
+  },
+  {
+    name: 'Technology',
+    open: false,
+    url: 'https://docs.google.com/forms/d/e/1FAIpQLSc8ufeVn9KoAHKiBEY_Y2BKxA-uFw13qmfVbQLdos7HNlmj3Q/viewform?usp=header',
+  },
+];
 
 const Apply = () => {
   return (
@@ -31,7 +45,13 @@ const Apply = () => {
           />
           <FadeContent delay={1}>
             <p className="text-xl text-white/90 text-center max-w-3xl mx-auto">
-              Take the first step towards joining our consulting team. Fill out our interest form to stay informed about upcoming events and opportunities.
+              {applications.some(application => application.open)
+                ? `See which ${cycle} applications are open below.`
+                : `${cycle} applications are closed.`}{' '}
+              For recruitment updates, fill out the{' '}
+              <a href={interestForm} target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-4">
+                interest form
+              </a>.
             </p>
           </FadeContent>
         </div>
@@ -47,46 +67,25 @@ const Apply = () => {
         <div className="section-container">
           <div className="max-w-4xl mx-auto text-center animate-scale-in">
             <h2 className="text-4xl lg:text-5xl font-extrabold text-white mb-8">
-              Fill out our interest form to stay informed about upcoming events, or start working on your application!
+              {cycle} applications
             </h2>
-            <div className="flex flex-col sm:flex-row flex-wrap gap-4 justify-center items-center">
-              <a
-                href="https://docs.google.com/forms/d/e/1FAIpQLScRGd_jSfsG86TSIEvweEsDQ6qSc35pk3S81C0U3R1eT7LIWw/viewform?usp=header"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button
-                  size="lg"
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-4 text-base font-medium hover-scale"
-                >
-                  Consultant Application
-                </Button>
-              </a>
-              <a
-                href="https://docs.google.com/forms/d/e/1FAIpQLSc8ufeVn9KoAHKiBEY_Y2BKxA-uFw13qmfVbQLdos7HNlmj3Q/viewform?usp=header"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button
-                  size="lg"
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-4 text-base font-medium hover-scale"
-                >
-                  Technology Application
-                </Button>
-              </a>
-              <a
-                href="https://docs.google.com/forms/d/1EhjSbp5X06GLFBy6pY3oTAaHrpmnH2_0MkmDNrDGBZo/viewform"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button
-                  size="lg"
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-4 text-base font-medium hover-scale"
-                >
-                  Interest Form
-                </Button>
-              </a>
-            </div>
+            <ul className="mx-auto mb-8 max-w-md divide-y divide-border text-left">
+              {applications.map(application => (
+                <li key={application.name} className="flex items-center justify-between gap-4 py-4">
+                  {application.open ? (
+                    <a href={application.url} target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline underline-offset-4">
+                      {application.name} Application
+                    </a>
+                  ) : (
+                    <span>{application.name} Application</span>
+                  )}
+                  <span className="text-muted-foreground">{application.open ? 'Open' : 'Closed'}</span>
+                </li>
+              ))}
+            </ul>
+            <Button asChild size="lg">
+              <a href={interestForm} target="_blank" rel="noopener noreferrer">Interest Form</a>
+            </Button>
           </div>
         </div>
       </section>
