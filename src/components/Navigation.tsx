@@ -176,6 +176,9 @@ export default function Navigation() {
           <Button
             variant="ghost"
             size="icon"
+            aria-label={isMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={isMenuOpen}
+            aria-controls="mobile-navigation"
             onClick={() => setIsMenuOpen((v) => !v)}
             className="relative group"
           >
@@ -193,8 +196,9 @@ export default function Navigation() {
 
       {/* Mobile menu */}
       <div
-        className={`md:hidden absolute left-0 top-full w-full bg-background/95 backdrop-blur-md border-b border-border shadow-lg transition-all duration-300 ${
-          isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
+        id="mobile-navigation"
+        className={`md:hidden absolute left-0 top-full w-full max-h-[calc(100dvh-100%)] overflow-y-auto overscroll-y-contain bg-background/95 backdrop-blur-md border-b border-border shadow-lg transition-all duration-300 ${
+          isMenuOpen ? 'visible opacity-100 translate-y-0' : 'invisible opacity-0 -translate-y-4 pointer-events-none'
         }`}
       >
         <div className="flex flex-col space-y-2 p-4">
@@ -202,6 +206,7 @@ export default function Navigation() {
           <div className="flex items-center space-x-2 mt-4 px-2">
             <a
               href="https://www.linkedin.com/company/otcr-consulting/about/"
+              aria-label="OTCR on LinkedIn"
               target="_blank"
               rel="noopener noreferrer"
               className="rounded-full p-2 hover:bg-accent/10 transition-all duration-300 group"
@@ -210,6 +215,7 @@ export default function Navigation() {
             </a>
             <a
               href="https://www.instagram.com/otcr_consulting/?hl=en"
+              aria-label="OTCR on Instagram"
               target="_blank"
               rel="noopener noreferrer"
               className="rounded-full p-2 hover:bg-accent/10 transition-all duration-300 group"
