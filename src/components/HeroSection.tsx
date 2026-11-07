@@ -111,8 +111,8 @@ const HeroSection = () => {
       </div>
 
       {/* Enhanced scroll indicator */}
-      <FadeContent delay={1.8}>
-        <div className="absolute left-1/2 bottom-8 -translate-x-1/2 flex flex-col items-center group cursor-pointer">
+      <FadeContent delay={1.8} className="relative z-10 pt-10 pb-8">
+        <div className="flex flex-col items-center group cursor-pointer">
           <div className="relative">
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-teal-primary/20 to-blue-accent/20 border border-teal-primary/30 flex items-center justify-center group-hover:border-teal-primary transition-all duration-300 backdrop-blur-sm group-hover:bg-teal-primary/30 group-hover:scale-110 animate-bounce-slow">
               <ArrowDown className="w-5 h-5 text-teal-primary group-hover:text-white transition-colors duration-300" />
