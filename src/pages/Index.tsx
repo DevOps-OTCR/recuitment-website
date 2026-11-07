@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import HeroSection from "@/components/HeroSection";
 import Footer from "@/components/Footer";
@@ -20,6 +20,24 @@ const clients = [
   { name: "Accenture", logo: "https://cdn.brandfetch.io/id44tJQbVE/theme/dark/logo.svg?c=1bxid64Mup7aczewSAYMX&t=1667564496635"},
   { name: "Chicago Cubs", logo: "https://cdn.brandfetch.io/idRRo1C-Pw/theme/dark/logo.svg?c=1bxid64Mup7aczewSAYMX&t=1756338618356"},
 ];
+
+type BenefitLinkProps = {
+  to: string;
+  external?: boolean;
+  className: string;
+  children: React.ReactNode;
+};
+
+const BenefitLink = ({ to, external, className, children }: BenefitLinkProps) =>
+  external ? (
+    <a href={to} target="_blank" rel="noopener noreferrer" className={className}>
+      {children}
+    </a>
+  ) : (
+    <Link to={to} className={className}>
+      {children}
+    </Link>
+  );
 
 const Index = () => {
   const navigate = useNavigate();
@@ -186,27 +204,36 @@ const Index = () => {
             {[
               {
                 text: "Work directly with Fortune 500 companies and innovative startups",
+                to: "https://otcr-consulting.com",
+                external: true,
                 icon: "🏢",
                 gradient: "from-teal-primary to-teal-light",
               },
               {
                 text: "Develop critical business analysis and strategic thinking skills",
+                to: "/recruitment-resources",
                 icon: "🧠",
                 gradient: "from-blue-accent to-cyan-accent",
               },
               {
                 text: "Build your professional portfolio with meaningful accomplishments",
+                to: "/recruitment-resources",
                 icon: "📈",
                 gradient: "from-cyan-accent to-teal-primary",
               },
               {
                 text: "Connect with industry professionals and like-minded peers",
+                to: "/about",
                 icon: "🤝",
                 gradient: "from-teal-light to-blue-accent",
               },
             ].map((benefit, index) => (
               <FadeContent key={index} delay={0.4 + index * 0.1}>
-                <div className="group relative">
+                <BenefitLink
+                  to={benefit.to}
+                  external={benefit.external}
+                  className="group relative block rounded-2xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-primary focus-visible:ring-offset-4 focus-visible:ring-offset-background"
+                >
                   <div
                     className={`absolute inset-0 bg-gradient-to-br ${benefit.gradient} opacity-20 rounded-2xl blur-xl transition-all duration-500 group-hover:opacity-30 group-hover:blur-2xl`}
                   />
@@ -225,6 +252,7 @@ const Index = () => {
                     </div>
                     <div className="mt-6 flex items-center text-sm text-white/60 group-hover:text-teal-primary transition-colors duration-300">
                       <span className="mr-2">Learn more</span>
+                      {benefit.external && <span className="sr-only">(opens in a new tab)</span>}
                       <svg
                         className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1"
                         fill="currentColor"
@@ -238,7 +266,7 @@ const Index = () => {
                       </svg>
                     </div>
                   </div>
-                </div>
+                </BenefitLink>
               </FadeContent>
             ))}
           </div>
